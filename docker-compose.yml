@@ -2,65 +2,70 @@ version: '3.9'
 
 # ══════════════════════════════════════════════════════════════
 #  Dashboard Gerencial — Probolsas S.A.S.
+#  Modo: Docker Swarm + Portainer
 #  Dominio: ippgerencia.probolsas.co
-#  Requiere red externa "proxy" con Traefik corriendo
+#  Imagen: ghcr.io/pedroprobolsas/dashboardgerencial:latest
+#
+#  Variables requeridas en Portainer → Stack → Environment:
+#    GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY,
+#    SPREADSHEET_ID_1, SPREADSHEET_ID_2, PORT, CORS_ORIGINS,
+#    NODE_ENV, META_VENTAS (y demás umbrales opcionales)
 # ══════════════════════════════════════════════════════════════
 
 services:
 
-  # ── Frontend React (Nginx) ────────────────────────────────────────────────
-  frontend:
-    build:
-      context: .
-      target: frontend
-    container_name: probolsas-dashboard-frontend
-    restart: unless-stopped
-    networks:
-      - proxy
-      - internal
-    labels:
-      # Habilitar Traefik
-      - "traefik.enable=true"
-      - "traefik.docker.network=proxy"
-
-      # Router HTTPS
-      - "traefik.http.routers.probolsas-dashboard.rule=Host(`ippgerencia.probolsas.co`)"
-      - "traefik.http.routers.probolsas-dashboard.entrypoints=websecure"
-      - "traefik.http.routers.probolsas-dashboard.tls=true"
-      - "traefik.http.routers.probolsas-dashboard.tls.certresolver=letsencrypt"
-
-      # Redirigir HTTP → HTTPS
-      - "traefik.http.routers.probolsas-dashboard-http.rule=Host(`ippgerencia.probolsas.co`)"
-      - "traefik.http.routers.probolsas-dashboard-http.entrypoints=web"
-      - "traefik.http.routers.probolsas-dashboard-http.middlewares=redirect-to-https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
-
-      # Puerto del servicio
-      - "traefik.http.services.probolsas-dashboard.loadbalancer.server.port=80"
-
-  # ── Backend Express ───────────────────────────────────────────────────────
-  backend:
-    build:
-      context: .
-      target: backend
-    container_name: probolsas-dashboard-backend
-    restart: unless-stopped
+  dashboard:
+    image: ghcr.io/pedroprobolsas/dashboardgerencial:latest
     environment:
       - GOOGLE_SERVICE_ACCOUNT_EMAIL=${GOOGLE_SERVICE_ACCOUNT_EMAIL}
       - GOOGLE_PRIVATE_KEY=${GOOGLE_PRIVATE_KEY}
       - SPREADSHEET_ID_1=${SPREADSHEET_ID_1}
       - SPREADSHEET_ID_2=${SPREADSHEET_ID_2}
-      - PORT=${PORT}
-      - CORS_ORIGINS=${CORS_ORIGINS}
-      - NODE_ENV=${NODE_ENV}
+      - PORT=${PORT:-3001}
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://ippgerencia.probolsas.co}
+      - NODE_ENV=${NODE_ENV:-production}
+      - META_VENTAS=${META_VENTAS:-450000000}
+      - META_VENTAS_PCT_VERDE=${META_VENTAS_PCT_VERDE:-90}
+      - META_VENTAS_PCT_AMARILLO=${META_VENTAS_PCT_AMARILLO:-80}
+      - META_MARGEN_VERDE=${META_MARGEN_VERDE:-35}
+      - META_MARGEN_AMARILLO=${META_MARGEN_AMARILLO:-25}
+      - META_CARTERA_VERDE=${META_CARTERA_VERDE:-30000000}
+      - META_CARTERA_AMARILLO=${META_CARTERA_AMARILLO:-50000000}
+      - META_FLUJO_VERDE=${META_FLUJO_VERDE:-5000000}
+      - META_CIERRE_VERDE=${META_CIERRE_VERDE:-100}
+      - META_CIERRE_AMARILLO=${META_CIERRE_AMARILLO:-60}
     networks:
-      - internal
-    # El backend NO se expone a Traefik — solo accesible vía nginx del frontend
+      - proxy
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      # ── Labels de Traefik para Swarm (deben ir aquí, NO en el nivel service) ──
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=proxy"
+
+        # Router HTTPS
+        - "traefik.http.routers.probolsas-dashboard.rule=Host(`ippgerencia.probolsas.co`)"
+        - "traefik.http.routers.probolsas-dashboard.entrypoints=websecure"
+        - "traefik.http.routers.probolsas-dashboard.tls=true"
+        - "traefik.http.routers.probolsas-dashboard.tls.certresolver=letsencrypt"
+
+        # Redirigir HTTP → HTTPS
+        - "traefik.http.routers.probolsas-dashboard-http.rule=Host(`ippgerencia.probolsas.co`)"
+        - "traefik.http.routers.probolsas-dashboard-http.entrypoints=web"
+        - "traefik.http.routers.probolsas-dashboard-http.middlewares=redirect-to-https@docker"
+
+        # Puerto del servicio (Nginx escucha en 80)
+        - "traefik.http.services.probolsas-dashboard.loadbalancer.server.port=80"
 
 # ── Redes ─────────────────────────────────────────────────────────────────────
 networks:
   proxy:
-    external: true          # Red de Traefik — debe existir antes del deploy
-  internal:
-    driver: bridge          # Red interna frontend ↔ backend
+    external: true   # Red overlay de Traefik — debe existir antes del deploy

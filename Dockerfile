@@ -4,44 +4,44 @@
 FROM node:20-alpine AS frontend-build
 
 WORKDIR /frontend
-
-# Instalar dependencias primero (aprovecha cache de capas)
 COPY app/package*.json ./
 RUN npm ci
-
-# Copiar fuente y compilar
 COPY app/ .
 RUN npm run build
-# → Resultado en /frontend/dist
+# → /frontend/dist
 
 # ============================================================
-# Stage 2 — Servir el frontend con Nginx
-#            + proxy inverso hacia el backend en /api
+# Stage 2 — Instalar dependencias del backend
 # ============================================================
-FROM nginx:alpine AS frontend
+FROM node:20-alpine AS backend-deps
 
-# SPA compilada
-COPY --from=frontend-build /frontend/dist /usr/share/nginx/html
-
-# Configuración Nginx: SPA fallback + proxy /api → backend
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
-
-# ============================================================
-# Stage 3 — Backend Express (Node.js 20)
-# ============================================================
-FROM node:20-alpine AS backend
-
-WORKDIR /app
-
-# Solo dependencias de producción
+WORKDIR /backend
 COPY backend/package*.json ./
 RUN npm ci --omit=dev
 
-# Código fuente
-COPY backend/src/ ./src/
+# ============================================================
+# Stage 3 — Imagen de producción combinada
+#            Nginx (frontend) + Express (backend) + Supervisor
+# ============================================================
+FROM node:20-alpine AS production
 
-EXPOSE 3001
-CMD ["node", "src/index.js"]
+# Nginx + Supervisor para manejar dos procesos en un contenedor
+RUN apk add --no-cache nginx supervisor
+
+# ── Frontend ──────────────────────────────────────────────────────────────────
+COPY --from=frontend-build /frontend/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/http.d/default.conf
+
+# Remover config por defecto de Alpine Nginx
+RUN rm -f /etc/nginx/http.d/default.conf.apk-new 2>/dev/null || true
+
+# ── Backend ───────────────────────────────────────────────────────────────────
+COPY --from=backend-deps /backend/node_modules /backend/node_modules
+COPY backend/src /backend/src
+
+# ── Supervisor ────────────────────────────────────────────────────────────────
+COPY supervisord.conf /etc/supervisord.conf
+
+EXPOSE 80
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
