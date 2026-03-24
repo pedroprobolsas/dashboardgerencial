@@ -5,11 +5,6 @@ version: '3.9'
 #  Modo: Docker Swarm + Portainer
 #  Dominio: ippgerencia.probolsas.co
 #  Imagen: ghcr.io/pedroprobolsas/dashboardgerencial:latest
-#
-#  Variables requeridas en Portainer → Stack → Environment:
-#    GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY,
-#    SPREADSHEET_ID_1, SPREADSHEET_ID_2, PORT, CORS_ORIGINS,
-#    NODE_ENV, META_VENTAS (y demás umbrales opcionales)
 # ══════════════════════════════════════════════════════════════
 
 services:
@@ -36,6 +31,7 @@ services:
       - META_CIERRE_AMARILLO=${META_CIERRE_AMARILLO:-60}
     networks:
       - proxy
+      - probolsas
     deploy:
       replicas: 1
       restart_policy:
@@ -46,21 +42,15 @@ services:
         parallelism: 1
         delay: 10s
         order: start-first
-      # ── Labels de Traefik para Swarm (deben ir aquí, NO en el nivel service) ──
       labels:
         - "traefik.enable=true"
-        - "traefik.docker.network=proxy"
+        - "traefik.docker.network=probolsas"
 
         # Router HTTPS
         - "traefik.http.routers.probolsas-dashboard.rule=Host(`ippgerencia.probolsas.co`)"
         - "traefik.http.routers.probolsas-dashboard.entrypoints=websecure"
         - "traefik.http.routers.probolsas-dashboard.tls=true"
-        - "traefik.http.routers.probolsas-dashboard.tls.certresolver=letsencrypt"
-
-        # Redirigir HTTP → HTTPS
-        - "traefik.http.routers.probolsas-dashboard-http.rule=Host(`ippgerencia.probolsas.co`)"
-        - "traefik.http.routers.probolsas-dashboard-http.entrypoints=web"
-        - "traefik.http.routers.probolsas-dashboard-http.middlewares=redirect-to-https@docker"
+        - "traefik.http.routers.probolsas-dashboard.tls.certresolver=letsencryptresolver"
 
         # Puerto del servicio (Nginx escucha en 80)
         - "traefik.http.services.probolsas-dashboard.loadbalancer.server.port=80"
@@ -68,4 +58,6 @@ services:
 # ── Redes ─────────────────────────────────────────────────────────────────────
 networks:
   proxy:
-    external: true   # Red overlay de Traefik — debe existir antes del deploy
+    external: true
+  probolsas:
+    external: true
