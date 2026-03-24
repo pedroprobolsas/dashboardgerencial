@@ -106,58 +106,103 @@ El frontend proxía `/api/*` al backend en `localhost:3001` (configurado en `vit
 
 ---
 
-## Despliegue en Portainer (Docker)
+## Despliegue en Portainer — Paso a paso
 
-### Variables de entorno requeridas en el stack
+### Prerrequisitos en el servidor
 
-En Portainer → Stacks → Add stack → Web editor, define las siguientes variables de entorno antes de desplegar:
+- Docker + Portainer instalados
+- Traefik corriendo con red externa `proxy` y certresolver `letsencrypt`
+- DNS de `ippgerencia.probolsas.co` apuntando a la IP del servidor
 
-| Variable | Descripción |
-|----------|-------------|
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Email de la cuenta de servicio |
-| `GOOGLE_PRIVATE_KEY` | Clave privada completa (con `\n` literales) |
-| `SPREADSHEET_ID_1` | ID de la hoja operativa |
-| `SPREADSHEET_ID_2` | ID de la hoja de cartera/egresos |
-| `META_VENTAS` | Meta de ventas en COP (ej: `450000000`) |
-
-### docker-compose.yml (stack Portainer)
-
-```yaml
-version: '3.9'
-
-services:
-  backend:
-    build:
-      context: ./backend
-    restart: unless-stopped
-    environment:
-      - GOOGLE_SERVICE_ACCOUNT_EMAIL=${GOOGLE_SERVICE_ACCOUNT_EMAIL}
-      - GOOGLE_PRIVATE_KEY=${GOOGLE_PRIVATE_KEY}
-      - SPREADSHEET_ID_1=${SPREADSHEET_ID_1}
-      - SPREADSHEET_ID_2=${SPREADSHEET_ID_2}
-      - META_VENTAS=${META_VENTAS}
-      - PORT=3001
-    ports:
-      - "3001:3001"
-
-  frontend:
-    build:
-      context: ./app
-      args:
-        - VITE_API_URL=http://backend:3001
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
+Verificar que la red `proxy` existe:
+```bash
+docker network ls | grep proxy
+# Si no existe:
+docker network create proxy
 ```
 
-### Pasos en Portainer
+---
 
-1. Conectar el repositorio GitHub como stack source (o pegar el YAML manualmente)
-2. Definir las variables de entorno en la sección **Environment variables**
-3. Deploy the stack
-4. Acceder al dashboard en `http://<IP-VPS>:80`
+### 1. Preparar el archivo `.env` en el servidor
+
+```bash
+# En el servidor (SSH)
+mkdir -p /opt/probolsas-dashboard/backend
+cd /opt/probolsas-dashboard
+
+# Copiar .env.production.example como backend/.env y completar valores
+nano backend/.env
+```
+
+El archivo `backend/.env` debe tener todos los valores de `.env.production.example` con las credenciales reales.
+
+---
+
+### 2. Crear el stack en Portainer
+
+1. Ir a **Portainer → Stacks → + Add stack**
+2. Nombre del stack: `probolsas-dashboard`
+3. Seleccionar **Repository** como fuente:
+   - Repository URL: `https://github.com/pedroprobolsas/dashboardgerencial`
+   - Branch: `main`
+   - Compose path: `docker-compose.yml`
+4. En **Environment variables**, no es necesario agregar nada — las variables se leen desde `backend/.env` en el servidor (montado vía `env_file`)
+
+> **Alternativa**: Si usas **Web editor**, pega el contenido de `docker-compose.yml` directamente.
+
+5. Click **Deploy the stack**
+
+---
+
+### 3. Verificar el despliegue
+
+```bash
+# Ver logs del backend
+docker logs probolsas-dashboard-backend -f
+
+# Ver logs del frontend (Nginx)
+docker logs probolsas-dashboard-frontend -f
+
+# Health check del backend
+curl https://ippgerencia.probolsas.co/api/health
+```
+
+El dashboard estará disponible en: **https://ippgerencia.probolsas.co**
+
+---
+
+### 4. Actualizar tras un git push
+
+Cuando hay cambios en el código:
+
+```bash
+# Opción A — Desde Portainer UI
+# Stacks → probolsas-dashboard → Pull and redeploy
+
+# Opción B — Desde el servidor vía SSH
+cd /opt/probolsas-dashboard
+git pull origin main
+docker compose build --no-cache
+docker compose up -d
+```
+
+---
+
+### Arquitectura del despliegue
+
+```
+Internet → Traefik (SSL + dominio)
+               ↓ HTTPS
+         [frontend: Nginx :80]
+               ↓ proxy /api/*
+         [backend: Express :3001]
+               ↓ Google Sheets API v4
+          Google Spreadsheets
+```
+
+- El backend **no** está expuesto a internet — solo accesible vía Nginx interno
+- Traefik gestiona el certificado SSL automáticamente con Let's Encrypt
+- La red `internal` (bridge) comunica frontend ↔ backend de forma aislada
 
 ---
 

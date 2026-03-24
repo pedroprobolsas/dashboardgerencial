@@ -1,0 +1,29 @@
+# Dependencias (se instalan dentro del contenedor)
+**/node_modules
+
+# Variables de entorno con credenciales reales
+**/.env
+**/.env.production
+!**/.env.example
+!**/.env.production.example
+
+# Builds previos
+**/dist
+**/.vite
+
+# Artefactos de depuración
+backend/*.json
+!backend/package.json
+!backend/package-lock.json
+
+# Control de versiones
+.git
+.gitignore
+
+# Claude Code
+.claude
+
+# Editor
+.vscode
+.idea
+**/*.log

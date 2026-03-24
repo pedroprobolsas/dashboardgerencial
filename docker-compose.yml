@@ -1,0 +1,63 @@
+version: '3.9'
+
+# ══════════════════════════════════════════════════════════════
+#  Dashboard Gerencial — Probolsas S.A.S.
+#  Dominio: ippgerencia.probolsas.co
+#  Requiere red externa "proxy" con Traefik corriendo
+# ══════════════════════════════════════════════════════════════
+
+services:
+
+  # ── Frontend React (Nginx) ────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      target: frontend
+    container_name: probolsas-dashboard-frontend
+    restart: unless-stopped
+    networks:
+      - proxy
+      - internal
+    labels:
+      # Habilitar Traefik
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+
+      # Router HTTPS
+      - "traefik.http.routers.probolsas-dashboard.rule=Host(`ippgerencia.probolsas.co`)"
+      - "traefik.http.routers.probolsas-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.probolsas-dashboard.tls=true"
+      - "traefik.http.routers.probolsas-dashboard.tls.certresolver=letsencrypt"
+
+      # Redirigir HTTP → HTTPS
+      - "traefik.http.routers.probolsas-dashboard-http.rule=Host(`ippgerencia.probolsas.co`)"
+      - "traefik.http.routers.probolsas-dashboard-http.entrypoints=web"
+      - "traefik.http.routers.probolsas-dashboard-http.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+
+      # Puerto del servicio
+      - "traefik.http.services.probolsas-dashboard.loadbalancer.server.port=80"
+
+  # ── Backend Express ───────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      target: backend
+    container_name: probolsas-dashboard-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      - PORT=3001
+      - CORS_ORIGINS=https://ippgerencia.probolsas.co
+    networks:
+      - internal
+    # El backend NO se expone a Traefik — solo accesible vía nginx del frontend
+
+# ── Redes ─────────────────────────────────────────────────────────────────────
+networks:
+  proxy:
+    external: true          # Red de Traefik — debe existir antes del deploy
+  internal:
+    driver: bridge          # Red interna frontend ↔ backend
