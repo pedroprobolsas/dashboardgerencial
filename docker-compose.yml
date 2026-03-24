@@ -46,11 +46,14 @@ services:
       target: backend
     container_name: probolsas-dashboard-backend
     restart: unless-stopped
-    env_file:
-      - ./backend/.env
     environment:
-      - PORT=3001
-      - CORS_ORIGINS=https://ippgerencia.probolsas.co
+      - GOOGLE_SERVICE_ACCOUNT_EMAIL=${GOOGLE_SERVICE_ACCOUNT_EMAIL}
+      - GOOGLE_PRIVATE_KEY=${GOOGLE_PRIVATE_KEY}
+      - SPREADSHEET_ID_1=${SPREADSHEET_ID_1}
+      - SPREADSHEET_ID_2=${SPREADSHEET_ID_2}
+      - PORT=${PORT}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - NODE_ENV=${NODE_ENV}
     networks:
       - internal
     # El backend NO se expone a Traefik — solo accesible vía nginx del frontend
