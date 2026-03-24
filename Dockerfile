@@ -1,7 +1,7 @@
 # ============================================================
 # Stage 1 — Build del frontend React (Vite + TypeScript)
 # ============================================================
-FROM node:20-alpine AS frontend-build
+FROM node:20 AS frontend-build
 
 WORKDIR /frontend
 COPY app/package*.json ./
@@ -13,7 +13,7 @@ RUN npm run build
 # ============================================================
 # Stage 2 — Instalar dependencias del backend
 # ============================================================
-FROM node:20-alpine AS backend-deps
+FROM node:20 AS backend-deps
 
 WORKDIR /backend
 COPY backend/package*.json ./
