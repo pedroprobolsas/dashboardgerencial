@@ -5,7 +5,7 @@ FROM node:20 AS frontend-build
 
 WORKDIR /frontend
 COPY app/package*.json ./
-RUN npm ci
+RUN npm install
 COPY app/ .
 RUN npm run build
 # → /frontend/dist
