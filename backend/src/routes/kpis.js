@@ -11,16 +11,27 @@ const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto'
 // ── Metas desde Google Sheets con fallback a .env ─────────────────────────────
 
 const ENV_METAS = {
-  ventas_mes:          parseFloat(process.env.META_VENTAS              || '200000000'),
-  ventas_pct_verde:    parseFloat(process.env.META_VENTAS_PCT_VERDE    || '90'),
-  ventas_pct_amarillo: parseFloat(process.env.META_VENTAS_PCT_AMARILLO || '80'),
-  margen_verde:        parseFloat(process.env.META_MARGEN_VERDE        || '35'),
-  margen_amarillo:     parseFloat(process.env.META_MARGEN_AMARILLO     || '25'),
-  cartera_verde:       parseFloat(process.env.META_CARTERA_VERDE       || '30000000'),
-  cartera_amarillo:    parseFloat(process.env.META_CARTERA_AMARILLO    || '50000000'),
-  flujo_verde:         parseFloat(process.env.META_FLUJO_VERDE         || '5000000'),
-  cierre_verde:        parseFloat(process.env.META_CIERRE_VERDE        || '100'),
-  cierre_amarillo:     parseFloat(process.env.META_CIERRE_AMARILLO     || '60'),
+  ventas_mes:             parseFloat(process.env.META_VENTAS                  || '200000000'),
+  ventas_pct_verde:       parseFloat(process.env.META_VENTAS_PCT_VERDE        || '90'),
+  ventas_pct_amarillo:    parseFloat(process.env.META_VENTAS_PCT_AMARILLO     || '80'),
+  // Margen: meta objetivo (mínimo aceptable) + umbrales de semáforo
+  margen_bruto:           parseFloat(process.env.META_MARGEN_BRUTO            || '28'),
+  margen_verde:           parseFloat(process.env.META_MARGEN_VERDE            || '35'),
+  margen_amarillo:        parseFloat(process.env.META_MARGEN_AMARILLO         || '25'),
+  // Cartera / proveedores
+  cartera_verde:          parseFloat(process.env.META_CARTERA_VERDE           || '30000000'),
+  cartera_amarillo:       parseFloat(process.env.META_CARTERA_AMARILLO        || '50000000'),
+  cartera_vencida_max:    parseFloat(process.env.META_CARTERA_MAX             || '30000000'),
+  // Flujo de caja
+  flujo_verde:            parseFloat(process.env.META_FLUJO_VERDE             || '50000000'),
+  // Eficiencia producción
+  eficiencia_produccion:  parseFloat(process.env.META_EFICIENCIA              || '85'),
+  // Rotación personal
+  rotacion_personal_max:  parseFloat(process.env.META_ROTACION               || '5'),
+  // Cierres
+  cierre_mensual:         parseFloat(process.env.META_CIERRE                  || '100'),
+  cierre_verde:           parseFloat(process.env.META_CIERRE_VERDE            || '100'),
+  cierre_amarillo:        parseFloat(process.env.META_CIERRE_AMARILLO         || '60'),
 };
 
 /**
@@ -227,14 +238,18 @@ async function kpiMargenBruto({ mesLabel }, metas = {}) {
 
     const margenPct = Math.round(margenes.reduce((s, v) => s + v, 0) / margenes.length * 10) / 10;
 
+    const metaObjetivo = getMeta(metas, 'margen_bruto');
+    const umbralVerde  = getMeta(metas, 'margen_verde');
+    const umbralAmari  = getMeta(metas, 'margen_amarillo');
+
     return {
       fuente: 'real',
       valor: margenPct,
       valorFormateado: `${margenPct}%`,
-      meta: `Meta: ≥ ${getMeta(metas, 'margen_verde')}%`,
+      meta: `Meta: ≥ ${metaObjetivo}% | Verde: ≥ ${umbralVerde}%`,
       alerta: alertaColor(margenPct, {
-        verde:    v => v >= getMeta(metas, 'margen_verde'),
-        amarillo: v => v >= getMeta(metas, 'margen_amarillo'),
+        verde:    v => v >= umbralVerde,
+        amarillo: v => v >= umbralAmari,
       }),
     };
   } catch (err) {
@@ -385,7 +400,7 @@ async function kpiFlujoCaja({ mesLabel, anio }, metas = {}) {
 
 // ── KPI: Producción desde Costo_por Orden ─────────────────────────────────────
 
-async function kpiProduccion({ mesNum, anio }) {
+async function kpiProduccion({ mesNum, anio }, metas = {}) {
   try {
     const filas = await readRange(SP1, 'Costo_por Orden!A:AZ');
     if (filas.length <= 1) return { fuente: 'real', valor: 0, valorFormateado: '—' };
@@ -437,8 +452,12 @@ async function kpiProduccion({ mesNum, anio }) {
       utilidadProduccion: fmt.format(utilidad),                          // ValorCumplido - CostoEjecutado
       ahorroPresupuesto:  ahorro >= 0 ? `+${fmt.format(ahorro)}` : fmt.format(ahorro),
       ahorroNumerico:     ahorro,                                        // raw number para formatear en frontend
+      meta: `Meta: > 100% | Mín. aceptable: ${getMeta(metas, 'eficiencia_produccion')}%`,
       detalle: `${ordenes} OPs | Efic.: ${eficiencia}% | Margen: ${margenProd.toFixed(1)}% | Producido: ${fmt.format(sumValor)}`,
-      alerta: alertaColor(eficiencia, { verde: v => v > 100, amarillo: v => v >= 90 }),
+      alerta: alertaColor(eficiencia, {
+        verde:    v => v > 100,
+        amarillo: v => v >= getMeta(metas, 'eficiencia_produccion'),
+      }),
     };
   } catch (err) {
     console.error('kpiProduccion:', err.message);
@@ -536,7 +555,7 @@ async function kpiObligacionesPorVencer() {
 
 // ── KPI: Rotación de personal (desde Cierre_TalentoHumano) ───────────────────
 
-async function kpiRotacionPersonal(periodo) {
+async function kpiRotacionPersonal(periodo, metas = {}) {
   try {
     const filas = await readRange(SP1, 'Cierre_TalentoHumano!A:AZ');
     if (filas.length <= 1) {
@@ -567,15 +586,15 @@ async function kpiRotacionPersonal(periodo) {
       fuente: 'real',
       valor: rotacion,
       valorFormateado: `${rotacion}%`,
-      meta: 'Alerta si > 5%',
+      meta: `Alerta si > ${getMeta(metas, 'rotacion_personal_max')}%`,
       totalEmpleados,
       retiros,
       diasAusentismo: ausentismo,
       incidentesSeguridad: incidentes,
       detalle: `Empleados: ${totalEmpleados} | Retiros: ${retiros} | Ausentismo: ${ausentismo} días | Incidentes: ${incidentes}`,
       alerta: alertaColor(rotacion, {
-        verde:    v => v <= 3,
-        amarillo: v => v <= 5,
+        verde:    v => v <= getMeta(metas, 'rotacion_personal_max') * 0.6,  // 60% del máximo = verde
+        amarillo: v => v <= getMeta(metas, 'rotacion_personal_max'),
       }),
     };
   } catch (err) {
@@ -600,8 +619,8 @@ router.get('/', async (req, res) => {
       kpiCarteraVencida(metas),
       kpiFlujoCaja({ mesLabel, anio }, metas),
       kpiCierreMensual(periodo, metas),
-      kpiProduccion({ mesNum, anio }),
-      kpiRotacionPersonal(periodo),
+      kpiProduccion({ mesNum, anio }, metas),
+      kpiRotacionPersonal(periodo, metas),
       kpiObligacionesPorVencer(),
     ]);
 
