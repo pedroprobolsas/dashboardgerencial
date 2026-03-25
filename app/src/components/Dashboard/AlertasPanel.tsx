@@ -71,15 +71,15 @@ function generarAlertas(kpis: Record<string, KPIReal>): Alerta[] {
     });
   }
 
-  // ── 4. Cartera +90 días (incobrabilidad) ──────────────────────────────────
+  // ── 4. Deuda con proveedores >90 días ─────────────────────────────────────
   if (cartera?.d100plusRaw != null && cartera.d100plusRaw > 30_000_000) {
     alertas.push({
-      id: 'cartera-alto-riesgo',
+      id: 'deuda-proveedores-critica',
       nivel: 'rojo',
-      titulo: `Cartera +90 días: ${fmtM(cartera.d100plusRaw)} de difícil recuperación`,
-      contexto: 'Cuentas con más de 90 días vencidos tienen alta probabilidad de incobrabilidad. Esta cartera no debería contarse como cobro esperado.',
-      responsable: 'Jefe de Cartera',
-      accion: 'Iniciar gestión prejurídica',
+      titulo: `Deuda con proveedores +90 días: ${fmtM(cartera.d100plusRaw)} en mora crítica`,
+      contexto: 'Más de 90 días sin pagar a proveedores. Alto riesgo de suspensión de crédito, corte de suministros o acciones legales por parte de los proveedores.',
+      responsable: 'Gerencia + Finanzas',
+      accion: 'Negociar acuerdo de pago con proveedores críticos',
     });
   }
 

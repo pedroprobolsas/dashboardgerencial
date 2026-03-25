@@ -446,96 +446,55 @@ async function kpiProduccion({ mesNum, anio }) {
   }
 }
 
-// ── KPI: Obligaciones por vencer (desde Cuentas_por_pagar en SP2) ────────────
-// Filtra filas "Base Exenta" (una por factura), agrupa por días al vencimiento.
-// No filtra por período: muestra todas las obligaciones activas (liquidez en tiempo real).
-// Salvaguarda: excluye registros con Año < (año actual - 1) para evitar inflar
-// con datos históricos de ejercicios anteriores ya cerrados.
+// ── KPI: Obligaciones por vencer (desde CarteraPorPagarDetalladaPorTercero) ──
+// Fuente correcta: deuda ACTUAL de la empresa (solo obligaciones pendientes).
+// DiasVencidos negativo = vencida (ej: -30 = 30 días de mora).
+// DiasVencidos positivo = por vencer (ej: 15 = vence en 15 días).
+// No filtra por período: liquidez en tiempo real.
 
 async function kpiObligacionesPorVencer() {
   try {
-    const filas = await readRange(SP2, 'Cuentas_por_pagar!A:V');
+    const filas = await readRange(SP2, 'CarteraPorPagarDetalladaPorTercero!A:AZ');
     if (filas.length <= 1) return { fuente: 'real', valor: 0, valorFormateado: '$0' };
 
-    const h            = filas[0];
-    const iDetalle     = h.indexOf('DetalleLiquidacion');
-    const iTercero     = h.indexOf('Tercero');
-    const iVencim      = h.indexOf('Vencimiento');
-    const iValorNeto   = h.indexOf('ValorNeto');
-    const iAnio        = h.indexOf('Año');   // salvaguarda histórica
+    const h        = filas[0];
+    const iSaldo   = h.indexOf('Saldo');
+    const iDias    = h.indexOf('DiasVencidos');
+    // Buscar columna de nombre del proveedor (puede llamarse Tercero o NombreTercero)
+    const iTercero = h.indexOf('Tercero') !== -1 ? h.indexOf('Tercero') : h.indexOf('NombreTercero');
 
-    if (iDetalle === -1) return { fuente: 'error', detalle: 'Columna DetalleLiquidacion no encontrada en Cuentas_por_pagar' };
-
-    const anioMinimo = new Date().getFullYear() - 1;
-
-    /**
-     * Parsea fecha en formato colombiano DD/MM/YYYY o ISO YYYY-MM-DD.
-     * Si p1 > 12 el primer componente es día (DD/MM/YYYY).
-     * Si p1 <= 12 asumimos DD/MM/YYYY (estándar Colombia) y p1 = día, p2 = mes.
-     */
-    function parseVencimiento(val) {
-      if (!val) return null;
-      const s = String(val).trim();
-      const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-      if (slash) {
-        const p1 = parseInt(slash[1], 10);
-        const p2 = parseInt(slash[2], 10);
-        const anio = parseInt(slash[3], 10);
-        // DD/MM/YYYY (colombiano): día = p1, mes = p2
-        // Si p2 > 12 inválido → intentar MM/DD/YYYY como fallback
-        const dia = p2 > 12 ? p2 : p1;
-        const mes = p2 > 12 ? p1 : p2;
-        const d = new Date(anio, mes - 1, dia);
-        return isNaN(d.getTime()) ? null : d;
-      }
-      const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (iso) return new Date(parseInt(iso[1]), parseInt(iso[2]) - 1, parseInt(iso[3]));
-      const d = new Date(s);
-      return isNaN(d.getTime()) ? null : d;
+    if (iSaldo === -1 || iDias === -1) {
+      return { fuente: 'error', detalle: 'Columnas Saldo/DiasVencidos no encontradas en CarteraPorPagarDetalladaPorTercero' };
     }
-
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
 
     let totalVencido = 0;
     let d15 = 0, d30 = 0, d60 = 0, d60plus = 0;
     const porProveedor = {};
 
-    filas.slice(1)
-      .filter(f => {
-        if ((f[iDetalle] || '').toString().trim() !== 'Base Exenta') return false;
-        // Excluir registros de ejercicios anteriores a (año actual - 1)
-        if (iAnio !== -1) {
-          const anioFila = parseInt((f[iAnio] || '0').toString().replace(/[^0-9]/g, ''), 10);
-          if (anioFila > 0 && anioFila < anioMinimo) return false;
-        }
-        return true;
-      })
-      .forEach(f => {
-        const monto   = iValorNeto !== -1 ? parseCOP(f[iValorNeto]) : 0;
-        const venc    = iVencim    !== -1 ? parseVencimiento(f[iVencim]) : null;
-        const tercero = iTercero   !== -1 ? (f[iTercero] || '').toString().trim() : '';
+    filas.slice(1).forEach(f => {
+      const monto   = parseCOP(f[iSaldo]);
+      const dias    = parseInt((f[iDias] || '0').toString(), 10);
+      const tercero = iTercero !== -1 ? (f[iTercero] || '').toString().trim() : '';
 
-        if (!venc || monto <= 0) return;
+      if (!monto || isNaN(dias)) return;
 
-        const diasRestantes = Math.ceil((venc - hoy) / (1000 * 60 * 60 * 24));
+      // DiasVencidos negativo = vencida, positivo = por vencer
+      if (dias < 0) {
+        totalVencido += monto;
+      } else if (dias <= 15) {
+        d15 += monto;
+      } else if (dias <= 30) {
+        d30 += monto;
+      } else if (dias <= 60) {
+        d60 += monto;
+      } else {
+        d60plus += monto;
+      }
 
-        if (diasRestantes < 0) {
-          totalVencido += monto;
-        } else if (diasRestantes <= 15) {
-          d15 += monto;
-        } else if (diasRestantes <= 30) {
-          d30 += monto;
-        } else if (diasRestantes <= 60) {
-          d60 += monto;
-        } else {
-          d60plus += monto;
-        }
-
-        if (tercero) {
-          porProveedor[tercero] = (porProveedor[tercero] || 0) + monto;
-        }
-      });
+      if (tercero) {
+        porProveedor[tercero] = (porProveedor[tercero] || 0) + monto;
+      }
+    });
 
     const totalPorVencer = d15 + d30 + d60 + d60plus;
     const total          = totalVencido + totalPorVencer;
@@ -651,9 +610,9 @@ router.get('/', async (req, res) => {
       kpis: {
         ventas_meta:             { id: 'ventas-meta',             nombre: 'Ventas del mes vs meta',    area: 'Ventas',          ...ventas        },
         margen_bruto:            { id: 'margen-bruto',            nombre: 'Margen bruto',               area: 'Finanzas',        ...margen        },
-        cartera_vencida:         { id: 'cartera-vencida',         nombre: 'Cartera vencida',            area: 'Cartera',         ...cartera       },
-        flujo_caja:              { id: 'flujo-caja',              nombre: 'Flujo de caja disponible',   area: 'Finanzas',        ...flujo         },
-        obligaciones_por_vencer: { id: 'obligaciones-por-vencer', nombre: 'Obligaciones por vencer',   area: 'Finanzas',        ...obligaciones  },
+        cartera_vencida:         { id: 'cartera-vencida',         nombre: 'Deuda vencida con proveedores', area: 'Proveedores',  ...cartera       },
+        flujo_caja:              { id: 'flujo-caja',              nombre: 'Flujo de caja disponible',      area: 'Finanzas',     ...flujo         },
+        obligaciones_por_vencer: { id: 'obligaciones-por-vencer', nombre: 'Obligaciones por vencer',      area: 'Proveedores',  ...obligaciones  },
         cierre_mensual:          { id: 'cierre-mensual',          nombre: '% Cierre mensual',           area: 'Todas las áreas', ...cierre        },
         eficiencia_produccion:   { id: 'eficiencia-produccion',   nombre: 'Producción',                 area: 'Producción',      ...produccion    },
         rotacion_personal:       { id: 'rotacion-personal',       nombre: 'Rotación de personal',       area: 'Talento Humano',  ...rotacion      },

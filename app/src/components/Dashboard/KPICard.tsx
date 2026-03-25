@@ -10,6 +10,7 @@ const iconosArea: Record<string, string> = {
   'Ventas':         '📈',
   'Finanzas':       '💰',
   'Cartera':        '🏦',
+  'Proveedores':    '🏭',
   'Producción':     '⚙️',
   'Todas las áreas': '📋',
   'Talento Humano': '👥',
