@@ -427,6 +427,111 @@ async function kpiProduccion({ mesNum, anio }) {
   }
 }
 
+// ── KPI: Obligaciones por vencer (desde Cuentas_por_pagar en SP2) ────────────
+// Filtra filas "Base Exenta" (una por factura), agrupa por días al vencimiento.
+
+async function kpiObligacionesPorVencer() {
+  try {
+    const filas = await readRange(SP2, 'Cuentas_por_pagar!A:V');
+    if (filas.length <= 1) return { fuente: 'real', valor: 0, valorFormateado: '$0' };
+
+    const h            = filas[0];
+    const iDetalle     = h.indexOf('DetalleLiquidacion');
+    const iTercero     = h.indexOf('Tercero');
+    const iVencim      = h.indexOf('Vencimiento');
+    const iValorNeto   = h.indexOf('ValorNeto');
+
+    if (iDetalle === -1) return { fuente: 'error', detalle: 'Columna DetalleLiquidacion no encontrada en Cuentas_por_pagar' };
+
+    /** Parsea DD/MM/YYYY, MM/DD/YYYY o ISO → Date */
+    function parseVencimiento(val) {
+      if (!val) return null;
+      const s = String(val).trim();
+      const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (slash) {
+        const [, p1, p2, anio] = slash.map(Number);
+        // Heurística: si p1 > 12 es día (DD/MM/YYYY), si no intentar DD/MM/YYYY (colombiano)
+        const dia = p1 > 12 ? p1 : p1;
+        const mes = p1 > 12 ? p2 : p2;
+        const d = new Date(anio, mes - 1, dia);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (iso) return new Date(parseInt(iso[1]), parseInt(iso[2]) - 1, parseInt(iso[3]));
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    let totalVencido = 0;
+    let d15 = 0, d30 = 0, d60 = 0, d60plus = 0;
+    const porProveedor = {};
+
+    filas.slice(1)
+      .filter(f => (f[iDetalle] || '').toString().trim() === 'Base Exenta')
+      .forEach(f => {
+        const monto   = iValorNeto !== -1 ? parseCOP(f[iValorNeto]) : 0;
+        const venc    = iVencim    !== -1 ? parseVencimiento(f[iVencim]) : null;
+        const tercero = iTercero   !== -1 ? (f[iTercero] || '').toString().trim() : '';
+
+        if (!venc || monto <= 0) return;
+
+        const diasRestantes = Math.ceil((venc - hoy) / (1000 * 60 * 60 * 24));
+
+        if (diasRestantes < 0) {
+          totalVencido += monto;
+        } else if (diasRestantes <= 15) {
+          d15 += monto;
+        } else if (diasRestantes <= 30) {
+          d30 += monto;
+        } else if (diasRestantes <= 60) {
+          d60 += monto;
+        } else {
+          d60plus += monto;
+        }
+
+        if (tercero) {
+          porProveedor[tercero] = (porProveedor[tercero] || 0) + monto;
+        }
+      });
+
+    const totalPorVencer = d15 + d30 + d60 + d60plus;
+    const total          = totalVencido + totalPorVencer;
+    const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+
+    const topProveedores = Object.entries(porProveedor)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([nombre, monto]) => ({ nombre, monto: fmt.format(monto) }));
+
+    return {
+      fuente:             'real',
+      valor:              total,
+      valorFormateado:    fmt.format(total),
+      meta:               'Total obligaciones activas',
+      totalPorVencer:     fmt.format(totalPorVencer),
+      totalVencidoPorPagar: fmt.format(totalVencido),
+      desgloseVencimientos: {
+        vencido: fmt.format(totalVencido),
+        d15:     fmt.format(d15),
+        d30:     fmt.format(d30),
+        d60:     fmt.format(d60),
+        d60plus: fmt.format(d60plus),
+      },
+      topProveedores,
+      alerta: alertaColor(totalVencido, {
+        verde:    v => v <= 0,
+        amarillo: v => v <= 10_000_000,
+      }),
+    };
+  } catch (err) {
+    console.error('kpiObligacionesPorVencer:', err.message);
+    return { fuente: 'error', detalle: err.message };
+  }
+}
+
 // ── KPI: Rotación de personal (desde Cierre_TalentoHumano) ───────────────────
 
 async function kpiRotacionPersonal(periodo) {
@@ -487,7 +592,7 @@ router.get('/', async (req, res) => {
     // Cargar metas desde Sheets (con fallback a .env si falla o no existe la clave)
     const metas = await loadMetasFromSheets();
 
-    const [ventas, margen, cartera, flujo, cierre, produccion, rotacion] = await Promise.all([
+    const [ventas, margen, cartera, flujo, cierre, produccion, rotacion, obligaciones] = await Promise.all([
       kpiVentasMeta({ mesLabel, anio }, metas),
       kpiMargenBruto({ mesLabel, anio }, metas),
       kpiCarteraVencida(metas),
@@ -495,18 +600,20 @@ router.get('/', async (req, res) => {
       kpiCierreMensual(periodo, metas),
       kpiProduccion({ mesNum, anio }),
       kpiRotacionPersonal(periodo),
+      kpiObligacionesPorVencer(),
     ]);
 
     res.json({
       periodo,
       kpis: {
-        ventas_meta:          { id: 'ventas-meta',          nombre: 'Ventas del mes vs meta',    area: 'Ventas',          ...ventas     },
-        margen_bruto:         { id: 'margen-bruto',         nombre: 'Margen bruto',               area: 'Finanzas',        ...margen     },
-        cartera_vencida:      { id: 'cartera-vencida',      nombre: 'Cartera vencida',            area: 'Cartera',         ...cartera    },
-        flujo_caja:           { id: 'flujo-caja',           nombre: 'Flujo de caja disponible',   area: 'Finanzas',        ...flujo      },
-        cierre_mensual:       { id: 'cierre-mensual',       nombre: '% Cierre mensual',           area: 'Todas las áreas', ...cierre     },
-        eficiencia_produccion:{ id: 'eficiencia-produccion',nombre: 'Producción',                 area: 'Producción',      ...produccion },
-        rotacion_personal:    { id: 'rotacion-personal',    nombre: 'Rotación de personal',       area: 'Talento Humano',  ...rotacion   },
+        ventas_meta:             { id: 'ventas-meta',             nombre: 'Ventas del mes vs meta',    area: 'Ventas',          ...ventas        },
+        margen_bruto:            { id: 'margen-bruto',            nombre: 'Margen bruto',               area: 'Finanzas',        ...margen        },
+        cartera_vencida:         { id: 'cartera-vencida',         nombre: 'Cartera vencida',            area: 'Cartera',         ...cartera       },
+        flujo_caja:              { id: 'flujo-caja',              nombre: 'Flujo de caja disponible',   area: 'Finanzas',        ...flujo         },
+        obligaciones_por_vencer: { id: 'obligaciones-por-vencer', nombre: 'Obligaciones por vencer',   area: 'Finanzas',        ...obligaciones  },
+        cierre_mensual:          { id: 'cierre-mensual',          nombre: '% Cierre mensual',           area: 'Todas las áreas', ...cierre        },
+        eficiencia_produccion:   { id: 'eficiencia-produccion',   nombre: 'Producción',                 area: 'Producción',      ...produccion    },
+        rotacion_personal:       { id: 'rotacion-personal',       nombre: 'Rotación de personal',       area: 'Talento Humano',  ...rotacion      },
       },
     });
   } catch (err) {

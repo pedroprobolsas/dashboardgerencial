@@ -94,6 +94,32 @@ function adaptarKPI(raw: KPIReal): KPI {
     return { ...base, descripcionAlerta: descProd, subtitulo, filas: filas.length > 0 ? filas : undefined, subtexto: subtexto || undefined };
   }
 
+  // ── Obligaciones por vencer: total + desglose por rango de días ─────────────
+  if (raw.id === 'obligaciones-por-vencer' && raw.fuente === 'real') {
+    const descOblig = raw.alerta === 'verde' ? 'Al día' : raw.alerta === 'amarillo' ? 'Con vencidos' : 'Vencidos urgentes';
+    const dv = raw.desgloseVencimientos;
+
+    const filas: FilaGrid[] = [];
+    if (raw.totalVencidoPorPagar && raw.totalPorVencer) {
+      filas.push({
+        izq: { label: 'Vencidas', valor: raw.totalVencidoPorPagar },
+        der: { label: 'Por vencer', valor: raw.totalPorVencer },
+      });
+    }
+
+    const subtexto = dv
+      ? [
+          dv.vencido && dv.vencido !== '$ 0' ? `Vencidas: ${dv.vencido}` : null,
+          dv.d15     && dv.d15 !== '$ 0'     ? `≤15 días: ${dv.d15}` : null,
+          dv.d30     && dv.d30 !== '$ 0'     ? `16-30 días: ${dv.d30}` : null,
+          dv.d60     && dv.d60 !== '$ 0'     ? `31-60 días: ${dv.d60}` : null,
+          dv.d60plus && dv.d60plus !== '$ 0' ? `+60 días: ${dv.d60plus}` : null,
+        ].filter(Boolean).join(' | ')
+      : undefined;
+
+    return { ...base, descripcionAlerta: descOblig, filas: filas.length > 0 ? filas : undefined, subtexto: subtexto || undefined };
+  }
+
   // ── Talento Humano: rotación + desglose empleados/retiros/ausentismo ────────
   if (raw.id === 'rotacion-personal' && raw.fuente === 'real') {
     const descRot = alerta === 'verde' ? 'Normal' : alerta === 'amarillo' ? 'Moderada' : 'Alta';

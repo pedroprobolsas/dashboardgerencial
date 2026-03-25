@@ -26,6 +26,11 @@ export interface KPIReal {
   retiros?: number;
   diasAusentismo?: string;
   incidentesSeguridad?: string;
+  // Obligaciones por vencer
+  totalPorVencer?: string;
+  totalVencidoPorPagar?: string;
+  desgloseVencimientos?: { vencido?: string; d15?: string; d30?: string; d60?: string; d60plus?: string };
+  topProveedores?: Array<{ nombre: string; monto: string }>;
 }
 
 export interface InformeBandeja {
