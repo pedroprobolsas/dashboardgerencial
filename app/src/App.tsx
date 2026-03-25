@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Layout from './components/Layout/Layout';
 import { type Vista } from './components/Layout/Sidebar';
 import KPICard from './components/Dashboard/KPICard';
+import AlertasPanel from './components/Dashboard/AlertasPanel';
 import CierreVentasForm from './components/Forms/CierreVentasForm';
 import CierreFinanzasForm from './components/Forms/CierreFinanzasForm';
 import CierreProduccionForm from './components/Forms/CierreProduccionForm';
@@ -42,13 +43,19 @@ function adaptarKPI(raw: KPIReal): KPI {
     };
   }
 
-  // ── Flujo de caja: desglose ingresos/egresos limpio dentro de la tarjeta ──
+  // ── Flujo de caja: desglose ingresos/egresos + días de caja disponibles ───
   if (raw.id === 'flujo-caja') {
     const descFlujo = alerta === 'verde' ? 'Flujo positivo' : alerta === 'amarillo' ? 'Flujo bajo' : 'Flujo negativo';
+    const diasLabel = raw.diasCajaDisponibles != null
+      ? (raw.diasCajaDisponibles < 1
+          ? 'Runway: < 1 día'
+          : `Runway: ${raw.diasCajaDisponibles.toFixed(1)} días`)
+      : null;
+    const subtexto = [raw.detalle, diasLabel].filter(Boolean).join(' | ');
     return {
       ...base,
       descripcionAlerta: descFlujo,
-      subtexto: raw.detalle,
+      subtexto: subtexto || undefined,
     };
   }
 
@@ -165,6 +172,7 @@ function generarPeriodos(): string[] {
 function Dashboard() {
   const [periodo, setPeriodo] = useState<string>(periodoActual);
   const [kpisData, setKpisData] = useState<KPI[]>(kpisMock);
+  const [rawKpisMap, setRawKpisMap] = useState<Record<string, KPIReal>>({});
   const [cargando, setCargando] = useState(true);
   const [errorAPI, setErrorAPI] = useState<string | null>(null);
 
@@ -173,6 +181,7 @@ function Dashboard() {
     setErrorAPI(null);
     fetchKPIs(periodo)
       .then(resp => {
+        setRawKpisMap(resp.kpis);
         const adaptados = Object.values(resp.kpis).map(adaptarKPI);
         setKpisData(adaptados);
       })
@@ -221,6 +230,10 @@ function Dashboard() {
           {cargando ? 'Cargando datos…' : errorAPI ? 'Usando datos de respaldo' : 'Datos en tiempo real — Google Sheets'}
         </span>
       </div>
+
+      {!cargando && !errorAPI && Object.keys(rawKpisMap).length > 0 && (
+        <AlertasPanel kpis={rawKpisMap} />
+      )}
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
         {kpisData.map(kpi => (

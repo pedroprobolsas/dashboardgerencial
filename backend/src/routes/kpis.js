@@ -265,6 +265,11 @@ async function kpiCarteraVencida(metas = {}) {
       .filter(f => { const d = parseInt(f[iDias] || '0', 10); return d <= desde && d > hasta; })
       .reduce((s, f) => s + parseCOP(f[iSaldo]), 0);
 
+    const raw30      = sumaRango(-1,   -31);
+    const raw60      = sumaRango(-31,  -61);
+    const raw90      = sumaRango(-61,  -91);
+    const raw100plus = sumaRango(-91, -Infinity);
+
     const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
     return {
@@ -273,11 +278,13 @@ async function kpiCarteraVencida(metas = {}) {
       valorFormateado: fmt.format(totalVencido),
       meta: `Umbral: < $${(getMeta(metas, 'cartera_verde') / 1_000_000).toFixed(0)}M`,
       desglose: {
-        d30:     fmt.format(sumaRango(-1,   -31)),   // 1-30 días
-        d60:     fmt.format(sumaRango(-31,  -61)),   // 31-60 días
-        d90:     fmt.format(sumaRango(-61,  -91)),   // 61-90 días
-        d100plus:fmt.format(sumaRango(-91, -Infinity)), // +90 días
+        d30:      fmt.format(raw30),
+        d60:      fmt.format(raw60),
+        d90:      fmt.format(raw90),
+        d100plus: fmt.format(raw100plus),
       },
+      d30Raw:      raw30,      // cartera 1-30 días (para cálculo brecha)
+      d100plusRaw: raw100plus, // cartera +90 días (para alerta incobrabilidad)
       alerta: alertaColor(totalVencido, {
         verde:    v => v < getMeta(metas, 'cartera_verde'),
         amarillo: v => v <= getMeta(metas, 'cartera_amarillo'),
@@ -347,12 +354,20 @@ async function kpiFlujoCaja({ mesLabel, anio }, metas = {}) {
     const flujo = ingresos - egresos;
     const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
+    // Días de caja: cuántos días de egresos cubre el flujo actual (22 días hábiles/mes)
+    const diasCajaDisponibles = egresos > 0
+      ? parseFloat((flujo / (egresos / 22)).toFixed(1))
+      : null;
+
     return {
       fuente: 'real',
       valor: flujo,
       valorFormateado: fmt.format(flujo),
       meta: 'Alerta si negativo',
       detalle: `Ingresos: ${fmt.format(ingresos)} | Egresos: ${fmt.format(egresos)}`,
+      egresosRaw: egresos,
+      flujoRaw:   flujo,
+      diasCajaDisponibles,
       alerta: alertaColor(flujo, {
         verde:    v => v > getMeta(metas, 'flujo_verde'),
         amarillo: v => v >= 0,
@@ -521,6 +536,9 @@ async function kpiObligacionesPorVencer() {
         d60plus: fmt.format(d60plus),
       },
       topProveedores,
+      totalVencidoRaw: totalVencido,  // para cálculo brecha en frontend
+      d15Raw:          d15,
+      d30Raw:          d30,
       alerta: alertaColor(totalVencido, {
         verde:    v => v <= 0,
         amarillo: v => v <= 10_000_000,

@@ -31,6 +31,16 @@ export interface KPIReal {
   totalVencidoPorPagar?: string;
   desgloseVencimientos?: { vencido?: string; d15?: string; d30?: string; d60?: string; d60plus?: string };
   topProveedores?: Array<{ nombre: string; monto: string }>;
+  // Raw numbers para cálculos en AlertasPanel (flujo_caja)
+  egresosRaw?: number;
+  flujoRaw?: number;
+  diasCajaDisponibles?: number;
+  // Raw numbers para cálculos en AlertasPanel (cartera_vencida)
+  d30Raw?: number;
+  d100plusRaw?: number;
+  // Raw numbers para cálculos en AlertasPanel (obligaciones_por_vencer)
+  totalVencidoRaw?: number;
+  d15Raw?: number;
 }
 
 export interface InformeBandeja {
