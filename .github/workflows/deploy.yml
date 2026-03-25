@@ -1,0 +1,66 @@
+name: 🚀 Build y Deploy — Dashboard Probolsas
+
+# Se ejecuta automáticamente cuando haces "git push" a la rama main
+on:
+  push:
+    branches: [main]
+
+  # También permite ejecutarlo manualmente desde GitHub.com si lo necesitas
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: Construir imagen y subir a ghcr.io
+    runs-on: ubuntu-latest
+
+    # Permisos para subir la imagen al registro de GitHub
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+
+      # 1. Descarga el código del repositorio
+      - name: 📥 Descargar código
+        uses: actions/checkout@v4
+
+      # 2. Login automático en ghcr.io con el token de GitHub (sin configuración extra)
+      - name: 🔐 Login en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 3. Construye y sube la imagen (usa caché para que sea más rápido en el 2do push)
+      - name: 🐳 Construir y subir imagen Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: production
+          push: true
+          tags: |
+            ghcr.io/pedroprobolsas/dashboardgerencial:latest
+            ghcr.io/pedroprobolsas/dashboardgerencial:${{ github.sha }}
+          # Caché entre builds — el 2do push en adelante tarda ~2 min en vez de 5
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 4. Avisa a Portainer que hay una nueva imagen para que redeploy automático
+      #    (Solo funciona si configuraste el webhook — ver instrucciones abajo)
+      - name: 🔄 Actualizar stack en Portainer
+        if: ${{ secrets.PORTAINER_WEBHOOK_URL != '' }}
+        run: |
+          echo "Enviando señal a Portainer para actualizar el stack..."
+          curl -s -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"
+          echo "✅ Portainer notificado"
+
+      # 5. Resumen final en la pantalla de GitHub Actions
+      - name: 📋 Resumen del deploy
+        run: |
+          echo "### ✅ Deploy completado" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Imagen:** ghcr.io/pedroprobolsas/dashboardgerencial:latest" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Rama:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Sitio:** https://ippgerencia.probolsas.co" >> $GITHUB_STEP_SUMMARY
