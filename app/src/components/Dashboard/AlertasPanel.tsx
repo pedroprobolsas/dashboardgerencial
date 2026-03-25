@@ -21,7 +21,7 @@ function generarAlertas(kpis: Record<string, KPIReal>): Alerta[] {
   const cierre       = kpis['cierre_mensual'];
 
   // ── 1. Días de caja disponibles ────────────────────────────────────────────
-  if (flujo?.diasCajaDisponibles != null) {
+  if (flujo?.diasCajaDisponibles != null && !flujo.sinDatos) {
     const dias = flujo.diasCajaDisponibles;
     if (dias < 7) {
       const diasLabel = dias < 1 ? 'menos de 1 día' : `${dias.toFixed(1)} días`;
@@ -84,7 +84,7 @@ function generarAlertas(kpis: Record<string, KPIReal>): Alerta[] {
   }
 
   // ── 5. Margen bruto ────────────────────────────────────────────────────────
-  if (margen?.valor != null && margen.fuente === 'real') {
+  if (margen?.valor != null && margen.fuente === 'real' && !margen.sinDatos) {
     if (margen.valor < 25) {
       alertas.push({
         id: 'margen-critico',

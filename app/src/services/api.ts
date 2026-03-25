@@ -6,6 +6,7 @@ export interface KPIReal {
   nombre: string;
   area: string;
   fuente: 'real' | 'pendiente_mapeo' | 'cierre_produccion' | 'cierre_talento_humano' | 'error';
+  sinDatos?: boolean;   // true cuando el período no tiene registros (evita falsas alarmas)
   valor?: number;
   valorFormateado?: string;
   valorAbsoluto?: string;

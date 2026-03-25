@@ -175,13 +175,17 @@ async function kpiVentasMeta({ mesLabel, anio }, metas = {}) {
     if (iValor === -1 || iMes === -1) return { fuente: 'error', detalle: 'Columnas ValorFacturado/MES no encontradas' };
 
     // Filtro: solo por MES (minúsculas sin tilde). La hoja ya está segmentada por periodo.
-    const total = filas.slice(1)
-      .filter(f => (f[iMes] || '').toString().toLowerCase().trim() === mesLabel)
-      .reduce((sum, f) => sum + parseCOP(f[iValor]), 0);
+    const filasPeriodo = filas.slice(1)
+      .filter(f => (f[iMes] || '').toString().toLowerCase().trim() === mesLabel);
 
+    if (filasPeriodo.length === 0) {
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin facturas este período', alerta: 'amarillo' };
+    }
+
+    const total      = filasPeriodo.reduce((sum, f) => sum + parseCOP(f[iValor]), 0);
     const metaVentas = getMeta(metas, 'ventas_mes');
-    const pct = Math.round((total / metaVentas) * 100);
-    const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+    const pct        = Math.round((total / metaVentas) * 100);
+    const fmt        = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
     return {
       fuente: 'real',
@@ -219,7 +223,7 @@ async function kpiMargenBruto({ mesLabel }, metas = {}) {
       .map(f => parsePct(f[iMargen]))
       .filter(v => v !== null && !isNaN(v));
 
-    if (margenes.length === 0) return { fuente: 'real', valor: 0, valorFormateado: '0%', meta: 'Sin facturas este período' };
+    if (margenes.length === 0) return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin facturas este período', alerta: 'amarillo' };
 
     const margenPct = Math.round(margenes.reduce((s, v) => s + v, 0) / margenes.length * 10) / 10;
 
@@ -444,6 +448,9 @@ async function kpiProduccion({ mesNum, anio }) {
 
 // ── KPI: Obligaciones por vencer (desde Cuentas_por_pagar en SP2) ────────────
 // Filtra filas "Base Exenta" (una por factura), agrupa por días al vencimiento.
+// No filtra por período: muestra todas las obligaciones activas (liquidez en tiempo real).
+// Salvaguarda: excluye registros con Año < (año actual - 1) para evitar inflar
+// con datos históricos de ejercicios anteriores ya cerrados.
 
 async function kpiObligacionesPorVencer() {
   try {
@@ -455,19 +462,29 @@ async function kpiObligacionesPorVencer() {
     const iTercero     = h.indexOf('Tercero');
     const iVencim      = h.indexOf('Vencimiento');
     const iValorNeto   = h.indexOf('ValorNeto');
+    const iAnio        = h.indexOf('Año');   // salvaguarda histórica
 
     if (iDetalle === -1) return { fuente: 'error', detalle: 'Columna DetalleLiquidacion no encontrada en Cuentas_por_pagar' };
 
-    /** Parsea DD/MM/YYYY, MM/DD/YYYY o ISO → Date */
+    const anioMinimo = new Date().getFullYear() - 1;
+
+    /**
+     * Parsea fecha en formato colombiano DD/MM/YYYY o ISO YYYY-MM-DD.
+     * Si p1 > 12 el primer componente es día (DD/MM/YYYY).
+     * Si p1 <= 12 asumimos DD/MM/YYYY (estándar Colombia) y p1 = día, p2 = mes.
+     */
     function parseVencimiento(val) {
       if (!val) return null;
       const s = String(val).trim();
       const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
       if (slash) {
-        const [, p1, p2, anio] = slash.map(Number);
-        // Heurística: si p1 > 12 es día (DD/MM/YYYY), si no intentar DD/MM/YYYY (colombiano)
-        const dia = p1 > 12 ? p1 : p1;
-        const mes = p1 > 12 ? p2 : p2;
+        const p1 = parseInt(slash[1], 10);
+        const p2 = parseInt(slash[2], 10);
+        const anio = parseInt(slash[3], 10);
+        // DD/MM/YYYY (colombiano): día = p1, mes = p2
+        // Si p2 > 12 inválido → intentar MM/DD/YYYY como fallback
+        const dia = p2 > 12 ? p2 : p1;
+        const mes = p2 > 12 ? p1 : p2;
         const d = new Date(anio, mes - 1, dia);
         return isNaN(d.getTime()) ? null : d;
       }
@@ -485,7 +502,15 @@ async function kpiObligacionesPorVencer() {
     const porProveedor = {};
 
     filas.slice(1)
-      .filter(f => (f[iDetalle] || '').toString().trim() === 'Base Exenta')
+      .filter(f => {
+        if ((f[iDetalle] || '').toString().trim() !== 'Base Exenta') return false;
+        // Excluir registros de ejercicios anteriores a (año actual - 1)
+        if (iAnio !== -1) {
+          const anioFila = parseInt((f[iAnio] || '0').toString().replace(/[^0-9]/g, ''), 10);
+          if (anioFila > 0 && anioFila < anioMinimo) return false;
+        }
+        return true;
+      })
       .forEach(f => {
         const monto   = iValorNeto !== -1 ? parseCOP(f[iValorNeto]) : 0;
         const venc    = iVencim    !== -1 ? parseVencimiento(f[iVencim]) : null;
