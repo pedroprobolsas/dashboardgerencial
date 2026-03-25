@@ -625,6 +625,28 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/kpis/metas-debug
+ * Muestra el contenido crudo de Metas_Gerencia y el mapa resultante.
+ * Útil para diagnosticar por qué una meta no se lee correctamente.
+ */
+router.get('/metas-debug', async (req, res) => {
+  try {
+    const filas = await readRange(SP1, 'Metas_Gerencia!A:G');
+    const mapa  = await loadMetasFromSheets();
+    res.json({
+      headers:        filas[0]  || [],
+      filas_raw:      filas.slice(1),
+      mapa_resultante: mapa,
+      claves_internas_esperadas: Object.keys(ENV_METAS),
+      claves_cargadas_desde_sheet: Object.keys(mapa),
+      claves_sin_match: Object.keys(ENV_METAS).filter(k => mapa[k] === undefined),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/kpis/headers/:spreadsheet/:sheet
  */
 router.get('/headers/:spreadsheet/:sheet', async (req, res) => {
