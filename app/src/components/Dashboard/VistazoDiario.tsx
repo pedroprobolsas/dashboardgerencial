@@ -1,11 +1,10 @@
 import React from 'react';
 import { type KPIDiario } from '../../services/api';
+import { type AlertaColor } from '../../data/kpis';
 
 interface Props {
   data: KPIDiario;
 }
-
-type AlertaColor = 'verde' | 'amarillo' | 'rojo';
 
 const coloresAlerta: Record<AlertaColor, { fondo: string; punto: string; texto: string; borde: string }> = {
   verde:    { fondo: 'bg-emerald-50',  punto: 'bg-emerald-500', texto: 'text-emerald-700',  borde: 'border-emerald-200' },
