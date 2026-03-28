@@ -1,5 +1,6 @@
 export type Vista =
   | 'dashboard'
+  | 'vista-diaria'
   | 'cierre-ventas'
   | 'cierre-finanzas'
   | 'cierre-produccion'
@@ -20,7 +21,8 @@ interface NavItem {
 }
 
 const itemsDashboard: NavItem[] = [
-  { id: 'dashboard', etiqueta: 'Dashboard', icono: '▦' },
+  { id: 'dashboard',    etiqueta: 'Dashboard',    icono: '▦' },
+  { id: 'vista-diaria', etiqueta: 'Vistazo Diario', icono: '📅' },
 ];
 
 const itemsCierre: NavItem[] = [

@@ -44,6 +44,25 @@ export interface KPIReal {
   d15Raw?: number;
 }
 
+export interface KPIDiario {
+  hoy: {
+    ventas:     { valor: string; alerta: 'verde' | 'amarillo' | 'rojo' };
+    egresos:    { valor: string; alerta: 'verde' | 'amarillo' | 'rojo' };
+    cobros:     { valor: string; alerta: 'verde' | 'amarillo' | 'rojo' };
+    saldo_neto: { valor: string; alerta: 'verde' | 'amarillo' | 'rojo' };
+    crudo: { ventasHoy: number; egresosHoy: number; cobrosHoy: number };
+  };
+  mes: {
+    ventas:     { valor: string; alerta: 'verde' | 'amarillo' | 'rojo' };
+    egresos:    { valor: string; alerta: 'verde' | 'amarillo' | 'rojo' };
+    cobros:     { valor: string; alerta: 'verde' | 'amarillo' | 'rojo' };
+    flujo_neto: { valor: string; alerta: 'verde' | 'amarillo' | 'rojo' };
+    meta_ventas: string;
+    pct_ventas: string;
+    crudo: { ventasMes: number; egresosMes: number; cobrosMes: number; metaVentas: number };
+  };
+}
+
 export interface InformeBandeja {
   ID_Registro: string;
   Período: string;
@@ -64,6 +83,7 @@ export async function fetchBandeja(): Promise<{ informes: InformeBandeja[] }> {
 export interface RespuestaKPIs {
   periodo: string;
   kpis: Record<string, KPIReal>;
+  diario?: KPIDiario;
 }
 
 export async function fetchKPIs(periodo?: string): Promise<RespuestaKPIs> {

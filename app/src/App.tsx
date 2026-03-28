@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout/Layout';
 import { type Vista } from './components/Layout/Sidebar';
 import KPICard from './components/Dashboard/KPICard';
@@ -10,7 +10,8 @@ import CierreCarteraForm from './components/Forms/CierreCarteraForm';
 import CierreTalentoHumanoForm from './components/Forms/CierreTalentoHumanoForm';
 import BandejaAprobacion from './components/Aprobaciones/BandejaAprobacion';
 import { kpis as kpisMock, type KPI, type AlertaColor, type FilaGrid } from './data/kpis';
-import { fetchKPIs, enviarCierre, actualizarEstadoCierre, fetchBandeja, type KPIReal } from './services/api';
+import { fetchKPIs, enviarCierre, actualizarEstadoCierre, fetchBandeja, type KPIReal, type KPIDiario } from './services/api';
+import VistazoDiario from './components/Dashboard/VistazoDiario';
 import type { InformeCierre, AreaCierre } from './types/cierres';
 
 // ── Adaptador: KPIReal (backend) → KPI (componente tarjeta) ──────────────────
@@ -250,6 +251,53 @@ function Dashboard() {
   );
 }
 
+// ── Vista Diario (Nueva) ───────────────────────────────────────────────────────
+
+function DailyDashboard() {
+  const [diario, setDiario] = useState<KPIDiario | null>(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchKPIs() // El backend ya inyecta el sumario diario en el response de /api/kpis
+      .then(resp => {
+        if (resp.diario) setDiario(resp.diario);
+        else setError('No hay datos diarios disponibles');
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setCargando(false));
+  }, []);
+
+  const ahora = new Date();
+  const saludo = ahora.getHours() < 12 ? 'Buenos días' : ahora.getHours() < 18 ? 'Buenas tardes' : 'Buenas noches';
+  const fechaFormateada = ahora.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  return (
+    <div className="max-w-7xl mx-auto">
+      <header className="mb-10 flex justify-between items-center">
+        <div>
+          <h2 className="text-3xl font-bold capitalize">{saludo}, Pedro</h2>
+          <p className="text-dashboard-textMuted text-sm mt-1 capitalize">{fechaFormateada}</p>
+        </div>
+        <div className="w-10 h-10 rounded-full bg-probolsas-navy flex items-center justify-center text-white font-bold text-sm">PS</div>
+      </header>
+
+      {cargando ? (
+        <div className="flex items-center justify-center h-64">
+          <p className="text-dashboard-textMuted animate-pulse">Obteniendo datos de hoy…</p>
+        </div>
+      ) : error ? (
+        <div className="bg-amber-50 border border-amber-200 p-6 rounded-3xl text-amber-800">
+          <p className="font-bold mb-1">Hubo un problema al cargar el vistazo diario</p>
+          <p className="text-sm opacity-80">{error}</p>
+        </div>
+      ) : diario ? (
+        <VistazoDiario data={diario} />
+      ) : null}
+    </div>
+  );
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -346,6 +394,7 @@ export default function App() {
         </div>
       )}
       {vistaActual === 'dashboard'              && <Dashboard />}
+      {vistaActual === 'vista-diaria'           && <DailyDashboard />}
       {vistaActual === 'cierre-ventas'          && <CierreVentasForm         onEnviar={registrarEnvio} />}
       {vistaActual === 'cierre-finanzas'        && <CierreFinanzasForm       onEnviar={registrarEnvio} />}
       {vistaActual === 'cierre-produccion'      && <CierreProduccionForm     onEnviar={registrarEnvio} />}

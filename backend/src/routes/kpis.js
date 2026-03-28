@@ -553,6 +553,133 @@ async function kpiObligacionesPorVencer() {
   }
 }
 
+// ── KPI: Vistazo Diario (Hoy y Mes al Día) ───────────────────────────────────
+
+async function kpiDiario(metas = {}) {
+  try {
+    // ── Tiempo en Colombia (UTC-5) ──
+    const ahora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+    const hoyD   = ahora.getDate();
+    const hoyM   = ahora.getMonth() + 1;
+    const hoyY   = ahora.getFullYear();
+
+    const [filasVentas, filasIngr, filasEgr] = await Promise.all([
+      readRange(SP1, 'Facturacion_OP!A:AZ'),
+      readRange(SP1, 'LISTADO_DE_INGRESOS!A:AZ'),
+      readRange(SP2, 'Consecutivo_de_egresos!A:AZ'),
+    ]);
+
+    const parseFecha = (val) => {
+      if (!val) return null;
+      const s = String(val).trim();
+      // Formato DD/MM/YYYY
+      const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (dmy) return { d: parseInt(dmy[1], 10), m: parseInt(dmy[2], 10), y: parseInt(dmy[3], 10) };
+      // Formato YYYY-MM-DD
+      const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (iso) return { y: parseInt(iso[1], 10), m: parseInt(iso[2], 10), d: parseInt(iso[3], 10) };
+      return null;
+    };
+
+    const esHoy = (fObj) => fObj && fObj.d === hoyD && fObj.m === hoyM && fObj.y === hoyY;
+    const esMesActual = (fObj) => fObj && fObj.m === hoyM && fObj.y === hoyY;
+
+    // 1. VENTAS
+    const hV = filasVentas[0] || [];
+    const iValV = hV.indexOf('ValorFacturado');
+    const iFecV = hV.findIndex(h => ['FechaContable', 'Fecha', 'FECHA'].includes(h));
+    let ventasHoy = 0, ventasMes = 0;
+    if (iValV !== -1 && iFecV !== -1) {
+      filasVentas.slice(1).forEach(f => {
+        const fecha = parseFecha(f[iFecV]);
+        const monto = parseCOP(f[iValV]);
+        if (esHoy(fecha)) ventasHoy += monto;
+        if (esMesActual(fecha)) ventasMes += monto;
+      });
+    }
+
+    // 2. INGRESOS (COBROS)
+    const hI = filasIngr[0] || [];
+    const iValI = hI.indexOf('ValorRecibido');
+    const iFecI = hI.findIndex(h => ['Fecha', 'FECHA', 'FechaContable'].includes(h));
+    const iIngLiq = hI.indexOf('IngresoLiquidacion');
+    let cobrosHoy = 0, cobrosMes = 0;
+    if (iValI !== -1 && iFecI !== -1) {
+      filasIngr.slice(1).forEach(f => {
+        const liq = iIngLiq !== -1 ? (f[iIngLiq] || '').toString().trim() : '';
+        if (liq !== '') return;
+        const fecha = parseFecha(f[iFecI]);
+        const monto = parseCOP(f[iValI]);
+        if (esHoy(fecha)) cobrosHoy += monto;
+        if (esMesActual(fecha)) cobrosMes += monto;
+      });
+    }
+
+    // 3. EGRESOS
+    const hE = filasEgr[0] || [];
+    const iValE = hE.findIndex(h => ['NetoPagar2', 'Valor', 'Neto'].includes(h));
+    const iFecE = hE.findIndex(h => ['Fecha', 'FECHA', 'FechaContable'].includes(h));
+    const iEgrLiq = hE.indexOf('EgresoLiquidacion');
+    const iMedioPago = hE.indexOf('MedioPago1');
+    let egresosHoy = 0, egresosMes = 0;
+    if (iValE !== -1 && iFecE !== -1) {
+      filasEgr.slice(1).forEach(f => {
+        if (iEgrLiq !== -1 && (f[iEgrLiq] || '').toString().trim() !== 'Base Exenta') return;
+        if (iMedioPago !== -1 && (f[iMedioPago] || '').toString().toUpperCase().includes('CRUCE')) return;
+        const fecha = parseFecha(f[iFecE]);
+        const monto = parseCOP(f[iValE]);
+        if (esHoy(fecha)) egresosHoy += monto;
+        if (esMesActual(fecha)) egresosMes += monto;
+      });
+    }
+
+    const metaVentas = getMeta(metas, 'ventas_mes');
+    const pctVentasMes = metaVentas > 0 ? (ventasMes / metaVentas) * 100 : 0;
+    const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+
+    const saldoHoy = cobrosHoy - egresosHoy;
+    const flujoMes = cobrosMes - egresosMes;
+
+    return {
+      hoy: {
+        ventas:     { valor: fmt.format(ventasHoy),  alerta: ventasHoy > 0 ? 'verde' : 'amarillo' },
+        egresos:    { valor: fmt.format(egresosHoy), alerta: 'rojo' }, // Egresos se ven en rojo
+        cobros:     { valor: fmt.format(cobrosHoy),  alerta: 'verde' },
+        saldo_neto: { valor: fmt.format(saldoHoy),   alerta: saldoHoy >= 0 ? 'verde' : 'rojo' },
+        crudo: { ventasHoy, egresosHoy, cobrosHoy }
+      },
+      mes: {
+        ventas:     { 
+          valor: fmt.format(ventasMes), 
+          alerta: pctVentasMes >= getMeta(metas, 'ventas_pct_verde') ? 'verde' : 
+                  pctVentasMes >= getMeta(metas, 'ventas_pct_amarillo') ? 'amarillo' : 'rojo' 
+        },
+        egresos:    { valor: fmt.format(egresosMes), alerta: 'rojo' },
+        cobros:     { valor: fmt.format(cobrosMes),  alerta: 'verde' },
+        flujo_neto: { valor: fmt.format(flujoMes),   alerta: flujoMes >= 0 ? 'verde' : 'rojo' },
+        meta_ventas:    fmt.format(metaVentas),
+        pct_ventas:     `${Math.round(pctVentasMes)}%`,
+        crudo: { ventasMes, egresosMes, cobrosMes, metaVentas }
+      }
+    };
+  } catch (err) {
+    console.error('kpiDiario error:', err.message);
+    throw err;
+  }
+}
+
+// ── GET /api/kpis/diario ──────────────────────────────────────────────────────
+
+router.get('/diario', async (req, res) => {
+  try {
+    const metas = await loadMetasFromSheets();
+    const data = await kpiDiario(metas);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── KPI: Rotación de personal (desde Cierre_TalentoHumano) ───────────────────
 
 async function kpiRotacionPersonal(periodo, metas = {}) {
@@ -613,7 +740,7 @@ router.get('/', async (req, res) => {
     // Cargar metas desde Sheets (con fallback a .env si falla o no existe la clave)
     const metas = await loadMetasFromSheets();
 
-    const [ventas, margen, cartera, flujo, cierre, produccion, rotacion, obligaciones] = await Promise.all([
+    const [ventas, margen, cartera, flujo, cierre, produccion, rotacion, obligaciones, diario] = await Promise.all([
       kpiVentasMeta({ mesLabel, anio }, metas),
       kpiMargenBruto({ mesLabel, anio }, metas),
       kpiCarteraVencida(metas),
@@ -622,6 +749,7 @@ router.get('/', async (req, res) => {
       kpiProduccion({ mesNum, anio }, metas),
       kpiRotacionPersonal(periodo, metas),
       kpiObligacionesPorVencer(),
+      kpiDiario(metas).catch(() => null),
     ]);
 
     res.json({
@@ -636,6 +764,7 @@ router.get('/', async (req, res) => {
         eficiencia_produccion:   { id: 'eficiencia-produccion',   nombre: 'Producción',                 area: 'Producción',      ...produccion    },
         rotacion_personal:       { id: 'rotacion-personal',       nombre: 'Rotación de personal',       area: 'Talento Humano',  ...rotacion      },
       },
+      diario,
     });
   } catch (err) {
     console.error('GET /api/kpis error:', err.message);
