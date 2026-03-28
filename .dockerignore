@@ -1,6 +1,10 @@
 # Dependencias (se instalan dentro del contenedor)
 **/node_modules
 
+# Lock files de Windows — el contenedor Linux los regenera limpio
+app/package-lock.json
+app/yarn.lock
+
 # Variables de entorno con credenciales reales
 **/.env
 **/.env.production

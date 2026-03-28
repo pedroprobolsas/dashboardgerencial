@@ -618,10 +618,16 @@ async function kpiDiario(metas = {}) {
     // 3. EGRESOS
     const hE = filasEgr[0] || [];
     const iValE = hE.findIndex(h => ['NetoPagar2', 'Valor', 'Neto'].includes(h));
-    const iFecE = hE.findIndex(h => ['Fecha', 'FECHA', 'FechaContable'].includes(h));
+    const iFecE = hE.findIndex(h => ['Fecha1', 'Fecha', 'FECHA', 'FechaContable'].includes(h));
     const iEgrLiq = hE.indexOf('EgresoLiquidacion');
     const iMedioPago = hE.indexOf('MedioPago1');
     let egresosHoy = 0, egresosMes = 0;
+
+    // [DEBUG] — eliminar después de validar
+    const rowsE = filasEgr.slice(1);
+    console.log('[DEBUG egresos]', { iFecE, nombreColumnaFecha: hE[iFecE], iValE, nombreColumnaValor: hE[iValE], iEgrLiq, totalFilas: rowsE.length, primeraFila: rowsE[0], ultimaFila: rowsE[rowsE.length - 1] });
+    // [/DEBUG]
+
     if (iValE !== -1 && iFecE !== -1) {
       filasEgr.slice(1).forEach(f => {
         if (iEgrLiq !== -1 && (f[iEgrLiq] || '').toString().trim() !== 'Base Exenta') return;
