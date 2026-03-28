@@ -5,7 +5,7 @@ FROM node:20 AS frontend-build
 
 WORKDIR /frontend
 COPY app/package*.json ./
-RUN rm -f package-lock.json && npm install
+RUN npm ci
 COPY app/ .
 RUN npm run build
 # → /frontend/dist
