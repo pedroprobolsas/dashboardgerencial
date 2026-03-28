@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from './components/Layout/Layout';
 import { type Vista } from './components/Layout/Sidebar';
 import KPICard from './components/Dashboard/KPICard';
