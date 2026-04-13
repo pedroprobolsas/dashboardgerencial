@@ -43,6 +43,10 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ error: err.message });
 });
 
+// ── Tareas programadas ────────────────────────────────────────────────────────
+
+require('./cron');
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {

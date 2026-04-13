@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
 const router = express.Router();
-const { readRange } = require('../sheetsClient');
+const { readRange, appendRow, createSheetIfMissing } = require('../sheetsClient');
 
 const SP1 = process.env.SPREADSHEET_ID_1;
 const SP2 = process.env.SPREADSHEET_ID_2;
@@ -555,13 +555,82 @@ async function kpiObligacionesPorVencer() {
 
 // ── KPI: Vistazo Diario (Hoy y Mes al Día) ───────────────────────────────────
 
-async function kpiDiario(metas = {}) {
+/**
+ * Calcula o recupera los KPIs diarios (Hoy y Mes al Día).
+ * @param {string} targetFecha Opcional. Fecha en formato YYYY-MM-DD.
+ * @param {Object} metas Mapa de metas.
+ */
+async function kpiDiario(targetFecha = null, metas = {}) {
   try {
-    // ── Tiempo en Colombia (UTC-5) ──
-    const ahora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
-    const hoyD   = ahora.getDate();
-    const hoyM   = ahora.getMonth() + 1;
-    const hoyY   = ahora.getFullYear();
+    const ahoraCol = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+    const hoyISO = ahoraCol.toISOString().split('T')[0];
+    const esConsultaHistoria = targetFecha && targetFecha !== hoyISO;
+
+    // ── 1. Intentar leer de Historial si no es "hoy" ──
+    if (esConsultaHistoria) {
+      try {
+        const filasHist = await readRange(SP1, 'Vistazo_Diario_Historico!A:J');
+        if (filasHist.length > 1) {
+          const headers = filasHist[0];
+          const iFecha = headers.indexOf('Fecha');
+          // Buscar la fila de la fecha solicitada
+          const fila = filasHist.slice(1).find(f => f[iFecha] === targetFecha);
+
+          if (fila) {
+            console.log(`Cargando datos históricos para ${targetFecha} desde Sheets`);
+            const getV = (col) => {
+              const idx = headers.indexOf(col);
+              return idx !== -1 ? fila[idx] || '0' : '0';
+            };
+            const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+
+            const vMeta       = parseCOP(getV('Meta_Ventas_Mes'));
+            const vVentasDia  = parseCOP(getV('Ventas_Dia'));
+            const vEgresosDia = parseCOP(getV('Egresos_Dia'));
+            const vCobrosDia  = parseCOP(getV('Cobros_Dia'));
+            const vVentasMes  = parseCOP(getV('Ventas_Mes_Acum'));
+            const vEgresosMes = parseCOP(getV('Egresos_Mes_Acum'));
+            const vCobrosMes  = parseCOP(getV('Cobros_Mes_Acum'));
+            const vSaldoHoy   = vCobrosDia - vEgresosDia;
+            const vFlujoMes   = vCobrosMes - vEgresosMes;
+            const pctVentasMes = vMeta > 0 ? (vVentasMes / vMeta) * 100 : 0;
+
+            return {
+              fecha: targetFecha,
+              fuente: 'historial',
+              hoy: {
+                ventas:     { valor: fmt.format(vVentasDia),  alerta: vVentasDia > 0 ? 'verde' : 'amarillo' },
+                egresos:    { valor: fmt.format(vEgresosDia), alerta: 'rojo' },
+                cobros:     { valor: fmt.format(vCobrosDia),  alerta: 'verde' },
+                saldo_neto: { valor: fmt.format(vSaldoHoy),   alerta: vSaldoHoy >= 0 ? 'verde' : 'rojo' },
+                crudo: { ventasHoy: vVentasDia, egresosHoy: vEgresosDia, cobrosHoy: vCobrosDia }
+              },
+              mes: {
+                ventas: {
+                  valor: fmt.format(vVentasMes),
+                  alerta: pctVentasMes >= getMeta(metas, 'ventas_pct_verde') ? 'verde' :
+                          pctVentasMes >= getMeta(metas, 'ventas_pct_amarillo') ? 'amarillo' : 'rojo'
+                },
+                egresos:    { valor: fmt.format(vEgresosMes), alerta: 'rojo' },
+                cobros:     { valor: fmt.format(vCobrosMes),  alerta: 'verde' },
+                flujo_neto: { valor: fmt.format(vFlujoMes),   alerta: vFlujoMes >= 0 ? 'verde' : 'rojo' },
+                meta_ventas: fmt.format(vMeta),
+                pct_ventas:  `${Math.round(pctVentasMes)}%`,
+                crudo: { ventasMes: vVentasMes, egresosMes: vEgresosMes, cobrosMes: vCobrosMes, metaVentas: vMeta }
+              }
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('Error leyendo Vistazo_Diario_Historico (procediendo a cálculo manual):', err.message);
+      }
+    }
+
+    // ── 2. Cálculo en tiempo real (si es hoy o no se encontró en historial) ──
+    const targetDate = targetFecha ? new Date(targetFecha + 'T00:00:00-05:00') : ahoraCol;
+    const tD = targetDate.getDate();
+    const tM = targetDate.getMonth() + 1;
+    const tY = targetDate.getFullYear();
 
     const [filasVentas, filasIngr, filasEgr] = await Promise.all([
       readRange(SP1, 'Facturacion_OP!A:AZ'),
@@ -572,17 +641,15 @@ async function kpiDiario(metas = {}) {
     const parseFecha = (val) => {
       if (!val) return null;
       const s = String(val).trim();
-      // Formato DD/MM/YYYY
       const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
       if (dmy) return { d: parseInt(dmy[1], 10), m: parseInt(dmy[2], 10), y: parseInt(dmy[3], 10) };
-      // Formato YYYY-MM-DD
       const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (iso) return { y: parseInt(iso[1], 10), m: parseInt(iso[2], 10), d: parseInt(iso[3], 10) };
       return null;
     };
 
-    const esHoy = (fObj) => fObj && fObj.d === hoyD && fObj.m === hoyM && fObj.y === hoyY;
-    const esMesActual = (fObj) => fObj && fObj.m === hoyM && fObj.y === hoyY;
+    const esDiaTarget = (fObj) => fObj && fObj.d === tD && fObj.m === tM && fObj.y === tY;
+    const esMesTarget = (fObj) => fObj && fObj.m === tM && fObj.y === tY && fObj.d <= tD;
 
     // 1. VENTAS
     const hV = filasVentas[0] || [];
@@ -593,8 +660,8 @@ async function kpiDiario(metas = {}) {
       filasVentas.slice(1).forEach(f => {
         const fecha = parseFecha(f[iFecV]);
         const monto = parseCOP(f[iValV]);
-        if (esHoy(fecha)) ventasHoy += monto;
-        if (esMesActual(fecha)) ventasMes += monto;
+        if (esDiaTarget(fecha)) ventasHoy += monto;
+        if (esMesTarget(fecha)) ventasMes += monto;
       });
     }
 
@@ -610,8 +677,8 @@ async function kpiDiario(metas = {}) {
         if (liq !== '') return;
         const fecha = parseFecha(f[iFecI]);
         const monto = parseCOP(f[iValI]);
-        if (esHoy(fecha)) cobrosHoy += monto;
-        if (esMesActual(fecha)) cobrosMes += monto;
+        if (esDiaTarget(fecha)) cobrosHoy += monto;
+        if (esMesTarget(fecha)) cobrosMes += monto;
       });
     }
 
@@ -629,8 +696,8 @@ async function kpiDiario(metas = {}) {
         if (iMedioPago !== -1 && (f[iMedioPago] || '').toString().toUpperCase().includes('CRUCE')) return;
         const fecha = parseFecha(f[iFecE]);
         const monto = parseCOP(f[iValE]);
-        if (esHoy(fecha)) egresosHoy += monto;
-        if (esMesActual(fecha)) egresosMes += monto;
+        if (esDiaTarget(fecha)) egresosHoy += monto;
+        if (esMesTarget(fecha)) egresosMes += monto;
       });
     }
 
@@ -642,9 +709,11 @@ async function kpiDiario(metas = {}) {
     const flujoMes = cobrosMes - egresosMes;
 
     return {
+      fecha: targetFecha || hoyISO,
+      fuente: 'calculo_manual',
       hoy: {
         ventas:     { valor: fmt.format(ventasHoy),  alerta: ventasHoy > 0 ? 'verde' : 'amarillo' },
-        egresos:    { valor: fmt.format(egresosHoy), alerta: 'rojo' }, // Egresos se ven en rojo
+        egresos:    { valor: fmt.format(egresosHoy), alerta: 'rojo' },
         cobros:     { valor: fmt.format(cobrosHoy),  alerta: 'verde' },
         saldo_neto: { valor: fmt.format(saldoHoy),   alerta: saldoHoy >= 0 ? 'verde' : 'rojo' },
         crudo: { ventasHoy, egresosHoy, cobrosHoy }
@@ -669,17 +738,148 @@ async function kpiDiario(metas = {}) {
   }
 }
 
+
 // ── GET /api/kpis/diario ──────────────────────────────────────────────────────
 
 router.get('/diario', async (req, res) => {
   try {
+    const fecha = req.query.fecha || null;
     const metas = await loadMetasFromSheets();
-    const data = await kpiDiario(metas);
+    const data = await kpiDiario(fecha, metas);
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+
+// ── POST /api/kpis/snapshot ───────────────────────────────────────────────────
+// n8n llama este endpoint a las 11:59 PM para guardar la foto del día en
+// Vistazo_Diario_Historico. Acepta ?fecha=YYYY-MM-DD (o body.fecha) para
+// poder rellenar días históricos manualmente.
+
+const VISTAZO_HEADERS = [
+  'Fecha', 'Ventas_Dia', 'Egresos_Dia', 'Cobros_Dia',
+  'Ventas_Mes_Acum', 'Egresos_Mes_Acum', 'Cobros_Mes_Acum', 'Meta_Ventas_Mes',
+];
+
+/**
+ * Calcula los totales del día y los guarda en Vistazo_Diario_Historico.
+ * @param {string|null} fechaParam  YYYY-MM-DD. Por defecto: hoy en Colombia.
+ * @returns {{ ok: boolean, fecha: string, ... }}
+ */
+async function ejecutarSnapshot(fechaParam = null) {
+  const ahoraCol = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+  const hoyISO   = ahoraCol.toISOString().split('T')[0];
+  const fecha    = fechaParam || hoyISO;
+
+  // 1. Garantizar que la hoja existe con las cabeceras correctas
+  await createSheetIfMissing(SP1, 'Vistazo_Diario_Historico', VISTAZO_HEADERS);
+
+  // 2. Verificar que no exista ya un snapshot para esa fecha
+  const colFecha = await readRange(SP1, 'Vistazo_Diario_Historico!A:A');
+  const yaExiste = colFecha.slice(1).some(f => f[0] === fecha);
+  if (yaExiste) {
+    return { ok: false, motivo: `Ya existe snapshot para ${fecha}` };
+  }
+
+  // 3. Calcular totales del día en tiempo real
+  const targetDate = new Date(fecha + 'T00:00:00-05:00');
+  const tD = targetDate.getDate();
+  const tM = targetDate.getMonth() + 1;
+  const tY = targetDate.getFullYear();
+
+  const parseFechaSnap = (val) => {
+    if (!val) return null;
+    const s = String(val).trim();
+    const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (dmy) return { d: parseInt(dmy[1], 10), m: parseInt(dmy[2], 10), y: parseInt(dmy[3], 10) };
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return { y: parseInt(iso[1], 10), m: parseInt(iso[2], 10), d: parseInt(iso[3], 10) };
+    return null;
+  };
+  const esDia = (f) => f && f.d === tD && f.m === tM && f.y === tY;
+  const esMes = (f) => f && f.m === tM && f.y === tY && f.d <= tD;
+
+  const [filasVentas, filasIngr, filasEgr, metas] = await Promise.all([
+    readRange(SP1, 'Facturacion_OP!A:AZ'),
+    readRange(SP1, 'LISTADO_DE_INGRESOS!A:AZ'),
+    readRange(SP2, 'Consecutivo_de_egresos!A:AZ'),
+    loadMetasFromSheets(),
+  ]);
+
+  // Ventas
+  const hV    = filasVentas[0] || [];
+  const iValV = hV.indexOf('ValorFacturado');
+  const iFecV = hV.findIndex(h => ['FechaContable', 'Fecha', 'FECHA'].includes(h));
+  let ventasHoy = 0, ventasMes = 0;
+  if (iValV !== -1 && iFecV !== -1) {
+    filasVentas.slice(1).forEach(f => {
+      const fObj = parseFechaSnap(f[iFecV]);
+      const v    = parseCOP(f[iValV]);
+      if (esDia(fObj)) ventasHoy += v;
+      if (esMes(fObj)) ventasMes += v;
+    });
+  }
+
+  // Cobros
+  const hI      = filasIngr[0] || [];
+  const iValI   = hI.indexOf('ValorRecibido');
+  const iFecI   = hI.findIndex(h => ['Fecha', 'FECHA', 'FechaContable'].includes(h));
+  const iIngLiq = hI.indexOf('IngresoLiquidacion');
+  let cobrosHoy = 0, cobrosMes = 0;
+  if (iValI !== -1 && iFecI !== -1) {
+    filasIngr.slice(1).forEach(f => {
+      const liq = iIngLiq !== -1 ? (f[iIngLiq] || '').trim() : '';
+      if (liq !== '') return;
+      const fObj = parseFechaSnap(f[iFecI]);
+      const v    = parseCOP(f[iValI]);
+      if (esDia(fObj)) cobrosHoy += v;
+      if (esMes(fObj)) cobrosMes += v;
+    });
+  }
+
+  // Egresos
+  const hE         = filasEgr[0] || [];
+  const iValE      = hE.findIndex(h => ['NetoPagar2', 'Valor', 'Neto'].includes(h));
+  const iFecE      = hE.findIndex(h => ['Fecha1', 'Fecha', 'FECHA', 'FechaContable'].includes(h));
+  const iEgrLiq    = hE.indexOf('EgresoLiquidacion');
+  const iMedioPago = hE.indexOf('MedioPago1');
+  let egresosHoy = 0, egresosMes = 0;
+  if (iValE !== -1 && iFecE !== -1) {
+    filasEgr.slice(1).forEach(f => {
+      if (iEgrLiq    !== -1 && (f[iEgrLiq]    || '').trim().toUpperCase() !== 'BASE EXENTA') return;
+      if (iMedioPago !== -1 && (f[iMedioPago] || '').toUpperCase().includes('CRUCE')) return;
+      const fObj = parseFechaSnap(f[iFecE]);
+      const v    = parseCOP(f[iValE]);
+      if (esDia(fObj)) egresosHoy += v;
+      if (esMes(fObj)) egresosMes += v;
+    });
+  }
+
+  const metaVentas = getMeta(metas, 'ventas_mes');
+
+  // 4. Escribir fila en Sheets
+  await appendRow(SP1, 'Vistazo_Diario_Historico', [
+    fecha, ventasHoy, egresosHoy, cobrosHoy,
+    ventasMes, egresosMes, cobrosMes, metaVentas,
+  ]);
+
+  console.log(`[SNAPSHOT] ${fecha} guardado — ventas: ${ventasHoy} | egresos: ${egresosHoy} | cobros: ${cobrosHoy}`);
+  return { ok: true, fecha, ventasHoy, egresosHoy, cobrosHoy, ventasMes, egresosMes, cobrosMes, metaVentas };
+}
+
+router.post('/snapshot', async (req, res) => {
+  try {
+    const fecha = (req.body && req.body.fecha) || req.query.fecha || null;
+    const resultado = await ejecutarSnapshot(fecha);
+    res.json(resultado);
+  } catch (err) {
+    console.error('[SNAPSHOT] Error:', err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 
 // ── KPI: Rotación de personal (desde Cierre_TalentoHumano) ───────────────────
 
@@ -750,8 +950,9 @@ router.get('/', async (req, res) => {
       kpiProduccion({ mesNum, anio }, metas),
       kpiRotacionPersonal(periodo, metas),
       kpiObligacionesPorVencer(),
-      kpiDiario(metas).catch(() => null),
+      kpiDiario(req.query.fecha, metas).catch(() => null),
     ]);
+
 
     res.json({
       periodo,
@@ -830,3 +1031,4 @@ router.get('/sheets/:spreadsheet', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.ejecutarSnapshot = ejecutarSnapshot;
