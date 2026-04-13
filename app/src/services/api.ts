@@ -86,12 +86,19 @@ export interface RespuestaKPIs {
   diario?: KPIDiario;
 }
 
-export async function fetchKPIs(periodo?: string): Promise<RespuestaKPIs> {
-  const url = periodo ? `/api/kpis?periodo=${periodo}` : '/api/kpis';
+export async function fetchKPIs(periodo?: string, fecha?: string): Promise<RespuestaKPIs> {
+  const params = new URLSearchParams();
+  if (periodo) params.append('periodo', periodo);
+  if (fecha) params.append('fecha', fecha);
+  
+  const queryString = params.toString();
+  const url = queryString ? `/api/kpis?${queryString}` : '/api/kpis';
+  
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Error ${res.status} al leer KPIs`);
   return res.json();
 }
+
 
 export async function enviarCierre(
   area: string,

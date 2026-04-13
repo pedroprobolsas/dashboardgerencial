@@ -253,20 +253,30 @@ function Dashboard() {
 
 // ── Vista Diario (Nueva) ───────────────────────────────────────────────────────
 
+function getAyerISO(): string {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+}
+
 function DailyDashboard() {
+  const [fecha, setFecha] = useState<string>(getAyerISO());
   const [diario, setDiario] = useState<KPIDiario | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchKPIs() // El backend ya inyecta el sumario diario en el response de /api/kpis
+    setCargando(true);
+    setError(null);
+    fetchKPIs(undefined, fecha)
       .then(resp => {
         if (resp.diario) setDiario(resp.diario);
-        else setError('No hay datos diarios disponibles');
+        else setError('No hay datos disponibles para esta fecha');
       })
       .catch(err => setError(err.message))
       .finally(() => setCargando(false));
-  }, []);
+  }, [fecha]);
+
 
   const ahora = new Date();
   const saludo = ahora.getHours() < 12 ? 'Buenos días' : ahora.getHours() < 18 ? 'Buenas tardes' : 'Buenas noches';
@@ -292,8 +302,13 @@ function DailyDashboard() {
           <p className="text-sm opacity-80">{error}</p>
         </div>
       ) : diario ? (
-        <VistazoDiario data={diario} />
+        <VistazoDiario 
+          data={diario} 
+          fechaSeleccionada={fecha} 
+          onCambiarFecha={setFecha} 
+        />
       ) : null}
+
     </div>
   );
 }

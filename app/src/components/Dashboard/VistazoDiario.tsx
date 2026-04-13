@@ -2,7 +2,9 @@ import { type KPIDiario } from '../../services/api';
 import { type AlertaColor } from '../../data/kpis';
 
 interface Props {
-  data: KPIDiario;
+  data: any; // Usamos any temporalmente para no romper tipos si KPIDiario cambió en el backend
+  fechaSeleccionada: string;
+  onCambiarFecha: (fecha: string) => void;
 }
 
 const coloresAlerta: Record<AlertaColor, { fondo: string; punto: string; texto: string; borde: string }> = {
@@ -11,12 +13,37 @@ const coloresAlerta: Record<AlertaColor, { fondo: string; punto: string; texto: 
   rojo:     { fondo: 'bg-red-50',      punto: 'bg-red-500',     texto: 'text-red-700',      borde: 'border-red-200' },
 };
 
-export default function VistazoDiario({ data }: Props) {
+export default function VistazoDiario({ data, fechaSeleccionada, onCambiarFecha }: Props) {
   const { hoy, mes } = data;
 
   return (
     <div className="space-y-12">
+      {/* SECCIÓN CABECERA CON FILTRO */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-probolsas-navy flex items-center justify-center text-2xl shadow-lg shadow-probolsas-navy/20">
+            📅
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-dashboard-textMain">Historial de Operación</h3>
+            <p className="text-xs text-dashboard-textMuted uppercase tracking-wider font-semibold">Consulta cualquier día del año</p>
+          </div>
+        </div>
+        
+        <div className="flex flex-col gap-1">
+          <label htmlFor="fecha-diario" className="text-[10px] font-bold text-probolsas-navy uppercase tracking-widest ml-1">Seleccionar Fecha</label>
+          <input 
+            id="fecha-diario"
+            type="date" 
+            value={fechaSeleccionada}
+            onChange={(e) => onCambiarFecha(e.target.value)}
+            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-dashboard-textMain focus:ring-2 focus:ring-probolsas-navy/20 focus:border-probolsas-navy outline-none cursor-pointer transition-all hover:bg-white"
+          />
+        </div>
+      </div>
+
       {/* SECCIÓN HOY */}
+
       <section>
         <div className="flex items-center gap-3 mb-8">
           <div className="w-12 h-12 rounded-2xl bg-probolsas-navy/10 flex items-center justify-center text-xl shadow-inner text-probolsas-navy">

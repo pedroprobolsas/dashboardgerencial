@@ -211,6 +211,8 @@ Internet → Traefik (SSL + dominio)
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | `GET` | `/api/kpis?periodo=YYYY-MM` | KPIs del período (por defecto: mes actual) |
+| `GET` | `/api/kpis?fecha=YYYY-MM-DD` | KPIs + vistazo diario para una fecha específica |
+| `POST` | `/api/kpis/snapshot` | Guarda la foto del día en `Vistazo_Diario_Historico` |
 | `POST` | `/api/setup` | Crea pestañas en Sheets si no existen |
 | `GET` | `/api/cierres/bandeja` | Bandeja de aprobaciones gerenciales |
 | `GET` | `/api/cierres/prefill/:area?periodo=YYYY-MM` | Datos pre-llenados para formularios |
@@ -221,7 +223,37 @@ Internet → Traefik (SSL + dominio)
 
 ---
 
+## Vistazo Diario e Histórico
+
+El componente **Vistazo Diario** permite consultar el historial operativo de días anteriores con carga instantánea.
+
+### Fuente de Datos Históricos
+Pestaña: `Vistazo_Diario_Historico` (en Spreadsheet 1)
+Columnas (en orden):
+
+| # | Columna | Descripción |
+|---|---------|-------------|
+| 1 | `Fecha` | YYYY-MM-DD — clave única |
+| 2 | `Ventas_Dia` | Total facturado ese día |
+| 3 | `Egresos_Dia` | Egresos pagados ese día |
+| 4 | `Cobros_Dia` | Recaudo neto ese día |
+| 5 | `Ventas_Mes_Acum` | Acumulado de ventas desde día 1 hasta esa fecha |
+| 6 | `Egresos_Mes_Acum` | Acumulado de egresos desde día 1 hasta esa fecha |
+| 7 | `Cobros_Mes_Acum` | Acumulado de cobros desde día 1 hasta esa fecha |
+| 8 | `Meta_Ventas_Mes` | Meta vigente de ventas en ese momento |
+
+> `Saldo_Neto` y `Flujo_Neto` no se almacenan — se calculan en el backend (`Cobros - Egresos`).
+
+### Funcionamiento
+- **Carga inicial:** El dashboard carga por defecto el día anterior (**ayer**).
+- **Filtro:** Permite seleccionar cualquier fecha pasada para ver la "foto" de ese día.
+- **Optimización:** Si la fecha existe en la hoja de histórico, la carga es instantánea. Si se consulta **Hoy**, el sistema calcula en tiempo real recorriendo las hojas maestras.
+- **Snapshot automático:** `node-cron` ejecuta `POST /api/kpis/snapshot` todos los días a las **11:00 PM hora Colombia**, guardando la foto del día sin intervención manual.
+
+---
+
 ## Áreas cubiertas y fuentes de datos
+
 
 | KPI | Hoja origen | Columna clave |
 |-----|-------------|---------------|
