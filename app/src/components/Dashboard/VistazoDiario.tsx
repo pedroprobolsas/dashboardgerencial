@@ -1,4 +1,3 @@
-import { type KPIDiario } from '../../services/api';
 import { type AlertaColor } from '../../data/kpis';
 
 interface Props {
