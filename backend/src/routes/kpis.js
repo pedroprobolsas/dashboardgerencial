@@ -218,20 +218,23 @@ async function kpiMargenBruto({ mesNum, anio }, metas = {}) {
     const { rows } = await query(
       `SELECT
          ROUND(
-           (SUM(valor_neto) - SUM(COALESCE(costo_ejecutado_total,0))) /
-           NULLIF(SUM(valor_neto), 0) * 100
-         , 1) AS margen_pct
+           (SUM(COALESCE(costo_total_estimado, 0)) - SUM(COALESCE(costo_ejecutado_total, 0))) /
+           NULLIF(SUM(COALESCE(costo_total_estimado, 0)), 0) * 100
+         , 1) AS margen_pct,
+         COUNT(*) AS ordenes
        FROM crisolweb.costo_por_orden
        WHERE EXTRACT(month FROM fecha) = $1
-         AND EXTRACT(year FROM fecha) = $2`,
+         AND EXTRACT(year FROM fecha) = $2
+         AND costo_total_estimado > 0`,
       [mesNum, anio]
     );
 
+    const ordenes   = parseInt(rows[0]?.ordenes || 0, 10);
     const rawMargen = rows[0]?.margen_pct;
     const margenPct = rawMargen !== null && rawMargen !== undefined ? parseFloat(rawMargen) : null;
 
-    if (margenPct === null || isNaN(margenPct)) {
-      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin datos este período', alerta: 'amarillo' };
+    if (ordenes === 0 || margenPct === null || isNaN(margenPct)) {
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo' };
     }
 
     const metaObjetivo = getMeta(metas, 'margen_bruto');
@@ -332,12 +335,12 @@ async function kpiCarteraVencida(metas = {}) {
 async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
   try {
     const [{ rows: rowsIngr }, { rows: rowsEgr }] = await Promise.all([
+      // Proxy de ingresos: facturas del mes (fecha_creacion en ingresos tiene NULLs históricos)
       query(
-        `SELECT SUM(valor_recibido) AS total
-         FROM crisolweb.ingresos
+        `SELECT SUM(valor_neto) AS total
+         FROM crisolweb.facturas
          WHERE EXTRACT(month FROM fecha_creacion) = $1
-           AND EXTRACT(year FROM fecha_creacion) = $2
-           AND (liquidacion IS NULL OR liquidacion = '')`,
+           AND EXTRACT(year FROM fecha_creacion) = $2`,
         [mesNum, anio]
       ),
       query(
@@ -345,8 +348,8 @@ async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
          FROM crisolweb.consecutivo_egresos
          WHERE EXTRACT(month FROM fecha_contable) = $1
            AND EXTRACT(year FROM fecha_contable) = $2
-           AND liquidacion = 'Base Exenta'
-           AND concepto NOT ILIKE '%CRUCE%'`,
+           AND (liquidacion = 'Base Exenta' OR liquidacion IS NULL)
+           AND (concepto IS NULL OR concepto NOT ILIKE '%CRUCE%')`,
         [mesNum, anio]
       ),
     ]);
@@ -388,46 +391,38 @@ async function kpiProduccion({ mesNum, anio }, metas = {}) {
     const { rows } = await query(
       `SELECT
          COUNT(*) AS ordenes,
-         SUM(COALESCE(costo_total_estimado,0)) AS sum_estimado,
-         SUM(COALESCE(costo_total,0))          AS sum_ejecutado,
-         SUM(COALESCE(valor_cumplido,0))       AS sum_valor
+         SUM(COALESCE(costo_total_estimado, costo_total, 0)) AS sum_estimado,
+         SUM(COALESCE(costo_ejecutado_total, costo_total, 0)) AS sum_ejecutado
        FROM crisolweb.costo_por_orden
        WHERE EXTRACT(month FROM fecha) = $1
          AND EXTRACT(year FROM fecha) = $2`,
       [mesNum, anio]
     );
 
-    const ordenes  = parseInt(rows[0]?.ordenes       || 0, 10);
-    const sumEstim = parseFloat(rows[0]?.sum_estimado || 0);
+    const ordenes  = parseInt(rows[0]?.ordenes        || 0, 10);
+    const sumEstim = parseFloat(rows[0]?.sum_estimado  || 0);
     const sumEjec  = parseFloat(rows[0]?.sum_ejecutado || 0);
-    const sumValor = parseFloat(rows[0]?.sum_valor    || 0);
 
     if (ordenes === 0) {
       return { fuente: 'real', valor: 0, valorFormateado: '0%', ordenes: 0, detalle: 'Sin órdenes en este período' };
     }
 
     // Eficiencia = CostoEstimado / CostoEjecutado × 100 (> 100% = mejor de lo esperado)
-    const eficiencia = sumEjec  > 0 ? Math.round(sumEstim / sumEjec  * 1000) / 10 : 0;
-    // Margen producción = (ValorCumplido - CostoEjecutado) / ValorCumplido × 100
-    const margenProd = sumValor > 0 ? Math.round((sumValor - sumEjec) / sumValor * 1000) / 10 : 0;
+    const eficiencia = sumEjec > 0 ? Math.round(sumEstim / sumEjec * 1000) / 10 : 0;
 
-    const fmt      = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
-    const ahorro   = Math.round(sumEstim - sumEjec);
-    const utilidad = Math.round(sumValor  - sumEjec);
+    const fmt    = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+    const ahorro = Math.round(sumEstim - sumEjec);
 
     return {
       fuente: 'real',
       valor: eficiencia,
       valorFormateado: `${eficiencia}%`,
       ordenes,
-      margenProduccion:   margenProd,
-      valorProducido:     fmt.format(sumValor),
-      costoEjecutado:     fmt.format(sumEjec),
-      utilidadProduccion: fmt.format(utilidad),
-      ahorroPresupuesto:  ahorro >= 0 ? `+${fmt.format(ahorro)}` : fmt.format(ahorro),
-      ahorroNumerico:     ahorro,
+      costoEjecutado:    fmt.format(sumEjec),
+      ahorroPresupuesto: ahorro >= 0 ? `+${fmt.format(ahorro)}` : fmt.format(ahorro),
+      ahorroNumerico:    ahorro,
       meta: `Meta: > 100% | Mín. aceptable: ${getMeta(metas, 'eficiencia_produccion')}%`,
-      detalle: `${ordenes} OPs | Efic.: ${eficiencia}% | Margen: ${margenProd.toFixed(1)}% | Producido: ${fmt.format(sumValor)}`,
+      detalle: `${ordenes} OPs | Efic.: ${eficiencia}% | Estimado: ${fmt.format(sumEstim)} | Ejecutado: ${fmt.format(sumEjec)}`,
       alerta: alertaColor(eficiencia, {
         verde:    v => v > 100,
         amarillo: v => v >= getMeta(metas, 'eficiencia_produccion'),
