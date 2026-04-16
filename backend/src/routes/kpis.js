@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { readRange, appendRow, createSheetIfMissing } = require('../sheetsClient');
+const { query } = require('../dbClient');
 
 const SP1 = process.env.SPREADSHEET_ID_1;
 const SP2 = process.env.SPREADSHEET_ID_2;
@@ -172,28 +173,23 @@ async function kpiCierreMensual(periodo, metas = {}) {
 }
 
 // ── KPI: Ventas del mes vs meta ───────────────────────────────────────────────
-// Columnas relevantes en Facturacion_OP: ValorFacturado, MES, FechaContable (para año)
 
-async function kpiVentasMeta({ mesLabel, anio }, metas = {}) {
+async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
   try {
-    const filas = await readRange(SP1, 'Facturacion_OP!A:AZ');
-    if (filas.length <= 1) return { fuente: 'real', valor: 0, valorFormateado: '0%' };
+    const { rows } = await query(
+      `SELECT SUM(valor_neto) AS total, COUNT(*) AS facturas
+       FROM crisolweb.facturas
+       WHERE EXTRACT(month FROM fecha_creacion) = $1
+         AND EXTRACT(year FROM fecha_creacion) = $2`,
+      [mesNum, anio]
+    );
 
-    const h = filas[0];
-    const iValor = h.indexOf('ValorFacturado');
-    const iMes   = h.indexOf('MES');
-
-    if (iValor === -1 || iMes === -1) return { fuente: 'error', detalle: 'Columnas ValorFacturado/MES no encontradas' };
-
-    // Filtro: solo por MES (minúsculas sin tilde). La hoja ya está segmentada por periodo.
-    const filasPeriodo = filas.slice(1)
-      .filter(f => (f[iMes] || '').toString().toLowerCase().trim() === mesLabel);
-
-    if (filasPeriodo.length === 0) {
+    const facturas = parseInt(rows[0]?.facturas || 0, 10);
+    if (facturas === 0) {
       return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin facturas este período', alerta: 'amarillo' };
     }
 
-    const total      = filasPeriodo.reduce((sum, f) => sum + parseCOP(f[iValor]), 0);
+    const total      = parseFloat(rows[0]?.total || 0);
     const metaVentas = getMeta(metas, 'ventas_mes');
     const pct        = Math.round((total / metaVentas) * 100);
     const fmt        = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
@@ -217,26 +213,26 @@ async function kpiVentasMeta({ mesLabel, anio }, metas = {}) {
 
 // ── KPI: Margen bruto % ───────────────────────────────────────────────────────
 
-async function kpiMargenBruto({ mesLabel }, metas = {}) {
+async function kpiMargenBruto({ mesNum, anio }, metas = {}) {
   try {
-    const filas = await readRange(SP1, 'Facturacion_OP!A:AZ');
-    if (filas.length <= 1) return { fuente: 'real', valor: 0, valorFormateado: '0%' };
+    const { rows } = await query(
+      `SELECT
+         ROUND(
+           (SUM(valor_neto) - SUM(COALESCE(costo_ejecutado_total,0))) /
+           NULLIF(SUM(valor_neto), 0) * 100
+         , 1) AS margen_pct
+       FROM crisolweb.costo_por_orden
+       WHERE EXTRACT(month FROM fecha) = $1
+         AND EXTRACT(year FROM fecha) = $2`,
+      [mesNum, anio]
+    );
 
-    const h = filas[0];
-    const iMargen = h.indexOf('MARGEN');
-    const iMes    = h.indexOf('MES');
+    const rawMargen = rows[0]?.margen_pct;
+    const margenPct = rawMargen !== null && rawMargen !== undefined ? parseFloat(rawMargen) : null;
 
-    if (iMargen === -1 || iMes === -1) return { fuente: 'error', detalle: 'Columnas MARGEN/MES no encontradas' };
-
-    // Filtro solo por MES. Promedio simple: quitar "%" y promediar.
-    const margenes = filas.slice(1)
-      .filter(f => (f[iMes] || '').toString().toLowerCase().trim() === mesLabel)
-      .map(f => parsePct(f[iMargen]))
-      .filter(v => v !== null && !isNaN(v));
-
-    if (margenes.length === 0) return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin facturas este período', alerta: 'amarillo' };
-
-    const margenPct = Math.round(margenes.reduce((s, v) => s + v, 0) / margenes.length * 10) / 10;
+    if (margenPct === null || isNaN(margenPct)) {
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin datos este período', alerta: 'amarillo' };
+    }
 
     const metaObjetivo = getMeta(metas, 'margen_bruto');
     const umbralVerde  = getMeta(metas, 'margen_verde');
@@ -259,55 +255,71 @@ async function kpiMargenBruto({ mesLabel }, metas = {}) {
 }
 
 // ── KPI: Cartera vencida ──────────────────────────────────────────────────────
-// Dato puntual (saldo actual), no se filtra por período
+// Dato puntual (saldo actual), no se filtra por período.
+// porCobrar = clientes con deuda vencida; porPagar = proveedores con saldo pendiente.
 
 async function kpiCarteraVencida(metas = {}) {
   try {
-    const filas = await readRange(SP2, 'CarteraPorPagarDetalladaPorTercero!A:AZ');
-    if (filas.length <= 1) return { fuente: 'real', valor: 0, valorFormateado: '$0' };
-
-    const h = filas[0];
-    const iSaldo = h.indexOf('Saldo');
-    const iDias  = h.indexOf('DiasVencidos');
-    if (iSaldo === -1 || iDias === -1) return { fuente: 'error', detalle: 'Columnas Saldo/DiasVencidos no encontradas' };
-
-    const filasFiltradas = filas.slice(1).filter(f => {
-      const dias = parseInt(f[iDias] || '0', 10);
-      return !isNaN(dias) && dias < 0;
-    });
-
-    const totalVencido = filasFiltradas.reduce((sum, f) => sum + parseCOP(f[iSaldo]), 0);
-
-    // Desglose por rango de días vencidos (DiasVencidos negativo: -1 = 1 día vencido)
-    // Rango inclusivo en ambos extremos: sumaRango(-1, -31) = días -1 a -30 inclusive
-    const sumaRango = (desde, hasta) => filasFiltradas
-      .filter(f => { const d = parseInt(f[iDias] || '0', 10); return d <= desde && d > hasta; })
-      .reduce((s, f) => s + parseCOP(f[iSaldo]), 0);
-
-    const raw30      = sumaRango(-1,   -31);
-    const raw60      = sumaRango(-31,  -61);
-    const raw90      = sumaRango(-61,  -91);
-    const raw100plus = sumaRango(-91, -Infinity);
+    const [{ rows: rowsCobrar }, { rows: rowsPagar }] = await Promise.all([
+      query(
+        `SELECT SUM(saldo) AS total,
+           SUM(CASE WHEN dias_vencido BETWEEN 1 AND 30  THEN saldo ELSE 0 END) AS d30,
+           SUM(CASE WHEN dias_vencido BETWEEN 31 AND 60 THEN saldo ELSE 0 END) AS d60,
+           SUM(CASE WHEN dias_vencido BETWEEN 61 AND 90 THEN saldo ELSE 0 END) AS d90,
+           SUM(CASE WHEN dias_vencido > 90              THEN saldo ELSE 0 END) AS d100plus,
+           COUNT(DISTINCT nombre_cliente) AS clientes
+         FROM crisolweb.cartera_clientes
+         WHERE saldo > 0 AND dias_vencido > 0`
+      ),
+      query(
+        `SELECT SUM(saldo) AS total,
+           SUM(CASE WHEN dias_vencido > 0 THEN saldo ELSE 0 END) AS vencida,
+           COUNT(DISTINCT nombre) AS proveedores
+         FROM crisolweb.cartera_por_pagar
+         WHERE saldo > 0`
+      ),
+    ]);
 
     const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
+    const totalCobrar = parseFloat(rowsCobrar[0]?.total    || 0);
+    const d30         = parseFloat(rowsCobrar[0]?.d30      || 0);
+    const d60         = parseFloat(rowsCobrar[0]?.d60      || 0);
+    const d90         = parseFloat(rowsCobrar[0]?.d90      || 0);
+    const d100plus    = parseFloat(rowsCobrar[0]?.d100plus || 0);
+    const clientes    = parseInt(rowsCobrar[0]?.clientes   || 0, 10);
+
+    const totalPagar     = parseFloat(rowsPagar[0]?.total      || 0);
+    const vencidaPagar   = parseFloat(rowsPagar[0]?.vencida    || 0);
+    const proveedores    = parseInt(rowsPagar[0]?.proveedores  || 0, 10);
+
     return {
       fuente: 'real',
-      valor: totalVencido,
-      valorFormateado: fmt.format(totalVencido),
-      meta: `Umbral: < $${(getMeta(metas, 'cartera_verde') / 1_000_000).toFixed(0)}M`,
-      desglose: {
-        d30:      fmt.format(raw30),
-        d60:      fmt.format(raw60),
-        d90:      fmt.format(raw90),
-        d100plus: fmt.format(raw100plus),
+      porCobrar: {
+        valor:          totalCobrar,
+        valorFormateado: fmt.format(totalCobrar),
+        desglose: {
+          d30:      fmt.format(d30),
+          d60:      fmt.format(d60),
+          d90:      fmt.format(d90),
+          d100plus: fmt.format(d100plus),
+          clientes,
+        },
+        alerta: alertaColor(totalCobrar, {
+          verde:    v => v < getMeta(metas, 'cartera_verde'),
+          amarillo: v => v <= getMeta(metas, 'cartera_amarillo'),
+        }),
       },
-      d30Raw:      raw30,      // cartera 1-30 días (para cálculo brecha)
-      d100plusRaw: raw100plus, // cartera +90 días (para alerta incobrabilidad)
-      alerta: alertaColor(totalVencido, {
-        verde:    v => v < getMeta(metas, 'cartera_verde'),
-        amarillo: v => v <= getMeta(metas, 'cartera_amarillo'),
-      }),
+      porPagar: {
+        valor:          totalPagar,
+        valorFormateado: fmt.format(totalPagar),
+        vencida:        fmt.format(vencidaPagar),
+        proveedores,
+        alerta: alertaColor(vencidaPagar, {
+          verde:    v => v <= 0,
+          amarillo: v => v <= getMeta(metas, 'cartera_amarillo'),
+        }),
+      },
     };
   } catch (err) {
     console.error('kpiCarteraVencida:', err.message);
@@ -316,62 +328,33 @@ async function kpiCarteraVencida(metas = {}) {
 }
 
 // ── KPI: Flujo de caja disponible ─────────────────────────────────────────────
-// LISTADO_DE_INGRESOS → ValorNeto, Mes, Año
-// Consecutivo_de_egresos → NetoPagar2, Mes, Año
 
-async function kpiFlujoCaja({ mesLabel, anio }, metas = {}) {
+async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
   try {
-    const anioStr = String(anio);
-
-    const [filasIngr, filasEgr] = await Promise.all([
-      readRange(SP1, 'LISTADO_DE_INGRESOS!A:AZ'),
-      readRange(SP2, 'Consecutivo_de_egresos!A:AZ'),
+    const [{ rows: rowsIngr }, { rows: rowsEgr }] = await Promise.all([
+      query(
+        `SELECT SUM(valor_recibido) AS total
+         FROM crisolweb.ingresos
+         WHERE EXTRACT(month FROM fecha_creacion) = $1
+           AND EXTRACT(year FROM fecha_creacion) = $2
+           AND (liquidacion IS NULL OR liquidacion = '')`,
+        [mesNum, anio]
+      ),
+      query(
+        `SELECT SUM(valor) AS total
+         FROM crisolweb.consecutivo_egresos
+         WHERE EXTRACT(month FROM fecha_contable) = $1
+           AND EXTRACT(year FROM fecha_contable) = $2
+           AND liquidacion = 'Base Exenta'
+           AND concepto NOT ILIKE '%CRUCE%'`,
+        [mesNum, anio]
+      ),
     ]);
 
-    // ── Ingresos: solo filas base (IngresoLiquidacion vacía), filtro por Mes y Año ──
-    const hI          = filasIngr[0] || [];
-    const iVal        = hI.indexOf('ValorRecibido');
-    const iMesI       = hI.indexOf('Mes');
-    const iAnioI      = hI.indexOf('Año');
-    const iIngLiq     = hI.indexOf('IngresoLiquidacion');
-
-    const ingresos = iVal !== -1 && iMesI !== -1
-      ? filasIngr.slice(1)
-          .filter(f => {
-            if ((f[iMesI] || '').toString().toLowerCase().trim() !== mesLabel) return false;
-            if (iAnioI !== -1 && (f[iAnioI] || '').toString().trim() !== anioStr) return false;
-            // Solo fila base: IngresoLiquidacion vacía
-            const liq = iIngLiq !== -1 ? (f[iIngLiq] || '').toString().trim() : '';
-            return liq === '';
-          })
-          .reduce((s, f) => s + parseCOP(f[iVal]), 0)
-      : 0;
-
-    // ── Egresos: solo "Base Exenta", excluir CRUCE, filtro por Mes y Año ──
-    const hE          = filasEgr[0] || [];
-    const iNeto       = hE.indexOf('NetoPagar2');
-    const iMesE       = hE.indexOf('Mes');
-    const iAnioE      = hE.indexOf('Año');
-    const iEgrLiq     = hE.indexOf('EgresoLiquidacion');
-    const iMedioPago  = hE.indexOf('MedioPago1');
-
-    const egresos = iNeto !== -1 && iMesE !== -1
-      ? filasEgr.slice(1)
-          .filter(f => {
-            if ((f[iMesE] || '').toString().toLowerCase().trim() !== mesLabel) return false;
-            // Filtro año exacto
-            if (iAnioE !== -1 && (f[iAnioE] || '').toString().trim() !== anioStr) return false;
-            // Solo fila base sin duplicados: EgresoLiquidacion == "Base Exenta"
-            if (iEgrLiq !== -1 && (f[iEgrLiq] || '').toString().trim() !== 'Base Exenta') return false;
-            // Excluir cruces contables (cualquier variante que contenga "CRUCE")
-            if (iMedioPago !== -1 && (f[iMedioPago] || '').toString().toUpperCase().includes('CRUCE')) return false;
-            return true;
-          })
-          .reduce((s, f) => s + parseCOP(f[iNeto]), 0)
-      : 0;
-
-    const flujo = ingresos - egresos;
-    const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+    const ingresos = parseFloat(rowsIngr[0]?.total || 0);
+    const egresos  = parseFloat(rowsEgr[0]?.total  || 0);
+    const flujo    = ingresos - egresos;
+    const fmt      = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
     // Días de caja: cuántos días de egresos cubre el flujo actual (22 días hábiles/mes)
     const diasCajaDisponibles = egresos > 0
@@ -398,60 +381,51 @@ async function kpiFlujoCaja({ mesLabel, anio }, metas = {}) {
   }
 }
 
-// ── KPI: Producción desde Costo_por Orden ─────────────────────────────────────
+// ── KPI: Producción desde costo_por_orden (PostgreSQL) ───────────────────────
 
 async function kpiProduccion({ mesNum, anio }, metas = {}) {
   try {
-    const filas = await readRange(SP1, 'Costo_por Orden!A:AZ');
-    if (filas.length <= 1) return { fuente: 'real', valor: 0, valorFormateado: '—' };
+    const { rows } = await query(
+      `SELECT
+         COUNT(*) AS ordenes,
+         SUM(COALESCE(costo_total_estimado,0)) AS sum_estimado,
+         SUM(COALESCE(costo_total,0))          AS sum_ejecutado,
+         SUM(COALESCE(valor_cumplido,0))       AS sum_valor
+       FROM crisolweb.costo_por_orden
+       WHERE EXTRACT(month FROM fecha) = $1
+         AND EXTRACT(year FROM fecha) = $2`,
+      [mesNum, anio]
+    );
 
-    const h = filas[0];
-    const iFechaFin = h.indexOf('FechaFinOP');
-    const iEstim    = h.indexOf('CostoTotalEstimado');
-    const iEjec     = h.indexOf('CostoTotalEjecutado1');
-    const iValor    = h.indexOf('ValorCumplido');
+    const ordenes  = parseInt(rows[0]?.ordenes       || 0, 10);
+    const sumEstim = parseFloat(rows[0]?.sum_estimado || 0);
+    const sumEjec  = parseFloat(rows[0]?.sum_ejecutado || 0);
+    const sumValor = parseFloat(rows[0]?.sum_valor    || 0);
 
-    if (iFechaFin === -1 || iEstim === -1 || iEjec === -1 || iValor === -1) {
-      return { fuente: 'error', detalle: 'Columnas no encontradas en Costo_por Orden' };
-    }
-
-    // Filtro: FechaFinOP en formato DD/MM/YYYY — extraer mes y año
-    const datos = filas.slice(1).filter(f => {
-      const m = String(f[iFechaFin] || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-      return m && parseInt(m[2], 10) === mesNum && parseInt(m[3], 10) === anio;
-    });
-
-    const ordenes = datos.length;
     if (ordenes === 0) {
       return { fuente: 'real', valor: 0, valorFormateado: '0%', ordenes: 0, detalle: 'Sin órdenes en este período' };
     }
-
-    const sumEstim = datos.reduce((s, f) => s + parseCOP(f[iEstim]), 0);
-    const sumEjec  = datos.reduce((s, f) => s + parseCOP(f[iEjec]),  0);
-    const sumValor = datos.reduce((s, f) => s + parseCOP(f[iValor]), 0);
 
     // Eficiencia = CostoEstimado / CostoEjecutado × 100 (> 100% = mejor de lo esperado)
     const eficiencia = sumEjec  > 0 ? Math.round(sumEstim / sumEjec  * 1000) / 10 : 0;
     // Margen producción = (ValorCumplido - CostoEjecutado) / ValorCumplido × 100
     const margenProd = sumValor > 0 ? Math.round((sumValor - sumEjec) / sumValor * 1000) / 10 : 0;
 
-    const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
-
-    const ahorro          = Math.round(sumEstim - sumEjec);
-    const utilidad        = Math.round(sumValor  - sumEjec);
+    const fmt      = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+    const ahorro   = Math.round(sumEstim - sumEjec);
+    const utilidad = Math.round(sumValor  - sumEjec);
 
     return {
       fuente: 'real',
       valor: eficiencia,
       valorFormateado: `${eficiencia}%`,
-      meta: `Meta: eficiencia > 100%`,
       ordenes,
       margenProduccion:   margenProd,
-      valorProducido:     fmt.format(sumValor),                          // ValorCumplido
-      costoEjecutado:     fmt.format(sumEjec),                           // CostoTotalEjecutado1
-      utilidadProduccion: fmt.format(utilidad),                          // ValorCumplido - CostoEjecutado
+      valorProducido:     fmt.format(sumValor),
+      costoEjecutado:     fmt.format(sumEjec),
+      utilidadProduccion: fmt.format(utilidad),
       ahorroPresupuesto:  ahorro >= 0 ? `+${fmt.format(ahorro)}` : fmt.format(ahorro),
-      ahorroNumerico:     ahorro,                                        // raw number para formatear en frontend
+      ahorroNumerico:     ahorro,
       meta: `Meta: > 100% | Mín. aceptable: ${getMeta(metas, 'eficiencia_produccion')}%`,
       detalle: `${ordenes} OPs | Efic.: ${eficiencia}% | Margen: ${margenProd.toFixed(1)}% | Producido: ${fmt.format(sumValor)}`,
       alerta: alertaColor(eficiencia, {
@@ -942,10 +916,10 @@ router.get('/', async (req, res) => {
     const metas = await loadMetasFromSheets();
 
     const [ventas, margen, cartera, flujo, cierre, produccion, rotacion, obligaciones, diario] = await Promise.all([
-      kpiVentasMeta({ mesLabel, anio }, metas),
-      kpiMargenBruto({ mesLabel, anio }, metas),
+      kpiVentasMeta({ mesNum, anio }, metas),
+      kpiMargenBruto({ mesNum, anio }, metas),
       kpiCarteraVencida(metas),
-      kpiFlujoCaja({ mesLabel, anio }, metas),
+      kpiFlujoCaja({ mesNum, anio }, metas),
       kpiCierreMensual(periodo, metas),
       kpiProduccion({ mesNum, anio }, metas),
       kpiRotacionPersonal(periodo, metas),
