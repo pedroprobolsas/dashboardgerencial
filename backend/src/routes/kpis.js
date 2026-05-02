@@ -180,7 +180,7 @@ async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
     const { rows } = await query(
       `SELECT SUM(valor_neto) AS total, COUNT(*) AS facturas
        FROM crisolweb.facturas
-       WHERE DATE_TRUNC('month', fecha_creacion) = $1::date
+       WHERE DATE_TRUNC('month', fecha_creacion AT TIME ZONE 'America/Bogota') = $1::date
          AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))
          AND valor_neto > 0`,
       [primerDiaMes]
