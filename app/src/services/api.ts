@@ -32,6 +32,10 @@ export interface KPIReal {
   totalVencidoPorPagar?: string;
   desgloseVencimientos?: { vencido?: string; d15?: string; d30?: string; d60?: string; d60plus?: string };
   topProveedores?: Array<{ nombre: string; monto: string }>;
+  // Ventas: desglose bruto / IVA / neto
+  valorBruto?: string;
+  valorIva?: string;
+  valorNetoTotal?: string;
   // Raw numbers para cálculos en AlertasPanel (flujo_caja)
   egresosRaw?: number;
   flujoRaw?: number;

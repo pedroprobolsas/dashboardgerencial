@@ -35,12 +35,17 @@ function adaptarKPI(raw: KPIReal): KPI {
     descripcionAlerta: descEstado,
   };
 
-  // ── Ventas: mostrar monto en pesos como valor principal ───────────────────
-  if (raw.id === 'ventas-meta' && raw.valorAbsoluto) {
+  // ── Ventas: valor bruto como principal + desglose IVA/neto ──────────────
+  if (raw.id === 'ventas-meta' && raw.valorBruto) {
+    const partes = [
+      raw.valorIva      ? `IVA: ${raw.valorIva}`       : null,
+      raw.valorNetoTotal ? `Con IVA: ${raw.valorNetoTotal}` : null,
+    ].filter(Boolean).join(' | ');
     return {
       ...base,
-      valorFormateado: raw.valorAbsoluto,
+      valorFormateado: raw.valorBruto,
       meta: `${raw.meta ?? ''} — ${raw.valorFormateado} cumplido`.trim(),
+      subtexto: partes || undefined,
     };
   }
 

@@ -178,7 +178,10 @@ async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
   try {
     const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
     const { rows } = await query(
-      `SELECT SUM(valor_neto) AS total, COUNT(*) AS facturas
+      `SELECT SUM(valor_bruto) AS total_bruto,
+              SUM(valor_iva)   AS total_iva,
+              SUM(valor_neto)  AS total_neto,
+              COUNT(*)         AS facturas
        FROM crisolweb.facturas
        WHERE fecha_creacion >= $1::date
          AND fecha_creacion <  ($1::date + INTERVAL '1 month')
@@ -186,21 +189,26 @@ async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
       [primerDiaMes]
     );
 
-    const facturas = parseInt(rows[0]?.facturas || 0, 10);
+    const facturas   = parseInt(rows[0]?.facturas    || 0, 10);
     if (facturas === 0) {
       return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin facturas este período', alerta: 'amarillo' };
     }
 
-    const total      = parseFloat(rows[0]?.total || 0);
+    const bruto      = parseFloat(rows[0]?.total_bruto || 0);
+    const iva        = parseFloat(rows[0]?.total_iva   || 0);
+    const neto       = parseFloat(rows[0]?.total_neto  || 0);
     const metaVentas = getMeta(metas, 'ventas_mes');
-    const pct        = Math.round((total / metaVentas) * 100);
+    const pct        = Math.round((bruto / metaVentas) * 100);
     const fmt        = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
     return {
       fuente: 'real',
       valor: pct,
       valorFormateado: `${pct}%`,
-      valorAbsoluto: fmt.format(total),
+      valorAbsoluto: fmt.format(bruto),
+      valorBruto:    fmt.format(bruto),
+      valorIva:      fmt.format(iva),
+      valorNetoTotal: fmt.format(neto),
       meta: `Meta: ${fmt.format(metaVentas)}`,
       alerta: alertaColor(pct, {
         verde:    v => v >= getMeta(metas, 'ventas_pct_verde'),
