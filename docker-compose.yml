@@ -19,6 +19,7 @@ services:
       - PORT=${PORT:-3001}
       - CORS_ORIGINS=${CORS_ORIGINS:-https://ippgerencia.probolsas.co}
       - NODE_ENV=${NODE_ENV:-production}
+      # ── Metas ────────────────────────────────────────────────────────────────
       - META_VENTAS=${META_VENTAS:-450000000}
       - META_VENTAS_PCT_VERDE=${META_VENTAS_PCT_VERDE:-90}
       - META_VENTAS_PCT_AMARILLO=${META_VENTAS_PCT_AMARILLO:-80}
@@ -29,6 +30,21 @@ services:
       - META_FLUJO_VERDE=${META_FLUJO_VERDE:-5000000}
       - META_CIERRE_VERDE=${META_CIERRE_VERDE:-100}
       - META_CIERRE_AMARILLO=${META_CIERRE_AMARILLO:-60}
+      # ── PostgreSQL ───────────────────────────────────────────────────────────
+      - DATABASE_URL=${DATABASE_URL}
+      - PG_HOST=${PG_HOST:-postgres_postgres}
+      - PG_PORT=${PG_PORT:-5432}
+      - PG_DATABASE=${PG_DATABASE:-probolsas_db}
+      - PG_USER=${PG_USER:-probolsas_user}
+      - PG_PASSWORD=${PG_PASSWORD}
+      # ── Feature flags — DATA_SOURCE por módulo ───────────────────────────────
+      # "postgres" = leer de probolsas_db | "sheets" = leer de Google Sheets
+      - DATA_SOURCE_VENTAS=${DATA_SOURCE_VENTAS:-postgres}
+      - DATA_SOURCE_EGRESOS=${DATA_SOURCE_EGRESOS:-postgres}
+      - DATA_SOURCE_COBROS=${DATA_SOURCE_COBROS:-sheets}
+      - DATA_SOURCE_COTIZACIONES=${DATA_SOURCE_COTIZACIONES:-sheets}
+      - DATA_SOURCE_ORDENES=${DATA_SOURCE_ORDENES:-sheets}
+      - DATA_SOURCE_CARTERA_CLI=${DATA_SOURCE_CARTERA_CLI:-sheets}
     networks:
       - proxy
       - probolsas

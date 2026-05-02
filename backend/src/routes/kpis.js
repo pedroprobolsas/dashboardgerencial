@@ -434,71 +434,56 @@ async function kpiProduccion({ mesNum, anio }, metas = {}) {
   }
 }
 
-// ── KPI: Obligaciones por vencer (desde CarteraPorPagarDetalladaPorTercero) ──
-// Fuente correcta: deuda ACTUAL de la empresa (solo obligaciones pendientes).
-// DiasVencidos negativo = vencida (ej: -30 = 30 días de mora).
-// DiasVencidos positivo = por vencer (ej: 15 = vence en 15 días).
+// ── KPI: Obligaciones por vencer (desde crisolweb.cartera_por_pagar) ──────────
+// dias_vencido > 0  → ya vencida (días de mora)
+// dias_vencido <= 0 → por vencer (negativo = días restantes hasta el vencimiento)
 // No filtra por período: liquidez en tiempo real.
 
 async function kpiObligacionesPorVencer() {
   try {
-    const filas = await readRange(SP2, 'CarteraPorPagarDetalladaPorTercero!A:AZ');
-    if (filas.length <= 1) return { fuente: 'real', valor: 0, valorFormateado: '$0' };
-
-    const h        = filas[0];
-    const iSaldo   = h.indexOf('Saldo');
-    const iDias    = h.indexOf('DiasVencidos');
-    // Buscar columna de nombre del proveedor (puede llamarse Tercero o NombreTercero)
-    const iTercero = h.indexOf('Tercero') !== -1 ? h.indexOf('Tercero') : h.indexOf('NombreTercero');
-
-    if (iSaldo === -1 || iDias === -1) {
-      return { fuente: 'error', detalle: 'Columnas Saldo/DiasVencidos no encontradas en CarteraPorPagarDetalladaPorTercero' };
-    }
-
-    let totalVencido = 0;
-    let d15 = 0, d30 = 0, d60 = 0, d60plus = 0;
-    const porProveedor = {};
-
-    filas.slice(1).forEach(f => {
-      const monto   = parseCOP(f[iSaldo]);
-      const dias    = parseInt((f[iDias] || '0').toString(), 10);
-      const tercero = iTercero !== -1 ? (f[iTercero] || '').toString().trim() : '';
-
-      if (!monto || isNaN(dias)) return;
-
-      // DiasVencidos negativo = vencida, positivo = por vencer
-      if (dias < 0) {
-        totalVencido += monto;
-      } else if (dias <= 15) {
-        d15 += monto;
-      } else if (dias <= 30) {
-        d30 += monto;
-      } else if (dias <= 60) {
-        d60 += monto;
-      } else {
-        d60plus += monto;
-      }
-
-      if (tercero) {
-        porProveedor[tercero] = (porProveedor[tercero] || 0) + monto;
-      }
-    });
-
-    const totalPorVencer = d15 + d30 + d60 + d60plus;
-    const total          = totalVencido + totalPorVencer;
     const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
-    const topProveedores = Object.entries(porProveedor)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([nombre, monto]) => ({ nombre, monto: fmt.format(monto) }));
+    const [{ rows: totales }, { rows: topRows }] = await Promise.all([
+      query(`
+        SELECT
+          COALESCE(SUM(saldo), 0)                                                        AS total,
+          COALESCE(SUM(CASE WHEN dias_vencido > 0              THEN saldo ELSE 0 END), 0) AS vencido,
+          COALESCE(SUM(CASE WHEN dias_vencido BETWEEN -15 AND 0 THEN saldo ELSE 0 END), 0) AS d15,
+          COALESCE(SUM(CASE WHEN dias_vencido BETWEEN -30 AND -16 THEN saldo ELSE 0 END), 0) AS d30,
+          COALESCE(SUM(CASE WHEN dias_vencido BETWEEN -60 AND -31 THEN saldo ELSE 0 END), 0) AS d60,
+          COALESCE(SUM(CASE WHEN dias_vencido < -60             THEN saldo ELSE 0 END), 0) AS d60plus
+        FROM crisolweb.cartera_por_pagar
+        WHERE saldo > 0
+      `),
+      query(`
+        SELECT nombre, SUM(saldo) AS monto
+        FROM crisolweb.cartera_por_pagar
+        WHERE saldo > 0
+        GROUP BY nombre
+        ORDER BY monto DESC
+        LIMIT 5
+      `),
+    ]);
+
+    const total          = parseFloat(totales[0]?.total   || 0);
+    const totalVencido   = parseFloat(totales[0]?.vencido || 0);
+    const d15            = parseFloat(totales[0]?.d15     || 0);
+    const d30            = parseFloat(totales[0]?.d30     || 0);
+    const d60            = parseFloat(totales[0]?.d60     || 0);
+    const d60plus        = parseFloat(totales[0]?.d60plus || 0);
+    const totalPorVencer = d15 + d30 + d60 + d60plus;
+
+    const topProveedores = topRows.map(r => ({
+      nombre: r.nombre,
+      monto:  fmt.format(parseFloat(r.monto || 0)),
+    }));
 
     return {
-      fuente:             'real',
-      valor:              total,
-      valorFormateado:    fmt.format(total),
-      meta:               'Total obligaciones activas',
-      totalPorVencer:     fmt.format(totalPorVencer),
+      fuente:               'real',
+      valor:                total,
+      valorFormateado:      fmt.format(total),
+      meta:                 'Total obligaciones activas',
+      totalPorVencer:       fmt.format(totalPorVencer),
       totalVencidoPorPagar: fmt.format(totalVencido),
       desgloseVencimientos: {
         vencido: fmt.format(totalVencido),
@@ -508,7 +493,7 @@ async function kpiObligacionesPorVencer() {
         d60plus: fmt.format(d60plus),
       },
       topProveedores,
-      totalVencidoRaw: totalVencido,  // para cálculo brecha en frontend
+      totalVencidoRaw: totalVencido,
       d15Raw:          d15,
       d30Raw:          d30,
       alerta: alertaColor(totalVencido, {
@@ -600,11 +585,33 @@ async function kpiDiario(targetFecha = null, metas = {}) {
     const tD = targetDate.getDate();
     const tM = targetDate.getMonth() + 1;
     const tY = targetDate.getFullYear();
+    const fechaStr = `${tY}-${String(tM).padStart(2, '0')}-${String(tD).padStart(2, '0')}`;
 
-    const [filasVentas, filasIngr, filasEgr] = await Promise.all([
-      readRange(SP1, 'Facturacion_OP!A:AZ'),
+    const usePgVentas  = process.env.DATA_SOURCE_VENTAS  !== 'sheets';
+    const usePgEgresos = process.env.DATA_SOURCE_EGRESOS !== 'sheets';
+
+    // Lanzar todas las fuentes necesarias en paralelo
+    const [
+      pgVHoy, pgVMes,
+      filasIngr,
+      pgEHoy, pgEMes,
+      filasVentas, filasEgr,
+    ] = await Promise.all([
+      usePgVentas
+        ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE fecha_creacion::date = $1`, [fechaStr])
+        : Promise.resolve(null),
+      usePgVentas
+        ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE EXTRACT(year FROM fecha_creacion) = $1 AND EXTRACT(month FROM fecha_creacion) = $2 AND fecha_creacion::date <= $3`, [tY, tM, fechaStr])
+        : Promise.resolve(null),
       readRange(SP1, 'LISTADO_DE_INGRESOS!A:AZ'),
-      readRange(SP2, 'Consecutivo_de_egresos!A:AZ'),
+      usePgEgresos
+        ? query(`SELECT COALESCE(SUM(valor), 0) AS total FROM crisolweb.consecutivo_egresos WHERE fecha_contable::date = $1 AND (liquidacion = 'Base Exenta' OR liquidacion IS NULL) AND (concepto IS NULL OR concepto NOT ILIKE '%CRUCE%')`, [fechaStr])
+        : Promise.resolve(null),
+      usePgEgresos
+        ? query(`SELECT COALESCE(SUM(valor), 0) AS total FROM crisolweb.consecutivo_egresos WHERE EXTRACT(year FROM fecha_contable) = $1 AND EXTRACT(month FROM fecha_contable) = $2 AND fecha_contable::date <= $3 AND (liquidacion = 'Base Exenta' OR liquidacion IS NULL) AND (concepto IS NULL OR concepto NOT ILIKE '%CRUCE%')`, [tY, tM, fechaStr])
+        : Promise.resolve(null),
+      usePgVentas  ? Promise.resolve([]) : readRange(SP1, 'Facturacion_OP!A:AZ'),
+      usePgEgresos ? Promise.resolve([]) : readRange(SP2, 'Consecutivo_de_egresos!A:AZ'),
     ]);
 
     const parseFecha = (val) => {
@@ -621,20 +628,25 @@ async function kpiDiario(targetFecha = null, metas = {}) {
     const esMesTarget = (fObj) => fObj && fObj.m === tM && fObj.y === tY && fObj.d <= tD;
 
     // 1. VENTAS
-    const hV = filasVentas[0] || [];
-    const iValV = hV.indexOf('ValorFacturado');
-    const iFecV = hV.findIndex(h => ['FechaContable', 'Fecha', 'FECHA'].includes(h));
     let ventasHoy = 0, ventasMes = 0;
-    if (iValV !== -1 && iFecV !== -1) {
-      filasVentas.slice(1).forEach(f => {
-        const fecha = parseFecha(f[iFecV]);
-        const monto = parseCOP(f[iValV]);
-        if (esDiaTarget(fecha)) ventasHoy += monto;
-        if (esMesTarget(fecha)) ventasMes += monto;
-      });
+    if (usePgVentas) {
+      ventasHoy = parseFloat(pgVHoy.rows[0]?.total || 0);
+      ventasMes = parseFloat(pgVMes.rows[0]?.total || 0);
+    } else {
+      const hV    = filasVentas[0] || [];
+      const iValV = hV.indexOf('ValorFacturado');
+      const iFecV = hV.findIndex(h => ['FechaContable', 'Fecha', 'FECHA'].includes(h));
+      if (iValV !== -1 && iFecV !== -1) {
+        filasVentas.slice(1).forEach(f => {
+          const fecha = parseFecha(f[iFecV]);
+          const monto = parseCOP(f[iValV]);
+          if (esDiaTarget(fecha)) ventasHoy += monto;
+          if (esMesTarget(fecha)) ventasMes += monto;
+        });
+      }
     }
 
-    // 2. INGRESOS (COBROS)
+    // 2. INGRESOS (COBROS) — siempre desde Sheets
     const hI = filasIngr[0] || [];
     const iValI = hI.indexOf('ValorRecibido');
     const iFecI = hI.findIndex(h => ['Fecha', 'FECHA', 'FechaContable'].includes(h));
@@ -652,22 +664,26 @@ async function kpiDiario(targetFecha = null, metas = {}) {
     }
 
     // 3. EGRESOS
-    const hE = filasEgr[0] || [];
-    const iValE = hE.findIndex(h => ['NetoPagar2', 'Valor', 'Neto'].includes(h));
-    const iFecE = hE.findIndex(h => ['Fecha1', 'Fecha', 'FECHA', 'FechaContable'].includes(h));
-    const iEgrLiq = hE.indexOf('EgresoLiquidacion');
-    const iMedioPago = hE.indexOf('MedioPago1');
     let egresosHoy = 0, egresosMes = 0;
-
-    if (iValE !== -1 && iFecE !== -1) {
-      filasEgr.slice(1).forEach(f => {
-        if (iEgrLiq !== -1 && (f[iEgrLiq] || '').toString().trim() !== 'Base Exenta') return;
-        if (iMedioPago !== -1 && (f[iMedioPago] || '').toString().toUpperCase().includes('CRUCE')) return;
-        const fecha = parseFecha(f[iFecE]);
-        const monto = parseCOP(f[iValE]);
-        if (esDiaTarget(fecha)) egresosHoy += monto;
-        if (esMesTarget(fecha)) egresosMes += monto;
-      });
+    if (usePgEgresos) {
+      egresosHoy = parseFloat(pgEHoy.rows[0]?.total || 0);
+      egresosMes = parseFloat(pgEMes.rows[0]?.total || 0);
+    } else {
+      const hE         = filasEgr[0] || [];
+      const iValE      = hE.findIndex(h => ['NetoPagar2', 'Valor', 'Neto'].includes(h));
+      const iFecE      = hE.findIndex(h => ['Fecha1', 'Fecha', 'FECHA', 'FechaContable'].includes(h));
+      const iEgrLiq    = hE.indexOf('EgresoLiquidacion');
+      const iMedioPago = hE.indexOf('MedioPago1');
+      if (iValE !== -1 && iFecE !== -1) {
+        filasEgr.slice(1).forEach(f => {
+          if (iEgrLiq    !== -1 && (f[iEgrLiq]    || '').toString().trim() !== 'Base Exenta') return;
+          if (iMedioPago !== -1 && (f[iMedioPago] || '').toString().toUpperCase().includes('CRUCE')) return;
+          const fecha = parseFecha(f[iFecE]);
+          const monto = parseCOP(f[iValE]);
+          if (esDiaTarget(fecha)) egresosHoy += monto;
+          if (esMesTarget(fecha)) egresosMes += monto;
+        });
+      }
     }
 
     const metaVentas = getMeta(metas, 'ventas_mes');
@@ -770,28 +786,54 @@ async function ejecutarSnapshot(fechaParam = null) {
   const esDia = (f) => f && f.d === tD && f.m === tM && f.y === tY;
   const esMes = (f) => f && f.m === tM && f.y === tY && f.d <= tD;
 
-  const [filasVentas, filasIngr, filasEgr, metas] = await Promise.all([
-    readRange(SP1, 'Facturacion_OP!A:AZ'),
+  const usePgVentas  = process.env.DATA_SOURCE_VENTAS  !== 'sheets';
+  const usePgEgresos = process.env.DATA_SOURCE_EGRESOS !== 'sheets';
+
+  const [
+    pgVHoy, pgVMes,
+    filasIngr,
+    pgEHoy, pgEMes,
+    filasVentas, filasEgr,
+    metas,
+  ] = await Promise.all([
+    usePgVentas
+      ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE fecha_creacion::date = $1`, [fecha])
+      : Promise.resolve(null),
+    usePgVentas
+      ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE EXTRACT(year FROM fecha_creacion) = $1 AND EXTRACT(month FROM fecha_creacion) = $2 AND fecha_creacion::date <= $3`, [tY, tM, fecha])
+      : Promise.resolve(null),
     readRange(SP1, 'LISTADO_DE_INGRESOS!A:AZ'),
-    readRange(SP2, 'Consecutivo_de_egresos!A:AZ'),
+    usePgEgresos
+      ? query(`SELECT COALESCE(SUM(valor), 0) AS total FROM crisolweb.consecutivo_egresos WHERE fecha_contable::date = $1 AND (liquidacion = 'Base Exenta' OR liquidacion IS NULL) AND (concepto IS NULL OR concepto NOT ILIKE '%CRUCE%')`, [fecha])
+      : Promise.resolve(null),
+    usePgEgresos
+      ? query(`SELECT COALESCE(SUM(valor), 0) AS total FROM crisolweb.consecutivo_egresos WHERE EXTRACT(year FROM fecha_contable) = $1 AND EXTRACT(month FROM fecha_contable) = $2 AND fecha_contable::date <= $3 AND (liquidacion = 'Base Exenta' OR liquidacion IS NULL) AND (concepto IS NULL OR concepto NOT ILIKE '%CRUCE%')`, [tY, tM, fecha])
+      : Promise.resolve(null),
+    usePgVentas  ? Promise.resolve([]) : readRange(SP1, 'Facturacion_OP!A:AZ'),
+    usePgEgresos ? Promise.resolve([]) : readRange(SP2, 'Consecutivo_de_egresos!A:AZ'),
     loadMetasFromSheets(),
   ]);
 
   // Ventas
-  const hV    = filasVentas[0] || [];
-  const iValV = hV.indexOf('ValorFacturado');
-  const iFecV = hV.findIndex(h => ['FechaContable', 'Fecha', 'FECHA'].includes(h));
   let ventasHoy = 0, ventasMes = 0;
-  if (iValV !== -1 && iFecV !== -1) {
-    filasVentas.slice(1).forEach(f => {
-      const fObj = parseFechaSnap(f[iFecV]);
-      const v    = parseCOP(f[iValV]);
-      if (esDia(fObj)) ventasHoy += v;
-      if (esMes(fObj)) ventasMes += v;
-    });
+  if (usePgVentas) {
+    ventasHoy = parseFloat(pgVHoy.rows[0]?.total || 0);
+    ventasMes = parseFloat(pgVMes.rows[0]?.total || 0);
+  } else {
+    const hV    = filasVentas[0] || [];
+    const iValV = hV.indexOf('ValorFacturado');
+    const iFecV = hV.findIndex(h => ['FechaContable', 'Fecha', 'FECHA'].includes(h));
+    if (iValV !== -1 && iFecV !== -1) {
+      filasVentas.slice(1).forEach(f => {
+        const fObj = parseFechaSnap(f[iFecV]);
+        const v    = parseCOP(f[iValV]);
+        if (esDia(fObj)) ventasHoy += v;
+        if (esMes(fObj)) ventasMes += v;
+      });
+    }
   }
 
-  // Cobros
+  // Cobros — siempre desde Sheets
   const hI      = filasIngr[0] || [];
   const iValI   = hI.indexOf('ValorRecibido');
   const iFecI   = hI.findIndex(h => ['Fecha', 'FECHA', 'FechaContable'].includes(h));
@@ -809,21 +851,26 @@ async function ejecutarSnapshot(fechaParam = null) {
   }
 
   // Egresos
-  const hE         = filasEgr[0] || [];
-  const iValE      = hE.findIndex(h => ['NetoPagar2', 'Valor', 'Neto'].includes(h));
-  const iFecE      = hE.findIndex(h => ['Fecha1', 'Fecha', 'FECHA', 'FechaContable'].includes(h));
-  const iEgrLiq    = hE.indexOf('EgresoLiquidacion');
-  const iMedioPago = hE.indexOf('MedioPago1');
   let egresosHoy = 0, egresosMes = 0;
-  if (iValE !== -1 && iFecE !== -1) {
-    filasEgr.slice(1).forEach(f => {
-      if (iEgrLiq    !== -1 && (f[iEgrLiq]    || '').trim().toUpperCase() !== 'BASE EXENTA') return;
-      if (iMedioPago !== -1 && (f[iMedioPago] || '').toUpperCase().includes('CRUCE')) return;
-      const fObj = parseFechaSnap(f[iFecE]);
-      const v    = parseCOP(f[iValE]);
-      if (esDia(fObj)) egresosHoy += v;
-      if (esMes(fObj)) egresosMes += v;
-    });
+  if (usePgEgresos) {
+    egresosHoy = parseFloat(pgEHoy.rows[0]?.total || 0);
+    egresosMes = parseFloat(pgEMes.rows[0]?.total || 0);
+  } else {
+    const hE         = filasEgr[0] || [];
+    const iValE      = hE.findIndex(h => ['NetoPagar2', 'Valor', 'Neto'].includes(h));
+    const iFecE      = hE.findIndex(h => ['Fecha1', 'Fecha', 'FECHA', 'FechaContable'].includes(h));
+    const iEgrLiq    = hE.indexOf('EgresoLiquidacion');
+    const iMedioPago = hE.indexOf('MedioPago1');
+    if (iValE !== -1 && iFecE !== -1) {
+      filasEgr.slice(1).forEach(f => {
+        if (iEgrLiq    !== -1 && (f[iEgrLiq]    || '').trim().toUpperCase() !== 'BASE EXENTA') return;
+        if (iMedioPago !== -1 && (f[iMedioPago] || '').toUpperCase().includes('CRUCE')) return;
+        const fObj = parseFechaSnap(f[iFecE]);
+        const v    = parseCOP(f[iValE]);
+        if (esDia(fObj)) egresosHoy += v;
+        if (esMes(fObj)) egresosMes += v;
+      });
+    }
   }
 
   const metaVentas = getMeta(metas, 'ventas_mes');
