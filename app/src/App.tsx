@@ -228,7 +228,7 @@ function Dashboard() {
           cargando ? 'bg-slate-50 border-slate-200 text-slate-500' :
           'bg-emerald-50 border-emerald-200 text-emerald-700'
         }`}>
-          {cargando ? 'Cargando datos…' : errorAPI ? 'Usando datos de respaldo' : 'Datos en tiempo real — Google Sheets'}
+          {cargando ? 'Cargando datos…' : errorAPI ? 'Usando datos de respaldo' : 'Datos en tiempo real — crisolweb'}
         </span>
       </div>
 
