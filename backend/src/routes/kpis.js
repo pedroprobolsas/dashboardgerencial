@@ -344,33 +344,25 @@ async function kpiCarteraVencida(metas = {}) {
 
 async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
   try {
-    const [{ rows: rowsIngr }, { rows: rowsEgr }] = await Promise.all([
-      // Proxy de ingresos: facturas del mes (fecha_creacion en ingresos tiene NULLs históricos)
-      query(
-        `SELECT SUM(valor_neto) AS total
-         FROM crisolweb.facturas
-         WHERE fecha_creacion >= $1::date
-           AND fecha_creacion <  ($1::date + INTERVAL '1 month')
-           AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))`,
-        [`${anio}-${String(mesNum).padStart(2, '0')}-01`]
-      ),
-      query(
-        `SELECT SUM(valor) AS total
-         FROM crisolweb.consecutivo_egresos
-         WHERE EXTRACT(month FROM fecha_contable) = $1
-           AND EXTRACT(year FROM fecha_contable) = $2
-           AND (liquidacion = 'Base Exenta' OR liquidacion IS NULL)
-           AND (concepto IS NULL OR concepto NOT ILIKE '%CRUCE%')`,
-        [mesNum, anio]
-      ),
-    ]);
+    const mesStr = `${anio}-${String(mesNum).padStart(2, '0')}`;
+    const { rows } = await query(
+      `SELECT ingresos_mes_acum, egresos_mes_acum, flujo_mes_acum
+       FROM analytics.v_vistazo_diario
+       WHERE mes = $1
+       ORDER BY fecha DESC
+       LIMIT 1`,
+      [mesStr]
+    );
 
-    const ingresos = parseFloat(rowsIngr[0]?.total || 0);
-    const egresos  = parseFloat(rowsEgr[0]?.total  || 0);
-    const flujo    = ingresos - egresos;
+    if (!rows[0]) {
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin datos este período', alerta: 'amarillo' };
+    }
+
+    const ingresos = parseFloat(rows[0].ingresos_mes_acum || 0);
+    const egresos  = parseFloat(rows[0].egresos_mes_acum  || 0);
+    const flujo    = parseFloat(rows[0].flujo_mes_acum    || 0);
     const fmt      = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
-    // Días de caja: cuántos días de egresos cubre el flujo actual (22 días hábiles/mes)
     const diasCajaDisponibles = egresos > 0
       ? parseFloat((flujo / (egresos / 22)).toFixed(1))
       : null;
@@ -528,205 +520,64 @@ async function kpiObligacionesPorVencer() {
 async function kpiDiario(targetFecha = null, metas = {}) {
   try {
     const ahoraCol = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
-    const hoyISO = ahoraCol.toISOString().split('T')[0];
-    const esConsultaHistoria = targetFecha && targetFecha !== hoyISO;
+    const hoyISO   = ahoraCol.toISOString().split('T')[0];
+    const fechaStr = targetFecha || hoyISO;
 
-    // ── 1. Intentar leer de Historial si no es "hoy" ──
-    if (esConsultaHistoria) {
-      try {
-        const filasHist = await readRange(SP1, 'Vistazo_Diario_Historico!A:J');
-        if (filasHist.length > 1) {
-          const headers = filasHist[0];
-          const iFecha = headers.indexOf('Fecha');
-          // Buscar la fila de la fecha solicitada
-          const fila = filasHist.slice(1).find(f => f[iFecha] === targetFecha);
-
-          if (fila) {
-            console.log(`Cargando datos históricos para ${targetFecha} desde Sheets`);
-            const getV = (col) => {
-              const idx = headers.indexOf(col);
-              return idx !== -1 ? fila[idx] || '0' : '0';
-            };
-            const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
-
-            const vMeta       = parseCOP(getV('Meta_Ventas_Mes'));
-            const vVentasDia  = parseCOP(getV('Ventas_Dia'));
-            const vEgresosDia = parseCOP(getV('Egresos_Dia'));
-            const vCobrosDia  = parseCOP(getV('Cobros_Dia'));
-            const vVentasMes  = parseCOP(getV('Ventas_Mes_Acum'));
-            const vEgresosMes = parseCOP(getV('Egresos_Mes_Acum'));
-            const vCobrosMes  = parseCOP(getV('Cobros_Mes_Acum'));
-            const vSaldoHoy   = vCobrosDia - vEgresosDia;
-            const vFlujoMes   = vCobrosMes - vEgresosMes;
-            const pctVentasMes = vMeta > 0 ? (vVentasMes / vMeta) * 100 : 0;
-
-            return {
-              fecha: targetFecha,
-              fuente: 'historial',
-              hoy: {
-                ventas:     { valor: fmt.format(vVentasDia),  alerta: vVentasDia > 0 ? 'verde' : 'amarillo' },
-                egresos:    { valor: fmt.format(vEgresosDia), alerta: 'rojo' },
-                cobros:     { valor: fmt.format(vCobrosDia),  alerta: 'verde' },
-                saldo_neto: { valor: fmt.format(vSaldoHoy),   alerta: vSaldoHoy >= 0 ? 'verde' : 'rojo' },
-                crudo: { ventasHoy: vVentasDia, egresosHoy: vEgresosDia, cobrosHoy: vCobrosDia }
-              },
-              mes: {
-                ventas: {
-                  valor: fmt.format(vVentasMes),
-                  alerta: pctVentasMes >= getMeta(metas, 'ventas_pct_verde') ? 'verde' :
-                          pctVentasMes >= getMeta(metas, 'ventas_pct_amarillo') ? 'amarillo' : 'rojo'
-                },
-                egresos:    { valor: fmt.format(vEgresosMes), alerta: 'rojo' },
-                cobros:     { valor: fmt.format(vCobrosMes),  alerta: 'verde' },
-                flujo_neto: { valor: fmt.format(vFlujoMes),   alerta: vFlujoMes >= 0 ? 'verde' : 'rojo' },
-                meta_ventas: fmt.format(vMeta),
-                pct_ventas:  `${Math.round(pctVentasMes)}%`,
-                crudo: { ventasMes: vVentasMes, egresosMes: vEgresosMes, cobrosMes: vCobrosMes, metaVentas: vMeta }
-              }
-            };
-          }
-        }
-      } catch (err) {
-        console.warn('Error leyendo Vistazo_Diario_Historico (procediendo a cálculo manual):', err.message);
-      }
-    }
-
-    // ── 2. Cálculo en tiempo real (si es hoy o no se encontró en historial) ──
-    const targetDate = targetFecha ? new Date(targetFecha + 'T00:00:00-05:00') : ahoraCol;
-    const tD = targetDate.getDate();
-    const tM = targetDate.getMonth() + 1;
-    const tY = targetDate.getFullYear();
-    const fechaStr = `${tY}-${String(tM).padStart(2, '0')}-${String(tD).padStart(2, '0')}`;
-
-    const usePgVentas  = process.env.DATA_SOURCE_VENTAS  !== 'sheets';
-    const usePgEgresos = process.env.DATA_SOURCE_EGRESOS !== 'sheets';
-
-    // Lanzar todas las fuentes necesarias en paralelo
-    const [
-      pgVHoy, pgVMes,
-      filasIngr,
-      pgEHoy, pgEMes,
-      filasVentas, filasEgr,
-    ] = await Promise.all([
-      usePgVentas
-        ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE fecha_creacion::date = $1 AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR')) AND valor_neto > 0`, [fechaStr])
-        : Promise.resolve(null),
-      usePgVentas
-        ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE DATE_TRUNC('month', fecha_creacion) = $1::date AND fecha_creacion::date <= $2 AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR')) AND valor_neto > 0`, [`${tY}-${String(tM).padStart(2, '0')}-01`, fechaStr])
-        : Promise.resolve(null),
-      readRange(SP1, 'LISTADO_DE_INGRESOS!A:AZ'),
-      usePgEgresos
-        ? query(`SELECT COALESCE(SUM(valor), 0) AS total FROM crisolweb.consecutivo_egresos WHERE fecha_contable::date = $1 AND (liquidacion = 'Base Exenta' OR liquidacion IS NULL) AND (concepto IS NULL OR concepto NOT ILIKE '%CRUCE%')`, [fechaStr])
-        : Promise.resolve(null),
-      usePgEgresos
-        ? query(`SELECT COALESCE(SUM(valor), 0) AS total FROM crisolweb.consecutivo_egresos WHERE EXTRACT(year FROM fecha_contable) = $1 AND EXTRACT(month FROM fecha_contable) = $2 AND fecha_contable::date <= $3 AND (liquidacion = 'Base Exenta' OR liquidacion IS NULL) AND (concepto IS NULL OR concepto NOT ILIKE '%CRUCE%')`, [tY, tM, fechaStr])
-        : Promise.resolve(null),
-      usePgVentas  ? Promise.resolve([]) : readRange(SP1, 'Facturacion_OP!A:AZ'),
-      usePgEgresos ? Promise.resolve([]) : readRange(SP2, 'Consecutivo_de_egresos!A:AZ'),
+    const [{ rows: rowsHoy }, { rows: rowsMes }] = await Promise.all([
+      query(
+        `SELECT ventas_dia, ingresos_dia, egresos_dia, flujo_neto_dia
+         FROM analytics.v_vistazo_diario
+         WHERE fecha = $1::date`,
+        [fechaStr]
+      ),
+      query(
+        `SELECT ventas_mes_acum, ingresos_mes_acum, egresos_mes_acum, flujo_mes_acum
+         FROM analytics.v_vistazo_diario
+         WHERE mes = TO_CHAR($1::date, 'YYYY-MM')
+         ORDER BY fecha DESC
+         LIMIT 1`,
+        [fechaStr]
+      ),
     ]);
 
-    const parseFecha = (val) => {
-      if (!val) return null;
-      const s = String(val).trim();
-      const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-      if (dmy) return { d: parseInt(dmy[1], 10), m: parseInt(dmy[2], 10), y: parseInt(dmy[3], 10) };
-      const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (iso) return { y: parseInt(iso[1], 10), m: parseInt(iso[2], 10), d: parseInt(iso[3], 10) };
-      return null;
-    };
-
-    const esDiaTarget = (fObj) => fObj && fObj.d === tD && fObj.m === tM && fObj.y === tY;
-    const esMesTarget = (fObj) => fObj && fObj.m === tM && fObj.y === tY && fObj.d <= tD;
-
-    // 1. VENTAS
-    let ventasHoy = 0, ventasMes = 0;
-    if (usePgVentas) {
-      ventasHoy = parseFloat(pgVHoy.rows[0]?.total || 0);
-      ventasMes = parseFloat(pgVMes.rows[0]?.total || 0);
-    } else {
-      const hV    = filasVentas[0] || [];
-      const iValV = hV.indexOf('ValorFacturado');
-      const iFecV = hV.findIndex(h => ['FechaContable', 'Fecha', 'FECHA'].includes(h));
-      if (iValV !== -1 && iFecV !== -1) {
-        filasVentas.slice(1).forEach(f => {
-          const fecha = parseFecha(f[iFecV]);
-          const monto = parseCOP(f[iValV]);
-          if (esDiaTarget(fecha)) ventasHoy += monto;
-          if (esMesTarget(fecha)) ventasMes += monto;
-        });
-      }
-    }
-
-    // 2. INGRESOS (COBROS) — siempre desde Sheets
-    const hI = filasIngr[0] || [];
-    const iValI = hI.indexOf('ValorRecibido');
-    const iFecI = hI.findIndex(h => ['Fecha', 'FECHA', 'FechaContable'].includes(h));
-    const iIngLiq = hI.indexOf('IngresoLiquidacion');
-    let cobrosHoy = 0, cobrosMes = 0;
-    if (iValI !== -1 && iFecI !== -1) {
-      filasIngr.slice(1).forEach(f => {
-        const liq = iIngLiq !== -1 ? (f[iIngLiq] || '').toString().trim() : '';
-        if (liq !== '') return;
-        const fecha = parseFecha(f[iFecI]);
-        const monto = parseCOP(f[iValI]);
-        if (esDiaTarget(fecha)) cobrosHoy += monto;
-        if (esMesTarget(fecha)) cobrosMes += monto;
-      });
-    }
-
-    // 3. EGRESOS
-    let egresosHoy = 0, egresosMes = 0;
-    if (usePgEgresos) {
-      egresosHoy = parseFloat(pgEHoy.rows[0]?.total || 0);
-      egresosMes = parseFloat(pgEMes.rows[0]?.total || 0);
-    } else {
-      const hE         = filasEgr[0] || [];
-      const iValE      = hE.findIndex(h => ['NetoPagar2', 'Valor', 'Neto'].includes(h));
-      const iFecE      = hE.findIndex(h => ['Fecha1', 'Fecha', 'FECHA', 'FechaContable'].includes(h));
-      const iEgrLiq    = hE.indexOf('EgresoLiquidacion');
-      const iMedioPago = hE.indexOf('MedioPago1');
-      if (iValE !== -1 && iFecE !== -1) {
-        filasEgr.slice(1).forEach(f => {
-          if (iEgrLiq    !== -1 && (f[iEgrLiq]    || '').toString().trim() !== 'Base Exenta') return;
-          if (iMedioPago !== -1 && (f[iMedioPago] || '').toString().toUpperCase().includes('CRUCE')) return;
-          const fecha = parseFecha(f[iFecE]);
-          const monto = parseCOP(f[iValE]);
-          if (esDiaTarget(fecha)) egresosHoy += monto;
-          if (esMesTarget(fecha)) egresosMes += monto;
-        });
-      }
-    }
-
-    const metaVentas = getMeta(metas, 'ventas_mes');
-    const pctVentasMes = metaVentas > 0 ? (ventasMes / metaVentas) * 100 : 0;
     const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
-    const saldoHoy = cobrosHoy - egresosHoy;
-    const flujoMes = cobrosMes - egresosMes;
+    const ventasHoy   = parseFloat(rowsHoy[0]?.ventas_dia    || 0);
+    const ingresosHoy = parseFloat(rowsHoy[0]?.ingresos_dia  || 0);
+    const egresosHoy  = parseFloat(rowsHoy[0]?.egresos_dia   || 0);
+    const flujoHoy    = parseFloat(rowsHoy[0]?.flujo_neto_dia || 0);
+
+    const ventasMes   = parseFloat(rowsMes[0]?.ventas_mes_acum   || 0);
+    const ingresosMes = parseFloat(rowsMes[0]?.ingresos_mes_acum || 0);
+    const egresosMes  = parseFloat(rowsMes[0]?.egresos_mes_acum  || 0);
+    const flujoMes    = parseFloat(rowsMes[0]?.flujo_mes_acum    || 0);
+
+    const metaVentas   = getMeta(metas, 'ventas_mes');
+    const pctVentasMes = metaVentas > 0 ? (ventasMes / metaVentas) * 100 : 0;
 
     return {
-      fecha: targetFecha || hoyISO,
-      fuente: 'calculo_manual',
+      fecha: fechaStr,
+      fuente: 'real',
       hoy: {
-        ventas:     { valor: fmt.format(ventasHoy),  alerta: ventasHoy > 0 ? 'verde' : 'amarillo' },
-        egresos:    { valor: fmt.format(egresosHoy), alerta: 'rojo' },
-        cobros:     { valor: fmt.format(cobrosHoy),  alerta: 'verde' },
-        saldo_neto: { valor: fmt.format(saldoHoy),   alerta: saldoHoy >= 0 ? 'verde' : 'rojo' },
-        crudo: { ventasHoy, egresosHoy, cobrosHoy }
+        ventas:     { valor: fmt.format(ventasHoy),   alerta: ventasHoy > 0 ? 'verde' : 'amarillo' },
+        egresos:    { valor: fmt.format(egresosHoy),  alerta: 'rojo' },
+        cobros:     { valor: fmt.format(ingresosHoy), alerta: 'verde' },
+        saldo_neto: { valor: fmt.format(flujoHoy),    alerta: flujoHoy >= 0 ? 'verde' : 'rojo' },
+        crudo: { ventasHoy, egresosHoy, cobrosHoy: ingresosHoy },
       },
       mes: {
-        ventas:     { 
-          valor: fmt.format(ventasMes), 
-          alerta: pctVentasMes >= getMeta(metas, 'ventas_pct_verde') ? 'verde' : 
-                  pctVentasMes >= getMeta(metas, 'ventas_pct_amarillo') ? 'amarillo' : 'rojo' 
+        ventas: {
+          valor: fmt.format(ventasMes),
+          alerta: pctVentasMes >= getMeta(metas, 'ventas_pct_verde') ? 'verde' :
+                  pctVentasMes >= getMeta(metas, 'ventas_pct_amarillo') ? 'amarillo' : 'rojo',
         },
-        egresos:    { valor: fmt.format(egresosMes), alerta: 'rojo' },
-        cobros:     { valor: fmt.format(cobrosMes),  alerta: 'verde' },
-        flujo_neto: { valor: fmt.format(flujoMes),   alerta: flujoMes >= 0 ? 'verde' : 'rojo' },
-        meta_ventas:    fmt.format(metaVentas),
-        pct_ventas:     `${Math.round(pctVentasMes)}%`,
-        crudo: { ventasMes, egresosMes, cobrosMes, metaVentas }
-      }
+        egresos:    { valor: fmt.format(egresosMes),  alerta: 'rojo' },
+        cobros:     { valor: fmt.format(ingresosMes), alerta: 'verde' },
+        flujo_neto: { valor: fmt.format(flujoMes),    alerta: flujoMes >= 0 ? 'verde' : 'rojo' },
+        meta_ventas: fmt.format(metaVentas),
+        pct_ventas:  `${Math.round(pctVentasMes)}%`,
+        crudo: { ventasMes, egresosMes, cobrosMes: ingresosMes, metaVentas },
+      },
     };
   } catch (err) {
     console.error('kpiDiario error:', err.message);
