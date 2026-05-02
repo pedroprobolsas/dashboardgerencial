@@ -1006,14 +1006,29 @@ router.get('/ventas-debug', async (req, res) => {
     // 1. crisolweb.facturas (fuente actual)
     let facturas = null;
     try {
-      const { rows } = await query(
-        `SELECT COALESCE(SUM(valor_neto), 0) AS total, COUNT(*) AS registros,
-                MIN(fecha_creacion) AS fecha_min, MAX(fecha_creacion) AS fecha_max
-         FROM crisolweb.facturas
-         WHERE EXTRACT(month FROM fecha_creacion) = $1 AND EXTRACT(year FROM fecha_creacion) = $2`,
-        [mesNum, anio]
-      );
-      facturas = { total: fmt.format(rows[0].total), registros: rows[0].registros, fecha_min: rows[0].fecha_min, fecha_max: rows[0].fecha_max };
+      const [{ rows }, { rows: estadoRows }] = await Promise.all([
+        query(
+          `SELECT COALESCE(SUM(valor_neto), 0) AS total, COUNT(*) AS registros,
+                  MIN(fecha_creacion) AS fecha_min, MAX(fecha_creacion) AS fecha_max
+           FROM crisolweb.facturas
+           WHERE EXTRACT(month FROM fecha_creacion) = $1 AND EXTRACT(year FROM fecha_creacion) = $2`,
+          [mesNum, anio]
+        ),
+        query(
+          `SELECT estado, COUNT(*) AS registros, SUM(valor_neto) AS total
+           FROM crisolweb.facturas
+           WHERE EXTRACT(month FROM fecha_creacion) = $1 AND EXTRACT(year FROM fecha_creacion) = $2
+           GROUP BY estado ORDER BY SUM(valor_neto) DESC`,
+          [mesNum, anio]
+        ),
+      ]);
+      facturas = {
+        total: fmt.format(rows[0].total),
+        registros: rows[0].registros,
+        fecha_min: rows[0].fecha_min,
+        fecha_max: rows[0].fecha_max,
+        por_estado: estadoRows.map(r => ({ estado: r.estado, registros: r.registros, total: fmt.format(r.total) })),
+      };
     } catch (e) { facturas = { error: e.message }; }
 
     // 2. crisolweb.facturacion_op (tabla alternativa)
