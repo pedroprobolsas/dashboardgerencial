@@ -176,14 +176,12 @@ async function kpiCierreMensual(periodo, metas = {}) {
 
 async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
   try {
-    const periodoISO = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
     const { rows } = await query(
       `SELECT SUM(valor_neto) AS total, COUNT(*) AS facturas
        FROM crisolweb.facturas
-       WHERE DATE_TRUNC('month', fecha_creacion) = $1::date
-         AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))
-         AND valor_neto > 0`,
-      [periodoISO]
+       WHERE EXTRACT(month FROM fecha_creacion) = $1
+         AND EXTRACT(year  FROM fecha_creacion) = $2`,
+      [mesNum, anio]
     );
 
     const facturas = parseInt(rows[0]?.facturas || 0, 10);
@@ -341,10 +339,9 @@ async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
       query(
         `SELECT SUM(valor_neto) AS total
          FROM crisolweb.facturas
-         WHERE DATE_TRUNC('month', fecha_creacion) = $1::date
-           AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))
-           AND valor_neto > 0`,
-        [`${anio}-${String(mesNum).padStart(2, '0')}-01`]
+         WHERE EXTRACT(month FROM fecha_creacion) = $1
+           AND EXTRACT(year  FROM fecha_creacion) = $2`,
+        [mesNum, anio]
       ),
       query(
         `SELECT SUM(valor) AS total
