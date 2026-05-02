@@ -38,10 +38,10 @@ services:
       - PG_USER=${PG_USER:-probolsas_user}
       - PG_PASSWORD=${PG_PASSWORD}
       # ── Feature flags — DATA_SOURCE por módulo ───────────────────────────────
-      - DATA_SOURCE_OBLIGACIONES=${DATA_SOURCE_OBLIGACIONES:-sheets}
-      - DATA_SOURCE_VENTAS=${DATA_SOURCE_VENTAS:-sheets}
+      # "postgres" = leer de probolsas_db | "sheets" = leer de Google Sheets
+      - DATA_SOURCE_VENTAS=${DATA_SOURCE_VENTAS:-postgres}
+      - DATA_SOURCE_EGRESOS=${DATA_SOURCE_EGRESOS:-postgres}
       - DATA_SOURCE_COBROS=${DATA_SOURCE_COBROS:-sheets}
-      - DATA_SOURCE_EGRESOS=${DATA_SOURCE_EGRESOS:-sheets}
       - DATA_SOURCE_COTIZACIONES=${DATA_SOURCE_COTIZACIONES:-sheets}
       - DATA_SOURCE_ORDENES=${DATA_SOURCE_ORDENES:-sheets}
       - DATA_SOURCE_CARTERA_CLI=${DATA_SOURCE_CARTERA_CLI:-sheets}
