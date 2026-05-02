@@ -176,12 +176,14 @@ async function kpiCierreMensual(periodo, metas = {}) {
 
 async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
   try {
+    const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
     const { rows } = await query(
       `SELECT SUM(valor_neto) AS total, COUNT(*) AS facturas
        FROM crisolweb.facturas
-       WHERE EXTRACT(month FROM fecha_creacion) = $1
-         AND EXTRACT(year  FROM fecha_creacion) = $2`,
-      [mesNum, anio]
+       WHERE DATE_TRUNC('month', fecha_creacion) = $1::date
+         AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))
+         AND valor_neto > 0`,
+      [primerDiaMes]
     );
 
     const facturas = parseInt(rows[0]?.facturas || 0, 10);
@@ -339,9 +341,10 @@ async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
       query(
         `SELECT SUM(valor_neto) AS total
          FROM crisolweb.facturas
-         WHERE EXTRACT(month FROM fecha_creacion) = $1
-           AND EXTRACT(year  FROM fecha_creacion) = $2`,
-        [mesNum, anio]
+         WHERE DATE_TRUNC('month', fecha_creacion) = $1::date
+           AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))
+           AND valor_neto > 0`,
+        [`${anio}-${String(mesNum).padStart(2, '0')}-01`]
       ),
       query(
         `SELECT SUM(valor) AS total
@@ -601,7 +604,7 @@ async function kpiDiario(targetFecha = null, metas = {}) {
         ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE fecha_creacion::date = $1 AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR')) AND valor_neto > 0`, [fechaStr])
         : Promise.resolve(null),
       usePgVentas
-        ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE EXTRACT(year FROM fecha_creacion) = $1 AND EXTRACT(month FROM fecha_creacion) = $2 AND fecha_creacion::date <= $3 AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR')) AND valor_neto > 0`, [tY, tM, fechaStr])
+        ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE DATE_TRUNC('month', fecha_creacion) = $1::date AND fecha_creacion::date <= $2 AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR')) AND valor_neto > 0`, [`${tY}-${String(tM).padStart(2, '0')}-01`, fechaStr])
         : Promise.resolve(null),
       readRange(SP1, 'LISTADO_DE_INGRESOS!A:AZ'),
       usePgEgresos
@@ -800,7 +803,7 @@ async function ejecutarSnapshot(fechaParam = null) {
       ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE fecha_creacion::date = $1 AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR')) AND valor_neto > 0`, [fecha])
       : Promise.resolve(null),
     usePgVentas
-      ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE EXTRACT(year FROM fecha_creacion) = $1 AND EXTRACT(month FROM fecha_creacion) = $2 AND fecha_creacion::date <= $3 AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR')) AND valor_neto > 0`, [tY, tM, fecha])
+      ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE DATE_TRUNC('month', fecha_creacion) = $1::date AND fecha_creacion::date <= $2 AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR')) AND valor_neto > 0`, [`${tY}-${String(tM).padStart(2, '0')}-01`, fecha])
       : Promise.resolve(null),
     readRange(SP1, 'LISTADO_DE_INGRESOS!A:AZ'),
     usePgEgresos
