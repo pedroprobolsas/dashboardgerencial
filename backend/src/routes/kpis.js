@@ -991,6 +991,87 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/kpis/ventas-debug?periodo=2026-04
+ * Compara suma de ventas entre crisolweb.facturas, crisolweb.facturacion_op y Sheets.
+ */
+router.get('/ventas-debug', async (req, res) => {
+  try {
+    const periodo = req.query.periodo || mesActual();
+    const { mesNum, anio } = parsePeriodo(periodo);
+    const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+
+    // 1. crisolweb.facturas (fuente actual)
+    let facturas = null;
+    try {
+      const { rows } = await query(
+        `SELECT COALESCE(SUM(valor_neto), 0) AS total, COUNT(*) AS registros,
+                MIN(fecha_creacion) AS fecha_min, MAX(fecha_creacion) AS fecha_max
+         FROM crisolweb.facturas
+         WHERE EXTRACT(month FROM fecha_creacion) = $1 AND EXTRACT(year FROM fecha_creacion) = $2`,
+        [mesNum, anio]
+      );
+      facturas = { total: fmt.format(rows[0].total), registros: rows[0].registros, fecha_min: rows[0].fecha_min, fecha_max: rows[0].fecha_max };
+    } catch (e) { facturas = { error: e.message }; }
+
+    // 2. crisolweb.facturacion_op (tabla alternativa)
+    let facturacion_op = null;
+    try {
+      const { rows: cols } = await query(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = 'crisolweb' AND table_name = 'facturacion_op'
+         ORDER BY ordinal_position LIMIT 20`
+      );
+      if (cols.length === 0) {
+        facturacion_op = { error: 'Tabla no existe' };
+      } else {
+        facturacion_op = { columnas: cols.map(c => c.column_name) };
+        // Intentar suma con columnas comunes
+        for (const col of ['valor_facturado', 'valor_neto', 'total', 'valor']) {
+          if (cols.find(c => c.column_name === col)) {
+            const fechaCols = cols.map(c => c.column_name).filter(n => n.includes('fecha'));
+            const fechaCol  = fechaCols[0] || 'fecha';
+            try {
+              const { rows } = await query(
+                `SELECT COALESCE(SUM(${col}), 0) AS total, COUNT(*) AS registros
+                 FROM crisolweb.facturacion_op
+                 WHERE EXTRACT(month FROM ${fechaCol}) = $1 AND EXTRACT(year FROM ${fechaCol}) = $2`,
+                [mesNum, anio]
+              );
+              facturacion_op[`suma_${col}`] = fmt.format(rows[0].total);
+              facturacion_op[`registros_${col}`] = rows[0].registros;
+            } catch (e) { facturacion_op[`error_${col}`] = e.message; }
+            break;
+          }
+        }
+      }
+    } catch (e) { facturacion_op = { error: e.message }; }
+
+    // 3. Sheets Facturacion_OP
+    let sheets = null;
+    try {
+      const filas = await readRange(SP1, 'Facturacion_OP!A:AZ');
+      const h = filas[0] || [];
+      const iVal = h.indexOf('ValorFacturado');
+      const iFec = h.findIndex(c => ['FechaContable', 'Fecha', 'FECHA'].includes(c));
+      let total = 0, registros = 0;
+      filas.slice(1).forEach(f => {
+        const s = String(f[iFec] || '').trim();
+        const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        const m = dmy ? parseInt(dmy[2]) : iso ? parseInt(iso[2]) : null;
+        const y = dmy ? parseInt(dmy[3]) : iso ? parseInt(iso[1]) : null;
+        if (m === mesNum && y === anio) { total += parseCOP(f[iVal]); registros++; }
+      });
+      sheets = { total: fmt.format(total), registros, columnas: h.slice(0, 15) };
+    } catch (e) { sheets = { error: e.message }; }
+
+    res.json({ periodo, fuentes: { facturas, facturacion_op, sheets } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * GET /api/kpis/metas-debug
  * Muestra el contenido crudo de Metas_Gerencia y el mapa resultante.
  * Útil para diagnosticar por qué una meta no se lee correctamente.
