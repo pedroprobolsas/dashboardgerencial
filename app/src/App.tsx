@@ -114,6 +114,23 @@ function adaptarKPI(raw: KPIReal): KPI {
     return { ...base, descripcionAlerta: descProd, filas: filas.length > 0 ? filas : undefined, subtexto: subtexto || undefined };
   }
 
+  // ── Costo de Producción: margen promedio + desglose facturado/costo ─────────
+  if (raw.id === 'costo-produccion' && raw.fuente === 'real') {
+    const descCosto = alerta === 'verde' ? 'Margen positivo' : alerta === 'amarillo' ? 'Margen bajo' : 'Con pérdidas';
+    const filas: FilaGrid[] = [];
+    if (raw.valorProducido && raw.costoEjecutado) {
+      filas.push({
+        izq: { label: 'Facturado', valor: raw.valorProducido },
+        der: { label: 'Costo',     valor: raw.costoEjecutado },
+      });
+    }
+    const subtexto = [
+      raw.ordenes       != null ? `OPs: ${raw.ordenes}`                        : null,
+      raw.opsConPerdida != null ? `Con pérdida: ${raw.opsConPerdida} OPs`      : null,
+    ].filter(Boolean).join(' | ');
+    return { ...base, descripcionAlerta: descCosto, filas: filas.length > 0 ? filas : undefined, subtexto: subtexto || undefined };
+  }
+
   // ── Obligaciones por vencer: total + desglose por rango de días ─────────────
   if (raw.id === 'obligaciones-por-vencer' && raw.fuente === 'real') {
     const descOblig = raw.alerta === 'verde' ? 'Al día' : raw.alerta === 'amarillo' ? 'Con vencidos' : 'Vencidos urgentes';

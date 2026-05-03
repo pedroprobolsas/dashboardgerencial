@@ -445,6 +445,60 @@ async function kpiOrdenesCumplidas({ mesNum, anio }) {
   }
 }
 
+// ── KPI: Costo de Producción (margen_pct desde crisolweb.costo_por_orden) ────
+
+async function kpiCostoProduccion({ mesNum, anio }) {
+  try {
+    const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
+    const { rows } = await query(
+      `SELECT
+         COUNT(*)                                AS ops_mes,
+         ROUND(AVG(margen_pct), 1)              AS margen_promedio_pct,
+         ROUND(SUM(costo_total), 0)             AS total_costo_ejecutado,
+         ROUND(SUM(valor_cumplido), 0)          AS total_facturado,
+         COUNT(*) FILTER (WHERE margen_pct < 0) AS ops_con_perdida
+       FROM crisolweb.costo_por_orden
+       WHERE fecha >= $1::date
+         AND fecha <  ($1::date + INTERVAL '1 month')
+         AND costo_total > 0`,
+      [primerDiaMes]
+    );
+
+    const opsMes        = parseInt(rows[0]?.ops_mes              || 0, 10);
+    const margenProm    = rows[0]?.margen_promedio_pct !== null
+                          ? parseFloat(rows[0].margen_promedio_pct)
+                          : null;
+    const totalCosto    = parseFloat(rows[0]?.total_costo_ejecutado || 0);
+    const totalFact     = parseFloat(rows[0]?.total_facturado       || 0);
+    const opsConPerdida = parseInt(rows[0]?.ops_con_perdida          || 0, 10);
+
+    if (opsMes === 0 || margenProm === null) {
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo' };
+    }
+
+    const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+
+    return {
+      fuente:          'real',
+      valor:           margenProm,
+      valorFormateado: `${margenProm}%`,
+      ordenes:         opsMes,
+      opsConPerdida,
+      costoEjecutado:  fmt.format(totalCosto),
+      valorProducido:  fmt.format(totalFact),
+      meta:            `Meta: > 0% | OPs con pérdida: ${opsConPerdida}`,
+      detalle:         `OPs: ${opsMes} | Con pérdida: ${opsConPerdida}`,
+      alerta: alertaColor(margenProm, {
+        verde:    v => v > 10,
+        amarillo: v => v >= 0,
+      }),
+    };
+  } catch (err) {
+    console.error('kpiCostoProduccion:', err.message);
+    return { fuente: 'error', detalle: err.message };
+  }
+}
+
 // ── KPI: Obligaciones por vencer (desde crisolweb.cartera_por_pagar) ──────────
 // dias_vencido > 0  → ya vencida (días de mora)
 // dias_vencido <= 0 → por vencer (negativo = días restantes hasta el vencimiento)
@@ -827,13 +881,14 @@ router.get('/', async (req, res) => {
     // Cargar metas desde Sheets (con fallback a .env si falla o no existe la clave)
     const metas = await loadMetasFromSheets();
 
-    const [ventas, margen, cartera, flujo, cierre, produccion, rotacion, obligaciones, diario] = await Promise.all([
+    const [ventas, margen, cartera, flujo, cierre, produccion, costo, rotacion, obligaciones, diario] = await Promise.all([
       kpiVentasMeta({ mesNum, anio }, metas),
       kpiMargenCaja({ mesNum, anio }, metas),
       kpiCarteraPorAsesor(),
       kpiFlujoCaja({ mesNum, anio }, metas),
       kpiCierreMensual(periodo, metas),
       kpiOrdenesCumplidas({ mesNum, anio }),
+      kpiCostoProduccion({ mesNum, anio }),
       kpiRotacionPersonal(periodo, metas),
       kpiObligacionesPorVencer(),
       kpiDiario(req.query.fecha, metas).catch(() => null),
@@ -850,6 +905,7 @@ router.get('/', async (req, res) => {
         obligaciones_por_vencer: { id: 'obligaciones-por-vencer', nombre: 'Obligaciones por vencer',      area: 'Proveedores',  ...obligaciones  },
         cierre_mensual:          { id: 'cierre-mensual',          nombre: '% Cierre mensual',           area: 'Todas las áreas', ...cierre        },
         ordenes_cumplidas:       { id: 'ordenes-cumplidas',       nombre: 'Órdenes Cumplidas',          area: 'Producción',      ...produccion    },
+        costo_produccion:        { id: 'costo-produccion',        nombre: 'Costo de Producción',        area: 'Producción',      ...costo         },
         rotacion_personal:       { id: 'rotacion-personal',       nombre: 'Rotación de personal',       area: 'Talento Humano',  ...rotacion      },
       },
       diario,

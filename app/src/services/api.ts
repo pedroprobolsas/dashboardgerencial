@@ -19,6 +19,7 @@ export interface KPIReal {
   opsCriticas?: number;
   opsAtrasadas?: number;
   totalDiasAtraso?: number;
+  opsConPerdida?: number;
   margenProduccion?: number;
   valorProducido?: string;
   costoEjecutado?: string;

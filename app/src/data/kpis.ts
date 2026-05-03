@@ -138,6 +138,16 @@ export const kpis: KPI[] = [
     descripcionAlerta: eficienciaMock >= 95 ? 'En meta' : eficienciaMock >= 85 ? 'Con desviaciones' : 'Crítico',
   },
   {
+    id: 'costo-produccion',
+    nombre: 'Costo de Producción',
+    area: 'Producción',
+    valor: eficienciaMock,
+    valorFormateado: `${eficienciaMock}%`,
+    meta: 'Meta: > 0%',
+    alerta: alertaEficienciaProduccion(eficienciaMock),
+    descripcionAlerta: eficienciaMock > 10 ? 'Margen positivo' : eficienciaMock >= 0 ? 'Margen bajo' : 'Con pérdidas',
+  },
+  {
     id: 'rotacion-personal',
     nombre: 'Rotación de personal',
     area: 'Talento Humano',
