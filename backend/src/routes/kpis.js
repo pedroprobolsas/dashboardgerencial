@@ -392,50 +392,55 @@ async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
 
 // ── KPI: Producción desde costo_por_orden (PostgreSQL) ───────────────────────
 
-async function kpiProduccion({ mesNum, anio }, metas = {}) {
+async function kpiOrdenesCumplidas({ mesNum, anio }) {
   try {
+    const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
     const { rows } = await query(
       `SELECT
-         COUNT(*) AS ordenes,
-         SUM(COALESCE(costo_total_estimado, costo_total, 0)) AS sum_estimado,
-         SUM(COALESCE(costo_ejecutado_total, costo_total, 0)) AS sum_ejecutado
-       FROM crisolweb.costo_por_orden
-       WHERE EXTRACT(month FROM fecha) = $1
-         AND EXTRACT(year FROM fecha) = $2`,
-      [mesNum, anio]
+         COUNT(*)                                                                        AS total_ops,
+         ROUND(AVG(cantidad_cumplida / NULLIF(cantidad_pedida,0) * 100), 1)             AS cumplimiento_prom_pct,
+         COUNT(*) FILTER (
+           WHERE ABS((cantidad_cumplida / NULLIF(cantidad_pedida,0) - 1) * 100) > 5
+         )                                                                               AS ops_criticas,
+         SUM(CASE WHEN dias_vencido < 0 THEN ABS(dias_vencido) ELSE 0 END)             AS total_dias_atraso,
+         COUNT(*) FILTER (WHERE dias_vencido < 0)                                       AS ops_atrasadas
+       FROM crisolweb.ordenes_cumplidas
+       WHERE fecha_cumplimiento >= $1::date
+         AND fecha_cumplimiento <  ($1::date + INTERVAL '1 month')`,
+      [primerDiaMes]
     );
 
-    const ordenes  = parseInt(rows[0]?.ordenes        || 0, 10);
-    const sumEstim = parseFloat(rows[0]?.sum_estimado  || 0);
-    const sumEjec  = parseFloat(rows[0]?.sum_ejecutado || 0);
+    const totalOps      = parseInt(rows[0]?.total_ops         || 0, 10);
+    const cumplimiento  = rows[0]?.cumplimiento_prom_pct !== null
+                          ? parseFloat(rows[0].cumplimiento_prom_pct)
+                          : null;
+    const opsCriticas   = parseInt(rows[0]?.ops_criticas      || 0, 10);
+    const totalAtraso   = parseInt(rows[0]?.total_dias_atraso || 0, 10);
+    const opsAtrasadas  = parseInt(rows[0]?.ops_atrasadas     || 0, 10);
 
-    if (ordenes === 0) {
-      return { fuente: 'real', valor: 0, valorFormateado: '0%', ordenes: 0, detalle: 'Sin órdenes en este período' };
+    if (totalOps === 0 || cumplimiento === null) {
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo' };
     }
 
-    // Eficiencia = CostoEstimado / CostoEjecutado × 100 (> 100% = mejor de lo esperado)
-    const eficiencia = sumEjec > 0 ? Math.round(sumEstim / sumEjec * 1000) / 10 : 0;
-
-    const fmt    = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
-    const ahorro = Math.round(sumEstim - sumEjec);
+    const pctCriticas = totalOps > 0 ? (opsCriticas / totalOps * 100) : 0;
 
     return {
-      fuente: 'real',
-      valor: eficiencia,
-      valorFormateado: `${eficiencia}%`,
-      ordenes,
-      costoEjecutado:    fmt.format(sumEjec),
-      ahorroPresupuesto: ahorro >= 0 ? `+${fmt.format(ahorro)}` : fmt.format(ahorro),
-      ahorroNumerico:    ahorro,
-      meta: `Meta: > 100% | Mín. aceptable: ${getMeta(metas, 'eficiencia_produccion')}%`,
-      detalle: `${ordenes} OPs | Efic.: ${eficiencia}% | Estimado: ${fmt.format(sumEstim)} | Ejecutado: ${fmt.format(sumEjec)}`,
-      alerta: alertaColor(eficiencia, {
-        verde:    v => v > 100,
-        amarillo: v => v >= getMeta(metas, 'eficiencia_produccion'),
+      fuente:          'real',
+      valor:           cumplimiento,
+      valorFormateado: `${cumplimiento}%`,
+      ordenes:         totalOps,
+      opsCriticas,
+      opsAtrasadas,
+      totalDiasAtraso: totalAtraso,
+      meta:            `Meta: entre 95% y 105% | OPs: ${totalOps}`,
+      detalle:         `Críticas: ${opsCriticas} OPs | Atraso acum.: ${totalAtraso} días`,
+      alerta: alertaColor(pctCriticas, {
+        verde:    v => v === 0,
+        amarillo: v => v <= 15,
       }),
     };
   } catch (err) {
-    console.error('kpiProduccion:', err.message);
+    console.error('kpiOrdenesCumplidas:', err.message);
     return { fuente: 'error', detalle: err.message };
   }
 }
@@ -828,7 +833,7 @@ router.get('/', async (req, res) => {
       kpiCarteraPorAsesor(),
       kpiFlujoCaja({ mesNum, anio }, metas),
       kpiCierreMensual(periodo, metas),
-      kpiProduccion({ mesNum, anio }, metas),
+      kpiOrdenesCumplidas({ mesNum, anio }),
       kpiRotacionPersonal(periodo, metas),
       kpiObligacionesPorVencer(),
       kpiDiario(req.query.fecha, metas).catch(() => null),
@@ -844,7 +849,7 @@ router.get('/', async (req, res) => {
         flujo_caja:              { id: 'flujo-caja',              nombre: 'Flujo de caja disponible',      area: 'Finanzas',     ...flujo         },
         obligaciones_por_vencer: { id: 'obligaciones-por-vencer', nombre: 'Obligaciones por vencer',      area: 'Proveedores',  ...obligaciones  },
         cierre_mensual:          { id: 'cierre-mensual',          nombre: '% Cierre mensual',           area: 'Todas las áreas', ...cierre        },
-        eficiencia_produccion:   { id: 'eficiencia-produccion',   nombre: 'Producción',                 area: 'Producción',      ...produccion    },
+        ordenes_cumplidas:       { id: 'ordenes-cumplidas',       nombre: 'Órdenes Cumplidas',          area: 'Producción',      ...produccion    },
         rotacion_personal:       { id: 'rotacion-personal',       nombre: 'Rotación de personal',       area: 'Talento Humano',  ...rotacion      },
       },
       diario,

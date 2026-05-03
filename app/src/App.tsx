@@ -94,32 +94,24 @@ function adaptarKPI(raw: KPIReal): KPI {
     };
   }
 
-  // ── Producción: tarjeta expandida con grid de 2 columnas ────────────────────
-  if (raw.id === 'eficiencia-produccion' && raw.fuente === 'real') {
-    const descProd = alerta === 'verde' ? 'Eficiente' : alerta === 'amarillo' ? 'Ajustado' : 'Ineficiente';
-
-    const ahorroAbs = raw.ahorroNumerico != null ? Math.abs(raw.ahorroNumerico) : null;
-    const ahorroM   = ahorroAbs != null ? (ahorroAbs / 1_000_000).toFixed(1) : null;
-    const subtitulo = ahorroM != null && raw.ahorroNumerico != null
-      ? (raw.ahorroNumerico >= 0
-          ? `Gastaste $${ahorroM}M menos del presupuesto`
-          : `Excediste el presupuesto por $${ahorroM}M`)
-      : undefined;
+  // ── Órdenes Cumplidas: cumplimiento % + críticas + días atraso ─────────────
+  if (raw.id === 'ordenes-cumplidas' && raw.fuente === 'real') {
+    const descProd = alerta === 'verde' ? 'En meta' : alerta === 'amarillo' ? 'Con desviaciones' : 'Crítico';
 
     const filas: FilaGrid[] = [];
-    if (raw.valorProducido && raw.utilidadProduccion) {
-      filas.push({ izq: { label: 'Valor producido', valor: raw.valorProducido }, der: { label: 'Utilidad bruta', valor: raw.utilidadProduccion } });
-    }
-    if (raw.costoEjecutado && raw.ahorroPresupuesto) {
-      filas.push({ izq: { label: 'Costo ejecutado', valor: raw.costoEjecutado }, der: { label: 'Ahorro presupuesto', valor: raw.ahorroPresupuesto } });
+    if (raw.opsCriticas != null && raw.opsAtrasadas != null) {
+      filas.push({
+        izq: { label: 'OPs críticas (>5%)', valor: `${raw.opsCriticas}` },
+        der: { label: 'OPs atrasadas',       valor: `${raw.opsAtrasadas}` },
+      });
     }
 
     const subtexto = [
-      raw.ordenes        != null ? `Órdenes: ${raw.ordenes} OPs`            : null,
-      raw.margenProduccion != null ? `Margen: ${raw.margenProduccion.toFixed(1)}%` : null,
+      raw.ordenes         != null ? `Total: ${raw.ordenes} OPs`                     : null,
+      raw.totalDiasAtraso != null ? `Días atraso acum.: ${raw.totalDiasAtraso}`     : null,
     ].filter(Boolean).join(' | ');
 
-    return { ...base, descripcionAlerta: descProd, subtitulo, filas: filas.length > 0 ? filas : undefined, subtexto: subtexto || undefined };
+    return { ...base, descripcionAlerta: descProd, filas: filas.length > 0 ? filas : undefined, subtexto: subtexto || undefined };
   }
 
   // ── Obligaciones por vencer: total + desglose por rango de días ─────────────

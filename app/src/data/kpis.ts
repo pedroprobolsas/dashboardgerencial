@@ -128,14 +128,14 @@ export const kpis: KPI[] = [
     descripcionAlerta: cierreMock >= 100 ? 'Cierre completo' : cierreMock >= 60 ? 'Cierre en progreso' : 'Cierres pendientes',
   },
   {
-    id: 'eficiencia-produccion',
-    nombre: 'Eficiencia producción',
+    id: 'ordenes-cumplidas',
+    nombre: 'Órdenes Cumplidas',
     area: 'Producción',
     valor: eficienciaMock,
     valorFormateado: `${eficienciaMock}%`,
-    meta: 'Meta: ≥ 90%',
+    meta: 'Meta: entre 95% y 105%',
     alerta: alertaEficienciaProduccion(eficienciaMock),
-    descripcionAlerta: eficienciaMock >= 90 ? 'Producción óptima' : eficienciaMock >= 85 ? 'Producción aceptable' : 'Producción baja',
+    descripcionAlerta: eficienciaMock >= 95 ? 'En meta' : eficienciaMock >= 85 ? 'Con desviaciones' : 'Crítico',
   },
   {
     id: 'rotacion-personal',

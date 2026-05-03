@@ -16,6 +16,9 @@ export interface KPIReal {
   nota?: string;
   desglose?: { d30?: string; d60?: string; d90?: string; d100plus?: string };
   ordenes?: number;
+  opsCriticas?: number;
+  opsAtrasadas?: number;
+  totalDiasAtraso?: number;
   margenProduccion?: number;
   valorProducido?: string;
   costoEjecutado?: string;
