@@ -222,40 +222,40 @@ async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
 }
 
 // ── KPI: Margen de caja % ────────────────────────────────────────────────────
-// Margen de caja = (Ventas - Egresos) / Ventas × 100
-// Ventas: crisolweb.facturas (valor_neto, sin anulados)
-// Egresos: crisolweb.egresos_agrupados_concepto (ya descuenta anulados)
+// Margen de caja = (Ventas_neto - Egresos_mes) / Ventas_neto × 100
+// Ventas: crisolweb.facturas (valor_neto, sin anulados; SIN filtro valor_neto>0
+//         para incluir notas crédito negativas y dar el neto real)
+// Egresos: analytics.v_vistazo_diario (egresos_mes_acum — evita duplicados
+//          de egresos_agrupados_concepto que mezcla filas mensuales y diarias)
 
 async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
   try {
     const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
-    const { rows } = await query(
-      `SELECT
-         COALESCE(v.total, 0) AS ventas_mes,
-         COALESCE(e.total, 0) AS egresos_mes,
-         COALESCE(v.total, 0) - COALESCE(e.total, 0) AS margen_caja,
-         ROUND(
-           (COALESCE(v.total, 0) - COALESCE(e.total, 0))
-           / NULLIF(COALESCE(v.total, 0), 0) * 100
-         , 1) AS margen_caja_pct
-       FROM
-         (SELECT SUM(valor_neto) AS total
-          FROM crisolweb.facturas
-          WHERE fecha_creacion >= $1::date
-            AND fecha_creacion <  ($1::date + INTERVAL '1 month')
-            AND valor_neto > 0
-            AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))) v,
-         (SELECT SUM(total_egresos) AS total
-          FROM crisolweb.egresos_agrupados_concepto
-          WHERE anio = $2
-            AND mes  = $3) e`,
-      [primerDiaMes, anio, mesNum]
-    );
+    const mesStr       = `${anio}-${String(mesNum).padStart(2, '0')}`;
 
-    const ventas  = parseFloat(rows[0]?.ventas_mes  || 0);
-    const egresos = parseFloat(rows[0]?.egresos_mes || 0);
-    const margen  = parseFloat(rows[0]?.margen_caja || 0);
-    const pct     = rows[0]?.margen_caja_pct !== null ? parseFloat(rows[0]?.margen_caja_pct || 0) : null;
+    const [{ rows: rowsV }, { rows: rowsE }] = await Promise.all([
+      query(
+        `SELECT COALESCE(SUM(valor_neto), 0) AS total
+         FROM crisolweb.facturas
+         WHERE fecha_creacion >= $1::date
+           AND fecha_creacion <  ($1::date + INTERVAL '1 month')
+           AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))`,
+        [primerDiaMes]
+      ),
+      query(
+        `SELECT egresos_mes_acum AS total
+         FROM analytics.v_vistazo_diario
+         WHERE mes = $1
+         ORDER BY fecha DESC
+         LIMIT 1`,
+        [mesStr]
+      ),
+    ]);
+
+    const ventas  = parseFloat(rowsV[0]?.total || 0);
+    const egresos = parseFloat(rowsE[0]?.total || 0);
+    const margen  = ventas - egresos;
+    const pct     = ventas !== 0 ? parseFloat((margen / ventas * 100).toFixed(1)) : null;
 
     if (ventas === 0 || pct === null || isNaN(pct)) {
       return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo' };
