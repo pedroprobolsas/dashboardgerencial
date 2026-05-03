@@ -47,6 +47,7 @@ export interface KPIReal {
   // Raw numbers para cálculos en AlertasPanel (obligaciones_por_vencer)
   totalVencidoRaw?: number;
   d15Raw?: number;
+  d30Raw?: number;
 }
 
 export interface KPIDiario {
