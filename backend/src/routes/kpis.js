@@ -456,7 +456,7 @@ async function kpiCostoProduccion({ mesNum, anio }) {
          ROUND(AVG(margen_pct), 1)              AS margen_promedio_pct,
          ROUND(SUM(costo_total), 0)             AS total_costo_ejecutado,
          ROUND(SUM(valor_cumplido), 0)          AS total_facturado,
-         COUNT(*) FILTER (WHERE margen_pct < 0) AS ops_con_perdida
+         COUNT(*) FILTER (WHERE margen_pct < 18) AS ops_con_perdida
        FROM crisolweb.costo_por_orden
        WHERE fecha >= $1::date
          AND fecha <  ($1::date + INTERVAL '1 month')
@@ -486,11 +486,11 @@ async function kpiCostoProduccion({ mesNum, anio }) {
       opsConPerdida,
       costoEjecutado:  fmt.format(totalCosto),
       valorProducido:  fmt.format(totalFact),
-      meta:            `Meta: > 0% | OPs con pérdida: ${opsConPerdida}`,
-      detalle:         `OPs: ${opsMes} | Con pérdida: ${opsConPerdida}`,
+      meta:            `Meta: ≥ 18% | Bajo meta: ${opsConPerdida} OPs`,
+      detalle:         `OPs: ${opsMes} | Bajo meta (<18%): ${opsConPerdida}`,
       alerta: alertaColor(margenProm, {
-        verde:    v => v > 10,
-        amarillo: v => v >= 0,
+        verde:    v => v >= 18,
+        amarillo: v => v >= 10,
       }),
     };
   } catch (err) {
