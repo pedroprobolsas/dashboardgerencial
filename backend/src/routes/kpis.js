@@ -221,48 +221,64 @@ async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
   }
 }
 
-// ── KPI: Margen bruto % ───────────────────────────────────────────────────────
+// ── KPI: Margen de caja % ────────────────────────────────────────────────────
+// Margen de caja = (Ventas - Egresos) / Ventas × 100
+// Ventas: crisolweb.facturas (valor_neto, sin anulados)
+// Egresos: crisolweb.egresos_agrupados_concepto (ya descuenta anulados)
 
-async function kpiMargenBruto({ mesNum, anio }, metas = {}) {
+async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
   try {
+    const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
     const { rows } = await query(
       `SELECT
+         COALESCE(v.total, 0) AS ventas_mes,
+         COALESCE(e.total, 0) AS egresos_mes,
+         COALESCE(v.total, 0) - COALESCE(e.total, 0) AS margen_caja,
          ROUND(
-           (SUM(COALESCE(costo_total_estimado, 0)) - SUM(COALESCE(costo_ejecutado_total, 0))) /
-           NULLIF(SUM(COALESCE(costo_total_estimado, 0)), 0) * 100
-         , 1) AS margen_pct,
-         COUNT(*) AS ordenes
-       FROM crisolweb.costo_por_orden
-       WHERE EXTRACT(month FROM fecha) = $1
-         AND EXTRACT(year FROM fecha) = $2
-         AND costo_total_estimado > 0`,
-      [mesNum, anio]
+           (COALESCE(v.total, 0) - COALESCE(e.total, 0))
+           / NULLIF(COALESCE(v.total, 0), 0) * 100
+         , 1) AS margen_caja_pct
+       FROM
+         (SELECT SUM(valor_neto) AS total
+          FROM crisolweb.facturas
+          WHERE fecha_creacion >= $1::date
+            AND fecha_creacion <  ($1::date + INTERVAL '1 month')
+            AND valor_neto > 0
+            AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))) v,
+         (SELECT SUM(total_egresos) AS total
+          FROM crisolweb.egresos_agrupados_concepto
+          WHERE anio = $2
+            AND mes  = $3) e`,
+      [primerDiaMes, anio, mesNum]
     );
 
-    const ordenes   = parseInt(rows[0]?.ordenes || 0, 10);
-    const rawMargen = rows[0]?.margen_pct;
-    const margenPct = rawMargen !== null && rawMargen !== undefined ? parseFloat(rawMargen) : null;
+    const ventas  = parseFloat(rows[0]?.ventas_mes  || 0);
+    const egresos = parseFloat(rows[0]?.egresos_mes || 0);
+    const margen  = parseFloat(rows[0]?.margen_caja || 0);
+    const pct     = rows[0]?.margen_caja_pct !== null ? parseFloat(rows[0]?.margen_caja_pct || 0) : null;
 
-    if (ordenes === 0 || margenPct === null || isNaN(margenPct)) {
+    if (ventas === 0 || pct === null || isNaN(pct)) {
       return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo' };
     }
 
-    const metaObjetivo = getMeta(metas, 'margen_bruto');
-    const umbralVerde  = getMeta(metas, 'margen_verde');
-    const umbralAmari  = getMeta(metas, 'margen_amarillo');
+    const fmt           = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+    const umbralVerde   = getMeta(metas, 'margen_verde');
+    const umbralAmari   = getMeta(metas, 'margen_amarillo');
 
     return {
       fuente: 'real',
-      valor: margenPct,
-      valorFormateado: `${margenPct}%`,
-      meta: `Meta: ≥ ${metaObjetivo}% | Verde: ≥ ${umbralVerde}%`,
-      alerta: alertaColor(margenPct, {
+      valor: pct,
+      valorFormateado: `${pct}%`,
+      valorAbsoluto: fmt.format(margen),
+      detalle: `Ventas: ${fmt.format(ventas)} | Egresos: ${fmt.format(egresos)}`,
+      meta: `Meta: ≥ ${umbralVerde}%`,
+      alerta: alertaColor(pct, {
         verde:    v => v >= umbralVerde,
         amarillo: v => v >= umbralAmari,
       }),
     };
   } catch (err) {
-    console.error('kpiMargenBruto:', err.message);
+    console.error('kpiMargenCaja:', err.message);
     return { fuente: 'error', detalle: err.message };
   }
 }
@@ -821,7 +837,7 @@ router.get('/', async (req, res) => {
 
     const [ventas, margen, cartera, flujo, cierre, produccion, rotacion, obligaciones, diario] = await Promise.all([
       kpiVentasMeta({ mesNum, anio }, metas),
-      kpiMargenBruto({ mesNum, anio }, metas),
+      kpiMargenCaja({ mesNum, anio }, metas),
       kpiCarteraVencida(metas),
       kpiFlujoCaja({ mesNum, anio }, metas),
       kpiCierreMensual(periodo, metas),
@@ -836,7 +852,7 @@ router.get('/', async (req, res) => {
       periodo,
       kpis: {
         ventas_meta:             { id: 'ventas-meta',             nombre: 'Ventas del mes vs meta',    area: 'Ventas',          ...ventas        },
-        margen_bruto:            { id: 'margen-bruto',            nombre: 'Margen bruto',               area: 'Finanzas',        ...margen        },
+        margen_caja:             { id: 'margen-caja',             nombre: 'Margen de caja',             area: 'Finanzas',        ...margen        },
         cartera_vencida:         { id: 'cartera-vencida',         nombre: 'Deuda vencida con proveedores', area: 'Proveedores',  ...cartera       },
         flujo_caja:              { id: 'flujo-caja',              nombre: 'Flujo de caja disponible',      area: 'Finanzas',     ...flujo         },
         obligaciones_por_vencer: { id: 'obligaciones-por-vencer', nombre: 'Obligaciones por vencer',      area: 'Proveedores',  ...obligaciones  },

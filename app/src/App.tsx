@@ -49,6 +49,16 @@ function adaptarKPI(raw: KPIReal): KPI {
     };
   }
 
+  // ── Margen de caja: % como principal + monto absoluto y desglose ────────
+  if (raw.id === 'margen-caja' && raw.valorAbsoluto) {
+    const descMargen = alerta === 'verde' ? 'Margen saludable' : alerta === 'amarillo' ? 'Margen ajustado' : 'Margen crítico';
+    return {
+      ...base,
+      descripcionAlerta: descMargen,
+      subtexto: raw.detalle || undefined,
+    };
+  }
+
   // ── Flujo de caja: desglose ingresos/egresos + días de caja disponibles ───
   if (raw.id === 'flujo-caja') {
     const descFlujo = alerta === 'verde' ? 'Flujo positivo' : alerta === 'amarillo' ? 'Flujo bajo' : 'Flujo negativo';

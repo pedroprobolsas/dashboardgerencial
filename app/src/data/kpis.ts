@@ -88,8 +88,8 @@ export const kpis: KPI[] = [
     descripcionAlerta: ventasMock >= 90 ? 'En meta' : ventasMock >= 80 ? 'Cerca de la meta' : 'Por debajo de la meta',
   },
   {
-    id: 'margen-bruto',
-    nombre: 'Margen bruto',
+    id: 'margen-caja',
+    nombre: 'Margen de caja',
     area: 'Finanzas',
     valor: margenMock,
     valorFormateado: `${margenMock}%`,
