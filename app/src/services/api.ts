@@ -40,9 +40,10 @@ export interface KPIReal {
   egresosRaw?: number;
   flujoRaw?: number;
   diasCajaDisponibles?: number;
-  // Raw numbers para cálculos en AlertasPanel (cartera_vencida)
-  d30Raw?: number;
-  d100plusRaw?: number;
+  // Cartera por asesor
+  topAsesores?: Array<{ nombre: string; saldo: string; vencido: string }>;
+  vencidoRaw?: number;
+  corrienteRaw?: number;
   // Raw numbers para cálculos en AlertasPanel (obligaciones_por_vencer)
   totalVencidoRaw?: number;
   d15Raw?: number;

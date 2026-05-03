@@ -283,75 +283,62 @@ async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
   }
 }
 
-// ── KPI: Cartera vencida ──────────────────────────────────────────────────────
-// Dato puntual (saldo actual), no se filtra por período.
-// porCobrar = clientes con deuda vencida; porPagar = proveedores con saldo pendiente.
+// ── KPI: Cuentas por Cobrar por Asesor ───────────────────────────────────────
+// Snapshot de cartera_vendedor (se actualiza completa en cada sync).
+// Muestra total + top asesores por saldo, con desglose vencido/corriente.
 
-async function kpiCarteraVencida(metas = {}) {
+async function kpiCarteraPorAsesor() {
   try {
-    const [{ rows: rowsCobrar }, { rows: rowsPagar }] = await Promise.all([
-      query(
-        `SELECT SUM(saldo) AS total,
-           SUM(CASE WHEN dias_vencido BETWEEN 1 AND 30  THEN saldo ELSE 0 END) AS d30,
-           SUM(CASE WHEN dias_vencido BETWEEN 31 AND 60 THEN saldo ELSE 0 END) AS d60,
-           SUM(CASE WHEN dias_vencido BETWEEN 61 AND 90 THEN saldo ELSE 0 END) AS d90,
-           SUM(CASE WHEN dias_vencido > 90              THEN saldo ELSE 0 END) AS d100plus,
-           COUNT(DISTINCT nombre_cliente) AS clientes
-         FROM crisolweb.cartera_clientes
-         WHERE saldo > 0 AND dias_vencido > 0`
-      ),
-      query(
-        `SELECT SUM(saldo) AS total,
-           SUM(CASE WHEN dias_vencido > 0 THEN saldo ELSE 0 END) AS vencida,
-           COUNT(DISTINCT nombre) AS proveedores
-         FROM crisolweb.cartera_por_pagar
-         WHERE saldo > 0`
-      ),
-    ]);
+    const { rows } = await query(
+      `SELECT
+         COALESCE(vendedor, 'TOTAL') AS vendedor,
+         COUNT(*)                                                             AS facturas,
+         ROUND(SUM(saldo), 0)                                                AS saldo_total,
+         ROUND(SUM(CASE WHEN dias_vencido > 0  THEN saldo ELSE 0 END), 0)   AS vencido,
+         ROUND(SUM(CASE WHEN dias_vencido <= 0 THEN saldo ELSE 0 END), 0)   AS corriente
+       FROM crisolweb.cartera_vendedor
+       WHERE saldo > 0
+       GROUP BY ROLLUP(vendedor)
+       ORDER BY saldo_total DESC NULLS LAST`
+    );
+
+    const totalRow = rows.find(r => r.vendedor === 'TOTAL');
+    if (!totalRow) {
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo' };
+    }
+
+    const total    = parseFloat(totalRow.saldo_total || 0);
+    const vencido  = parseFloat(totalRow.vencido     || 0);
+    const corriente = parseFloat(totalRow.corriente  || 0);
+    const vencidoPct = total > 0 ? (vencido / total * 100) : 0;
 
     const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
-    const totalCobrar = parseFloat(rowsCobrar[0]?.total    || 0);
-    const d30         = parseFloat(rowsCobrar[0]?.d30      || 0);
-    const d60         = parseFloat(rowsCobrar[0]?.d60      || 0);
-    const d90         = parseFloat(rowsCobrar[0]?.d90      || 0);
-    const d100plus    = parseFloat(rowsCobrar[0]?.d100plus || 0);
-    const clientes    = parseInt(rowsCobrar[0]?.clientes   || 0, 10);
-
-    const totalPagar     = parseFloat(rowsPagar[0]?.total      || 0);
-    const vencidaPagar   = parseFloat(rowsPagar[0]?.vencida    || 0);
-    const proveedores    = parseInt(rowsPagar[0]?.proveedores  || 0, 10);
+    const topAsesores = rows
+      .filter(r => r.vendedor !== 'TOTAL')
+      .slice(0, 4)
+      .map(r => ({
+        nombre:  r.vendedor,
+        saldo:   fmt.format(parseFloat(r.saldo_total || 0)),
+        vencido: fmt.format(parseFloat(r.vencido     || 0)),
+      }));
 
     return {
-      fuente: 'real',
-      porCobrar: {
-        valor:          totalCobrar,
-        valorFormateado: fmt.format(totalCobrar),
-        desglose: {
-          d30:      fmt.format(d30),
-          d60:      fmt.format(d60),
-          d90:      fmt.format(d90),
-          d100plus: fmt.format(d100plus),
-          clientes,
-        },
-        alerta: alertaColor(totalCobrar, {
-          verde:    v => v < getMeta(metas, 'cartera_verde'),
-          amarillo: v => v <= getMeta(metas, 'cartera_amarillo'),
-        }),
-      },
-      porPagar: {
-        valor:          totalPagar,
-        valorFormateado: fmt.format(totalPagar),
-        vencida:        fmt.format(vencidaPagar),
-        proveedores,
-        alerta: alertaColor(vencidaPagar, {
-          verde:    v => v <= 0,
-          amarillo: v => v <= getMeta(metas, 'cartera_amarillo'),
-        }),
-      },
+      fuente:         'real',
+      valor:          total,
+      valorFormateado: fmt.format(total),
+      meta:           `Vencido: ${fmt.format(vencido)} (${vencidoPct.toFixed(1)}%)`,
+      detalle:        `Vencido: ${fmt.format(vencido)} | Corriente: ${fmt.format(corriente)}`,
+      vencidoRaw:     vencido,
+      corrienteRaw:   corriente,
+      topAsesores,
+      alerta: alertaColor(vencidoPct, {
+        verde:    v => v <= 20,
+        amarillo: v => v <= 40,
+      }),
     };
   } catch (err) {
-    console.error('kpiCarteraVencida:', err.message);
+    console.error('kpiCarteraPorAsesor:', err.message);
     return { fuente: 'error', detalle: err.message };
   }
 }
@@ -838,7 +825,7 @@ router.get('/', async (req, res) => {
     const [ventas, margen, cartera, flujo, cierre, produccion, rotacion, obligaciones, diario] = await Promise.all([
       kpiVentasMeta({ mesNum, anio }, metas),
       kpiMargenCaja({ mesNum, anio }, metas),
-      kpiCarteraVencida(metas),
+      kpiCarteraPorAsesor(),
       kpiFlujoCaja({ mesNum, anio }, metas),
       kpiCierreMensual(periodo, metas),
       kpiProduccion({ mesNum, anio }, metas),
@@ -853,7 +840,7 @@ router.get('/', async (req, res) => {
       kpis: {
         ventas_meta:             { id: 'ventas-meta',             nombre: 'Ventas del mes vs meta',    area: 'Ventas',          ...ventas        },
         margen_caja:             { id: 'margen-caja',             nombre: 'Margen de caja',             area: 'Finanzas',        ...margen        },
-        cartera_vencida:         { id: 'cartera-vencida',         nombre: 'Deuda vencida con proveedores', area: 'Proveedores',  ...cartera       },
+        cartera_asesores:        { id: 'cartera-asesores',        nombre: 'CxC por Asesor',               area: 'Cartera',      ...cartera       },
         flujo_caja:              { id: 'flujo-caja',              nombre: 'Flujo de caja disponible',      area: 'Finanzas',     ...flujo         },
         obligaciones_por_vencer: { id: 'obligaciones-por-vencer', nombre: 'Obligaciones por vencer',      area: 'Proveedores',  ...obligaciones  },
         cierre_mensual:          { id: 'cierre-mensual',          nombre: '% Cierre mensual',           area: 'Todas las áreas', ...cierre        },

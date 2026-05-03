@@ -15,9 +15,9 @@ const fmtM = (n: number) => `$${(Math.abs(n) / 1_000_000).toFixed(1)}M`;
 function generarAlertas(kpis: Record<string, KPIReal>): Alerta[] {
   const alertas: Alerta[] = [];
   const flujo        = kpis['flujo_caja'];
-  const cartera      = kpis['cartera_vencida'];
+  const cartera      = kpis['cartera_asesores'];
   const obligaciones = kpis['obligaciones_por_vencer'];
-  const margen       = kpis['margen_bruto'];
+  const margen       = kpis['margen_caja'];
   const cierre       = kpis['cierre_mensual'];
 
   // ── 1. Días de caja disponibles ────────────────────────────────────────────
@@ -36,13 +36,12 @@ function generarAlertas(kpis: Record<string, KPIReal>): Alerta[] {
     }
   }
 
-  // ── 2. Brecha cobro vs pago en los próximos 30 días ────────────────────────
+  // ── 2. Brecha cobro vs pago: cartera vencida vs obligaciones próximas ─────
   if (
-    cartera?.d30Raw != null &&
-    obligaciones?.totalVencidoRaw != null &&
-    flujo?.flujoRaw != null
+    cartera?.vencidoRaw != null &&
+    obligaciones?.totalVencidoRaw != null
   ) {
-    const cobrosEsperados = (cartera.d30Raw ?? 0) + (flujo.flujoRaw ?? 0);
+    const cobrosEsperados = (cartera.vencidoRaw ?? 0);
     const pagosRequeridos = (obligaciones.totalVencidoRaw ?? 0)
                           + (obligaciones.d15Raw ?? 0)
                           + (obligaciones.d30Raw ?? 0);
@@ -51,8 +50,8 @@ function generarAlertas(kpis: Record<string, KPIReal>): Alerta[] {
       alertas.push({
         id: 'brecha-30d',
         nivel: 'rojo',
-        titulo: `Brecha financiera 30 días: faltan ${fmtM(brecha)} para cubrir los pagos`,
-        contexto: `Cobros esperados (cartera 1-30d + flujo = ${fmtM(cobrosEsperados)}) no alcanzan para los pagos vencidos y próximos (${fmtM(pagosRequeridos)}). La cadena venta→cobro→pago está desbalanceada.`,
+        titulo: `Brecha financiera: cartera vencida (${fmtM(cobrosEsperados)}) no cubre pagos próximos (${fmtM(pagosRequeridos)})`,
+        contexto: `La cartera vencida por cobrar a clientes no alcanza para cubrir las obligaciones vencidas y próximas a 30 días con proveedores. La cadena cobro→pago está desbalanceada.`,
         responsable: 'Gerencia + Finanzas + Cartera',
         accion: 'Plan de caja urgente',
       });
@@ -71,37 +70,38 @@ function generarAlertas(kpis: Record<string, KPIReal>): Alerta[] {
     });
   }
 
-  // ── 4. Deuda con proveedores >90 días ─────────────────────────────────────
-  if (cartera?.d100plusRaw != null && cartera.d100plusRaw > 30_000_000) {
+  // ── 4. Cartera vencida de clientes alta ────────────────────────────────────
+  if (cartera?.vencidoRaw != null && cartera.vencidoRaw > 50_000_000) {
+    const pctVencido = cartera.valor ? (cartera.vencidoRaw / cartera.valor * 100) : 0;
     alertas.push({
-      id: 'deuda-proveedores-critica',
-      nivel: 'rojo',
-      titulo: `Deuda con proveedores +90 días: ${fmtM(cartera.d100plusRaw)} en mora crítica`,
-      contexto: 'Más de 90 días sin pagar a proveedores. Alto riesgo de suspensión de crédito, corte de suministros o acciones legales por parte de los proveedores.',
-      responsable: 'Gerencia + Finanzas',
-      accion: 'Negociar acuerdo de pago con proveedores críticos',
+      id: 'cartera-vencida-alta',
+      nivel: pctVencido > 40 ? 'rojo' : 'amarillo',
+      titulo: `Cartera vencida clientes: ${fmtM(cartera.vencidoRaw)} (${pctVencido.toFixed(1)}% del total)`,
+      contexto: 'Cartera de clientes con mora activa. Un alto porcentaje vencido compromete el flujo de caja y puede requerir gestión de cobro urgente.',
+      responsable: 'Cartera',
+      accion: 'Activar gestión de cobro con asesores',
     });
   }
 
-  // ── 5. Margen bruto ────────────────────────────────────────────────────────
+  // ── 5. Margen de caja ─────────────────────────────────────────────────────
   if (margen?.valor != null && margen.fuente === 'real' && !margen.sinDatos) {
     if (margen.valor < 25) {
       alertas.push({
         id: 'margen-critico',
         nivel: 'rojo',
-        titulo: `Margen bruto crítico: ${margen.valor}% — bajo el umbral de viabilidad (≥35%)`,
-        contexto: 'Un margen bajo 25% compromete la capacidad de cubrir costos fijos. Revisar mix de productos y costos de producción de forma urgente.',
-        responsable: 'Ventas + Producción',
-        accion: 'Revisar productos con margen negativo',
+        titulo: `Margen de caja crítico: ${margen.valor}% — bajo el umbral de viabilidad (≥35%)`,
+        contexto: 'Los egresos consumen más del 75% de las ventas. La operación no genera caja suficiente para cubrir costos fijos e inversión.',
+        responsable: 'Gerencia + Finanzas',
+        accion: 'Revisar egresos y reducir costos operativos',
       });
     } else if (margen.valor < 35) {
       alertas.push({
         id: 'margen-bajo',
         nivel: 'amarillo',
-        titulo: `Margen bruto en precaución: ${margen.valor}% (meta ≥ 35%)`,
-        contexto: 'El margen se acerca al umbral de alerta. Cada punto porcentual que baja equivale a menos caja al final del mes.',
-        responsable: 'Ventas + Producción',
-        accion: 'Analizar productos de bajo margen',
+        titulo: `Margen de caja en precaución: ${margen.valor}% (meta ≥ 35%)`,
+        contexto: 'El margen de caja está por debajo de la meta. Cada punto que baja representa menos disponibilidad operativa al cierre del mes.',
+        responsable: 'Gerencia + Finanzas',
+        accion: 'Revisar egresos del período',
       });
     }
   }

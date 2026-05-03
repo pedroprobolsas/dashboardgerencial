@@ -75,17 +75,22 @@ function adaptarKPI(raw: KPIReal): KPI {
     };
   }
 
-  // ── Cartera: desglose por aging 30/60/90/+90 días ────────────────────────
-  if (raw.id === 'cartera-vencida' && raw.desglose) {
-    const { d30, d60, d90, d100plus } = raw.desglose;
+  // ── CxC por Asesor: total + top asesores en filas ───────────────────────
+  if (raw.id === 'cartera-asesores' && raw.fuente === 'real') {
+    const asesores = raw.topAsesores ?? [];
+    const filas: FilaGrid[] = [];
+    for (let i = 0; i < asesores.length; i += 2) {
+      filas.push({
+        izq: { label: asesores[i].nombre,        valor: asesores[i].saldo },
+        der: asesores[i + 1]
+          ? { label: asesores[i + 1].nombre, valor: asesores[i + 1].saldo }
+          : { label: '', valor: '' },
+      });
+    }
     return {
       ...base,
-      subtexto: [
-        `1-30 días: ${d30}`,
-        `31-60 días: ${d60}`,
-        `61-90 días: ${d90}`,
-        `+90 días: ${d100plus}`,
-      ].join(' | '),
+      subtexto: raw.detalle || undefined,
+      filas: filas.length > 0 ? filas : undefined,
     };
   }
 

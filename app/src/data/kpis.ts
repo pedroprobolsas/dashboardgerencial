@@ -98,8 +98,8 @@ export const kpis: KPI[] = [
     descripcionAlerta: margenMock >= 35 ? 'Margen saludable' : margenMock >= 25 ? 'Margen ajustado' : 'Margen crítico',
   },
   {
-    id: 'cartera-vencida',
-    nombre: 'Cartera vencida',
+    id: 'cartera-asesores',
+    nombre: 'CxC por Asesor',
     area: 'Cartera',
     valor: carteraMock,
     valorFormateado: new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(carteraMock),
