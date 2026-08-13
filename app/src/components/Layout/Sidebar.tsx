@@ -6,7 +6,8 @@ export type Vista =
   | 'cierre-produccion'
   | 'cierre-cartera'
   | 'cierre-talento-humano'
-  | 'bandeja-aprobacion';
+  | 'bandeja-aprobacion'
+  | 'costo-produccion-detalle';
 
 interface Props {
   vistaActual: Vista;
@@ -23,6 +24,7 @@ interface NavItem {
 const itemsDashboard: NavItem[] = [
   { id: 'dashboard',    etiqueta: 'Dashboard',    icono: '▦' },
   { id: 'vista-diaria', etiqueta: 'Vistazo Diario', icono: '📅' },
+  { id: 'costo-produccion-detalle', etiqueta: 'Margen por OP', icono: '⚙️' },
 ];
 
 const itemsCierre: NavItem[] = [

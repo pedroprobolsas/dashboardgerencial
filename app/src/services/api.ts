@@ -177,7 +177,7 @@ export async function fetchMargenGlobal(periodo: string): Promise<KPIReal> {
   const data = await res.json();
   return {
     id: 'margen-caja', nombre: 'Margen de caja', area: 'Finanzas',
-    fuente: data.ventas === 0 ? 'real' : 'real',
+    fuente: 'real',
     sinDatos: data.ventas === 0,
     valor: data.margen_pct,
     valorFormateado: `${data.margen_pct}%`,
@@ -185,6 +185,27 @@ export async function fetchMargenGlobal(periodo: string): Promise<KPIReal> {
     detalle: `Ventas: ${data.ventas_fmt} | Egresos: ${data.egresos_fmt}`,
     meta: 'Meta: ≥ 35%',
     alerta: data.alerta,
+  };
+}
+
+export interface OrdenProduccion {
+  nro_op: string;
+  cliente: string;
+  referencia: string;
+  fecha: string;
+  costo_total_estimado: number;
+  costo_ejecutado_total: number;
+  valor_cumplido: number;
+  margen_pct: number;
+}
+
+export async function fetchCostoPorOrden(fechaInicio: string, fechaFin: string, margenMinimo: number): Promise<{ ordenes: OrdenProduccion[], total: number }> {
+  const res = await fetch(`/api/costo_por_orden?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&margen_minimo=${margenMinimo}`);
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  const data = await res.json();
+  return {
+    ordenes: data.ordenes || [],
+    total: data.total || 0,
   };
 }
 

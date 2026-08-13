@@ -71,7 +71,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     ),
     query(
       `SELECT
-         nro_factura, cliente, fecha_creacion AS fecha,
+         consecutivo, nombre AS cliente, fecha_creacion AS fecha,
          ROUND(valor_bruto, 2) AS valor_bruto,
          ROUND(valor_iva, 2)   AS valor_iva,
          ROUND(valor_neto, 2)  AS valor_neto,

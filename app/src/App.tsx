@@ -9,6 +9,7 @@ import CierreProduccionForm from './components/Forms/CierreProduccionForm';
 import CierreCarteraForm from './components/Forms/CierreCarteraForm';
 import CierreTalentoHumanoForm from './components/Forms/CierreTalentoHumanoForm';
 import BandejaAprobacion from './components/Aprobaciones/BandejaAprobacion';
+import CostoProduccionDetalle from './components/Produccion/CostoProduccionDetalle';
 import { type KPI, type AlertaColor, type FilaGrid } from './data/kpis';
 import { fetchKPIs, fetchVentasMes, fetchCarteraAsesor, fetchMargenGlobal, enviarCierre, actualizarEstadoCierre, fetchBandeja, type KPIReal, type KPIDiario } from './services/api';
 import VistazoDiario from './components/Dashboard/VistazoDiario';
@@ -279,9 +280,9 @@ function Dashboard() {
     fetchKPIs(periodo)
       .then(resp => {
         KPIS_MONOLITICOS.forEach(id => {
-          const raw = resp.kpis[id];
+          const raw = Object.values(resp.kpis).find((k: any) => k.id === id);
           if (raw) {
-            updateWidget(id, raw);
+            updateWidget(id, raw as KPIReal);
           } else {
             failWidget(id, 'KPI no encontrado en respuesta');
           }
@@ -520,6 +521,7 @@ export default function App() {
       {vistaActual === 'cierre-cartera'         && <CierreCarteraForm        onEnviar={registrarEnvio} />}
       {vistaActual === 'cierre-talento-humano'  && <CierreTalentoHumanoForm  onEnviar={registrarEnvio} />}
       {vistaActual === 'bandeja-aprobacion'     && <BandejaAprobacion informes={informes} onAprobar={aprobar} onRechazar={rechazar} />}
+      {vistaActual === 'costo-produccion-detalle' && <CostoProduccionDetalle />}
     </Layout>
   );
 }
