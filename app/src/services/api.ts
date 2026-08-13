@@ -110,6 +110,84 @@ export async function fetchKPIs(periodo?: string, fecha?: string): Promise<Respu
 }
 
 
+// ── Endpoints REST independientes ─────────────────────────────────────────────
+
+const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+
+/** Convierte periodo 'YYYY-MM' a { fecha_inicio, fecha_fin } */
+function periodoToRango(periodo: string): { fecha_inicio: string; fecha_fin: string } {
+  const [y, m] = periodo.split('-').map(Number);
+  const fecha_inicio = `${y}-${String(m).padStart(2, '0')}-01`;
+  const lastDay = new Date(y, m, 0).getDate();
+  const fecha_fin = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  return { fecha_inicio, fecha_fin };
+}
+
+export async function fetchVentasMes(periodo: string): Promise<KPIReal> {
+  const { fecha_inicio, fecha_fin } = periodoToRango(periodo);
+  const res = await fetch(`/api/ventas_mes?fecha_inicio=${fecha_inicio}&fecha_fin=${fecha_fin}`);
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  const data = await res.json();
+  const bruto = data.resumen.total_bruto;
+  const iva = data.resumen.total_iva;
+  const neto = data.resumen.total_neto;
+  const meta = data.meta_ventas || 200000000;
+  const pct = meta > 0 ? Math.round((bruto / meta) * 100) : 0;
+  return {
+    id: 'ventas-meta', nombre: 'Ventas del mes vs meta', area: 'Ventas',
+    fuente: bruto === 0 && data.resumen.facturas === 0 ? 'real' : 'real',
+    sinDatos: data.resumen.facturas === 0,
+    valor: pct,
+    valorFormateado: `${pct}%`,
+    valorBruto: fmtCOP.format(bruto),
+    valorIva: fmtCOP.format(iva),
+    valorNetoTotal: fmtCOP.format(neto),
+    meta: `Meta: ${fmtCOP.format(meta)}`,
+    alerta: pct >= 90 ? 'verde' : pct >= 80 ? 'amarillo' : 'rojo',
+  };
+}
+
+export async function fetchCarteraAsesor(): Promise<KPIReal> {
+  const res = await fetch('/api/cartera_por_asesor');
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  const data = await res.json();
+  const { total, vencido, corriente, pct_vencido } = data.resumen;
+  return {
+    id: 'cartera-asesores', nombre: 'CxC por Asesor', area: 'Cartera',
+    fuente: 'real',
+    valor: total,
+    valorFormateado: fmtCOP.format(total),
+    meta: `Vencido: ${fmtCOP.format(vencido)} (${pct_vencido}%)`,
+    detalle: `Vencido: ${fmtCOP.format(vencido)} | Corriente: ${fmtCOP.format(corriente)}`,
+    vencidoRaw: vencido,
+    corrienteRaw: corriente,
+    topAsesores: data.asesores.slice(0, 4).map((a: { asesor: string; saldo_total: number; vencido: number }) => ({
+      nombre: a.asesor,
+      saldo: fmtCOP.format(a.saldo_total),
+      vencido: fmtCOP.format(a.vencido),
+    })),
+    alerta: pct_vencido <= 20 ? 'verde' : pct_vencido <= 40 ? 'amarillo' : 'rojo',
+  };
+}
+
+export async function fetchMargenGlobal(periodo: string): Promise<KPIReal> {
+  const { fecha_inicio, fecha_fin } = periodoToRango(periodo);
+  const res = await fetch(`/api/margen_global?fecha_inicio=${fecha_inicio}&fecha_fin=${fecha_fin}`);
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  const data = await res.json();
+  return {
+    id: 'margen-caja', nombre: 'Margen de caja', area: 'Finanzas',
+    fuente: data.ventas === 0 ? 'real' : 'real',
+    sinDatos: data.ventas === 0,
+    valor: data.margen_pct,
+    valorFormateado: `${data.margen_pct}%`,
+    valorAbsoluto: data.margen_absoluto_fmt,
+    detalle: `Ventas: ${data.ventas_fmt} | Egresos: ${data.egresos_fmt}`,
+    meta: 'Meta: ≥ 35%',
+    alerta: data.alerta,
+  };
+}
+
 export async function enviarCierre(
   area: string,
   datos: Record<string, string>

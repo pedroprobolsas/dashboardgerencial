@@ -16,6 +16,42 @@ const iconosArea: Record<string, string> = {
   'Talento Humano': '👥',
 };
 
+/** Skeleton de carga para un KPI individual */
+export function KPICardSkeleton() {
+  return (
+    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5 flex flex-col gap-3 animate-pulse">
+      <div className="flex items-center justify-between">
+        <div className="h-3 w-16 bg-slate-200 rounded" />
+        <div className="h-5 w-20 bg-slate-200 rounded-full" />
+      </div>
+      <div className="h-4 w-32 bg-slate-200 rounded" />
+      <div className="h-7 w-24 bg-slate-200 rounded" />
+      <div className="h-3 w-28 bg-slate-100 rounded" />
+    </div>
+  );
+}
+
+/** Tarjeta de error para un KPI individual */
+export function KPICardError({ nombre, area }: { nombre: string; area: string }) {
+  return (
+    <div className="bg-white rounded-3xl shadow-sm border border-red-200 p-5 flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-dashboard-textMuted uppercase tracking-wide flex items-center gap-1">
+          <span>{iconosArea[area] ?? '📊'}</span>
+          <span>{area}</span>
+        </span>
+        <span className="flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700">
+          <span className="w-2 h-2 rounded-full bg-red-500" />
+          Error de lectura
+        </span>
+      </div>
+      <p className="text-sm font-medium text-dashboard-textMain leading-snug">{nombre}</p>
+      <p className="text-2xl font-bold text-slate-300 leading-none">—</p>
+      <p className="text-xs text-red-400">No se pudo obtener datos de este indicador</p>
+    </div>
+  );
+}
+
 export default function KPICard({ kpi }: { kpi: KPI }) {
   const colores = coloresAlerta[kpi.alerta];
 

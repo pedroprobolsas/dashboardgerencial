@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from './components/Layout/Layout';
 import { type Vista } from './components/Layout/Sidebar';
-import KPICard from './components/Dashboard/KPICard';
+import KPICard, { KPICardSkeleton, KPICardError } from './components/Dashboard/KPICard';
 import AlertasPanel from './components/Dashboard/AlertasPanel';
 import CierreVentasForm from './components/Forms/CierreVentasForm';
 import CierreFinanzasForm from './components/Forms/CierreFinanzasForm';
@@ -10,7 +10,7 @@ import CierreCarteraForm from './components/Forms/CierreCarteraForm';
 import CierreTalentoHumanoForm from './components/Forms/CierreTalentoHumanoForm';
 import BandejaAprobacion from './components/Aprobaciones/BandejaAprobacion';
 import { kpis as kpisMock, type KPI, type AlertaColor, type FilaGrid } from './data/kpis';
-import { fetchKPIs, enviarCierre, actualizarEstadoCierre, fetchBandeja, type KPIReal, type KPIDiario } from './services/api';
+import { fetchKPIs, fetchVentasMes, fetchCarteraAsesor, fetchMargenGlobal, enviarCierre, actualizarEstadoCierre, fetchBandeja, type KPIReal, type KPIDiario } from './services/api';
 import VistazoDiario from './components/Dashboard/VistazoDiario';
 import type { InformeCierre, AreaCierre } from './types/cierres';
 
@@ -199,34 +199,111 @@ function generarPeriodos(): string[] {
 
 // ── Vista Dashboard ───────────────────────────────────────────────────────────
 
+// IDs de KPIs que tienen endpoint REST independiente
+const KPIS_INDEPENDIENTES = ['ventas-meta', 'cartera-asesores', 'margen-caja'] as const;
+// IDs de KPIs que siguen usando el endpoint monolítico /api/kpis
+const KPIS_MONOLITICOS = ['flujo-caja', 'cierre-mensual', 'ordenes-cumplidas', 'costo-produccion', 'rotacion-personal', 'obligaciones-por-vencer'] as const;
+// Orden de visualización de todos los KPIs
+const KPI_ORDER = ['ventas-meta', 'margen-caja', 'cartera-asesores', 'flujo-caja', 'cierre-mensual', 'ordenes-cumplidas', 'costo-produccion', 'rotacion-personal', 'obligaciones-por-vencer'];
+
+// Metadata para mostrar skeletons/errores con nombre y área
+const KPI_META: Record<string, { nombre: string; area: string }> = {
+  'ventas-meta':             { nombre: 'Ventas del mes vs meta',  area: 'Ventas' },
+  'margen-caja':             { nombre: 'Margen de caja',          area: 'Finanzas' },
+  'cartera-asesores':        { nombre: 'CxC por Asesor',          area: 'Cartera' },
+  'flujo-caja':              { nombre: 'Flujo de caja disponible', area: 'Finanzas' },
+  'cierre-mensual':          { nombre: '% Cierre mensual',        area: 'Todas las áreas' },
+  'ordenes-cumplidas':       { nombre: 'Órdenes Cumplidas',       area: 'Producción' },
+  'costo-produccion':        { nombre: 'Costo de Producción',     area: 'Producción' },
+  'rotacion-personal':       { nombre: 'Rotación de personal',    area: 'Talento Humano' },
+  'obligaciones-por-vencer': { nombre: 'Obligaciones por vencer', area: 'Proveedores' },
+};
+
+interface KPIWidgetState {
+  data: KPI | null;
+  raw: KPIReal | null;
+  loading: boolean;
+  error: string | null;
+}
+
 function Dashboard() {
   const [periodo, setPeriodo] = useState<string>(periodoActual);
-  const [kpisData, setKpisData] = useState<KPI[]>(kpisMock);
+  const [widgets, setWidgets] = useState<Record<string, KPIWidgetState>>({});
   const [rawKpisMap, setRawKpisMap] = useState<Record<string, KPIReal>>({});
-  const [cargando, setCargando] = useState(true);
-  const [errorAPI, setErrorAPI] = useState<string | null>(null);
+  const [fuentesListas, setFuentesListas] = useState(0);
+  const [fuentesTotales] = useState(4); // ventas, cartera, margen, monolítico
 
+  // Inicializar estado de todos los widgets como loading
   useEffect(() => {
-    setCargando(true);
-    setErrorAPI(null);
+    const initial: Record<string, KPIWidgetState> = {};
+    KPI_ORDER.forEach(id => {
+      initial[id] = { data: null, raw: null, loading: true, error: null };
+    });
+    setWidgets(initial);
+    setRawKpisMap({});
+    setFuentesListas(0);
+
+    // Helper para actualizar un widget específico
+    const updateWidget = (id: string, raw: KPIReal) => {
+      setWidgets(prev => ({
+        ...prev,
+        [id]: { data: adaptarKPI(raw), raw, loading: false, error: null },
+      }));
+      setRawKpisMap(prev => ({ ...prev, [id]: raw }));
+    };
+
+    const failWidget = (id: string, errorMsg: string) => {
+      setWidgets(prev => ({
+        ...prev,
+        [id]: { data: null, raw: null, loading: false, error: errorMsg },
+      }));
+    };
+
+    // ── Fuente 1: /api/ventas_mes (endpoint independiente) ─────────────
+    fetchVentasMes(periodo)
+      .then(raw => updateWidget('ventas-meta', raw))
+      .catch(err => failWidget('ventas-meta', err.message))
+      .finally(() => setFuentesListas(n => n + 1));
+
+    // ── Fuente 2: /api/cartera_por_asesor (endpoint independiente) ─────
+    fetchCarteraAsesor()
+      .then(raw => updateWidget('cartera-asesores', raw))
+      .catch(err => failWidget('cartera-asesores', err.message))
+      .finally(() => setFuentesListas(n => n + 1));
+
+    // ── Fuente 3: /api/margen_global (endpoint independiente) ──────────
+    fetchMargenGlobal(periodo)
+      .then(raw => updateWidget('margen-caja', raw))
+      .catch(err => failWidget('margen-caja', err.message))
+      .finally(() => setFuentesListas(n => n + 1));
+
+    // ── Fuente 4: /api/kpis (monolítico, para KPIs sin endpoint propio) ─
     fetchKPIs(periodo)
       .then(resp => {
-        setRawKpisMap(resp.kpis);
-        const adaptados = Object.values(resp.kpis).map(adaptarKPI);
-        setKpisData(adaptados);
+        KPIS_MONOLITICOS.forEach(id => {
+          const raw = resp.kpis[id];
+          if (raw) {
+            updateWidget(id, raw);
+          } else {
+            failWidget(id, 'KPI no encontrado en respuesta');
+          }
+        });
       })
       .catch(err => {
-        console.error('No se pudo leer KPIs del backend:', err.message);
-        setErrorAPI(err.message);
+        KPIS_MONOLITICOS.forEach(id => failWidget(id, err.message));
       })
-      .finally(() => setCargando(false));
+      .finally(() => setFuentesListas(n => n + 1));
+
   }, [periodo]);
 
   const ahora = new Date();
   const saludo = ahora.getHours() < 12 ? 'Buenos días' : ahora.getHours() < 18 ? 'Buenas tardes' : 'Buenas noches';
   const fechaFormateada = ahora.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-
   const periodos = generarPeriodos();
+
+  const todoCargando = fuentesListas === 0;
+  const todoListo = fuentesListas >= fuentesTotales;
+  const hayErrores = Object.values(widgets).some(w => w.error);
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -241,7 +318,6 @@ function Dashboard() {
       <div className="flex items-center justify-between mb-4 gap-4">
         <div className="flex items-center gap-3">
           <h3 className="text-lg font-semibold text-dashboard-textMain">KPIs del período</h3>
-          {/* Selector de período */}
           <select
             value={periodo}
             onChange={e => setPeriodo(e.target.value)}
@@ -253,29 +329,30 @@ function Dashboard() {
           </select>
         </div>
         <span className={`text-xs px-3 py-1 rounded-full border ${
-          errorAPI ? 'bg-amber-50 border-amber-200 text-amber-700' :
-          cargando ? 'bg-slate-50 border-slate-200 text-slate-500' :
+          todoCargando ? 'bg-slate-50 border-slate-200 text-slate-500' :
+          hayErrores ? 'bg-amber-50 border-amber-200 text-amber-700' :
           'bg-emerald-50 border-emerald-200 text-emerald-700'
         }`}>
-          {cargando ? 'Cargando datos…' : errorAPI ? 'Usando datos de respaldo' : 'Datos en tiempo real — crisolweb'}
+          {todoCargando ? 'Cargando datos…' :
+           !todoListo ? `Cargando… (${fuentesListas}/${fuentesTotales} fuentes)` :
+           hayErrores ? 'Algunos indicadores con error' :
+           'Datos en tiempo real — crisolweb'}
         </span>
       </div>
 
-      {!cargando && !errorAPI && Object.keys(rawKpisMap).length > 0 && (
+      {todoListo && !hayErrores && Object.keys(rawKpisMap).length > 0 && (
         <AlertasPanel kpis={rawKpisMap} />
       )}
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-        {kpisData.map(kpi => (
-          <KPICard key={kpi.id} kpi={kpi} />
-        ))}
+        {KPI_ORDER.map(id => {
+          const w = widgets[id];
+          if (!w || w.loading) return <KPICardSkeleton key={id} />;
+          if (w.error) return <KPICardError key={id} nombre={KPI_META[id]?.nombre ?? id} area={KPI_META[id]?.area ?? ''} />;
+          if (w.data) return <KPICard key={id} kpi={w.data} />;
+          return <KPICardSkeleton key={id} />;
+        })}
       </section>
-
-      {errorAPI && (
-        <p className="text-xs text-amber-600 -mt-4 mb-4">
-          ⚠ Backend no disponible ({errorAPI}). Mostrando datos de demostración.
-        </p>
-      )}
     </div>
   );
 }

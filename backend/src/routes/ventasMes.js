@@ -90,6 +90,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
   const resultado = {
     ok:      true,
     filtros: { fecha_inicio, fecha_fin, limit },
+    meta_ventas: parseFloat(process.env.META_VENTAS || '200000000'),
     resumen: {
       facturas:    parseInt(resumen.facturas || 0, 10),
       total_bruto: parseFloat(resumen.total_bruto || 0),
