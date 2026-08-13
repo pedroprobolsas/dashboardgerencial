@@ -9,7 +9,7 @@ import CierreProduccionForm from './components/Forms/CierreProduccionForm';
 import CierreCarteraForm from './components/Forms/CierreCarteraForm';
 import CierreTalentoHumanoForm from './components/Forms/CierreTalentoHumanoForm';
 import BandejaAprobacion from './components/Aprobaciones/BandejaAprobacion';
-import { kpis as kpisMock, type KPI, type AlertaColor, type FilaGrid } from './data/kpis';
+import { type KPI, type AlertaColor, type FilaGrid } from './data/kpis';
 import { fetchKPIs, fetchVentasMes, fetchCarteraAsesor, fetchMargenGlobal, enviarCierre, actualizarEstadoCierre, fetchBandeja, type KPIReal, type KPIDiario } from './services/api';
 import VistazoDiario from './components/Dashboard/VistazoDiario';
 import type { InformeCierre, AreaCierre } from './types/cierres';
@@ -199,8 +199,6 @@ function generarPeriodos(): string[] {
 
 // ── Vista Dashboard ───────────────────────────────────────────────────────────
 
-// IDs de KPIs que tienen endpoint REST independiente
-const KPIS_INDEPENDIENTES = ['ventas-meta', 'cartera-asesores', 'margen-caja'] as const;
 // IDs de KPIs que siguen usando el endpoint monolítico /api/kpis
 const KPIS_MONOLITICOS = ['flujo-caja', 'cierre-mensual', 'ordenes-cumplidas', 'costo-produccion', 'rotacion-personal', 'obligaciones-por-vencer'] as const;
 // Orden de visualización de todos los KPIs
