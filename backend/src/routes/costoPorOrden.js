@@ -57,8 +57,22 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     return res.json(cached);
   }
 
-  // ── Query a PostgreSQL ─────────────────────────────────────────────
-  const sql = `
+  // ── Queries a PostgreSQL ─────────────────────────────────────────────
+  const sqlMaxFecha = `SELECT MAX(fecha) AS ultima_actualizacion FROM crisolweb.costo_por_orden`;
+  
+  const sqlResumen = `
+    SELECT
+      COUNT(*) AS total_ops,
+      ROUND(AVG(margen_pct), 2) AS margen_promedio,
+      ROUND(SUM(valor_cumplido), 2) AS valor_facturado,
+      SUM(CASE WHEN margen_pct < $3 THEN 1 ELSE 0 END) AS ops_bajo_umbral
+    FROM crisolweb.costo_por_orden
+    WHERE fecha >= $1::date
+      AND fecha <= $2::date
+      AND valor_cumplido > 0
+  `;
+
+  const sqlDetalle = `
     SELECT
       nro_op,
       cliente,
@@ -76,18 +90,33 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     ORDER BY fecha DESC, margen_pct ASC
   `;
 
-  const { rows } = await query(sql, [fecha_inicio, fecha_fin, umbral]);
+  const [maxFechaResult, resumenResult, detalleResult] = await Promise.all([
+    query(sqlMaxFecha),
+    query(sqlResumen, [fecha_inicio, fecha_fin, umbral]),
+    query(sqlDetalle, [fecha_inicio, fecha_fin, umbral])
+  ]);
+
+  const maxFecha = maxFechaResult.rows[0]?.ultima_actualizacion || null;
+  const resumen = resumenResult.rows[0] || {};
+  const rows = detalleResult.rows;
 
   const resultado = {
     ok:            true,
     filtros:       { fecha_inicio, fecha_fin, margen_minimo: umbral },
+    resumen: {
+      ultima_actualizacion: maxFecha,
+      total_ops:           parseInt(resumen.total_ops || 0, 10),
+      margen_promedio:     parseFloat(resumen.margen_promedio || 0),
+      valor_facturado:     parseFloat(resumen.valor_facturado || 0),
+      ops_bajo_umbral:     parseInt(resumen.ops_bajo_umbral || 0, 10),
+    },
     total:         rows.length,
     ordenes:       rows,
   };
 
   // Guardar en cache (5 min)
   cache.set(cacheKey, resultado);
-  logger.info(ENDPOINT, `OK — ${rows.length} OPs con margen < ${umbral}%`, { fecha_inicio, fecha_fin });
+  logger.info(ENDPOINT, `OK — ${resultado.resumen.total_ops} OPs en periodo, ${rows.length} críticas`, { fecha_inicio, fecha_fin });
 
   return res.json(resultado);
 }));

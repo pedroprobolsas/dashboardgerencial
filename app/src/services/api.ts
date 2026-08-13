@@ -199,13 +199,22 @@ export interface OrdenProduccion {
   margen_pct: number;
 }
 
-export async function fetchCostoPorOrden(fechaInicio: string, fechaFin: string, margenMinimo: number): Promise<{ ordenes: OrdenProduccion[], total: number }> {
+export interface CostoPorOrdenResumen {
+  ultima_actualizacion: string | null;
+  total_ops: number;
+  margen_promedio: number;
+  valor_facturado: number;
+  ops_bajo_umbral: number;
+}
+
+export async function fetchCostoPorOrden(fechaInicio: string, fechaFin: string, margenMinimo: number): Promise<{ ordenes: OrdenProduccion[], total: number, resumen: CostoPorOrdenResumen }> {
   const res = await fetch(`/api/costo_por_orden?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&margen_minimo=${margenMinimo}`);
   if (!res.ok) throw new Error(`Error ${res.status}`);
   const data = await res.json();
   return {
     ordenes: data.ordenes || [],
     total: data.total || 0,
+    resumen: data.resumen || { ultima_actualizacion: null, total_ops: 0, margen_promedio: 0, valor_facturado: 0, ops_bajo_umbral: 0 },
   };
 }
 
