@@ -66,13 +66,13 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       ROUND(costo_total_estimado,   2)                                              AS costo_total_estimado,
       ROUND(costo_ejecutado_total,  2)                                              AS costo_ejecutado_total,
       ROUND(valor_cumplido, 2)                                                      AS valor_cumplido,
-      ROUND(100.0 * (valor_cumplido - costo_ejecutado_total) / NULLIF(valor_cumplido, 0), 2) AS margen_pct,
+      margen_pct,
       fecha
     FROM crisolweb.costo_por_orden
     WHERE fecha >= $1::date
       AND fecha <= $2::date
       AND valor_cumplido > 0
-      AND (100.0 * (valor_cumplido - costo_ejecutado_total) / NULLIF(valor_cumplido, 0)) < $3
+      AND margen_pct < $3
     ORDER BY fecha DESC, margen_pct ASC
   `;
 
