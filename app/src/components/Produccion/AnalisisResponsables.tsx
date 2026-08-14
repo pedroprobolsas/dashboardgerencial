@@ -170,10 +170,10 @@ export default function AnalisisResponsables() {
                             <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">S/C</span>
                           ) : (
                             <span className={
-                                d.diferencia_horas_pct! > 20 ? 'text-red-700 bg-red-100 px-1.5 py-0.5 rounded' : 
-                                d.diferencia_horas_pct! > 0 ? 'text-amber-600' : 'text-emerald-600'
+                                (d.diferencia_horas_pct ?? 0) > 20 ? 'text-red-700 bg-red-100 px-1.5 py-0.5 rounded' : 
+                                (d.diferencia_horas_pct ?? 0) > 0 ? 'text-amber-600' : 'text-emerald-600'
                               }>
-                              {d.diferencia_horas_pct > 0 ? '+' : ''}{fmtNum.format(d.diferencia_horas_pct!)}%
+                              {(d.diferencia_horas_pct ?? 0) > 0 ? '+' : ''}{fmtNum.format(d.diferencia_horas_pct ?? 0)}%
                             </span>
                           )}
                         </td>
