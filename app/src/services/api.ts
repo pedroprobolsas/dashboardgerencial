@@ -218,6 +218,39 @@ export async function fetchCostoPorOrden(fechaInicio: string, fechaFin: string, 
   };
 }
 
+export interface LineaResponsable {
+  nro_op: string;
+  referencia: string;
+  actividad: string;
+  cant_cotizada: number;
+  cant_ejecutada: number;
+  valor_cotizado: number;
+  valor_ejecutado: number;
+  cumplimiento: number;
+  diferencia_horas: number;
+  diferencia_horas_pct: number | null;
+  tarifa_cotizada: number | null;
+  tarifa_real: number;
+  efecto_horas: number | null;
+  efecto_tarifa: number | null;
+}
+
+export interface IndicadoresResponsables {
+  jesus_efecto_horas: number;
+  cristian_efecto_tarifa: number;
+}
+
+export async function fetchAnalisisResponsables(fechaInicio: string, fechaFin: string): Promise<{ detalle: LineaResponsable[], indicadores: IndicadoresResponsables, total: number }> {
+  const res = await fetch(`/api/analisis_responsables?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`);
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  const data = await res.json();
+  return {
+    detalle: data.detalle || [],
+    indicadores: data.indicadores || { jesus_efecto_horas: 0, cristian_efecto_tarifa: 0 },
+    total: data.total || 0,
+  };
+}
+
 export async function enviarCierre(
   area: string,
   datos: Record<string, string>

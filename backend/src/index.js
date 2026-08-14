@@ -16,6 +16,7 @@ const costoPorOrdenRouter  = require('./routes/costoPorOrden');
 const ventasMesRouter      = require('./routes/ventasMes');
 const carteraPorAsesorRouter = require('./routes/carteraPorAsesor');
 const margenGlobalRouter   = require('./routes/margenGlobal');
+const analisisResponsablesRouter = require('./routes/analisisResponsables');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -44,6 +45,7 @@ const ENDPOINTS_REGISTRADOS = [
   'GET  /api/cartera_por_asesor',
   'GET  /api/costo_por_orden',
   'GET  /api/margen_global',
+  'GET  /api/analisis_responsables',
   'POST /api/setup',
   'GET  /api/cierres/bandeja',
   'POST /api/cierres/:area',
@@ -111,6 +113,7 @@ app.use('/api/costo_por_orden',   costoPorOrdenRouter);
 app.use('/api/ventas_mes',        ventasMesRouter);
 app.use('/api/cartera_por_asesor', carteraPorAsesorRouter);
 app.use('/api/margen_global',     margenGlobalRouter);
+app.use('/api/analisis_responsables', analisisResponsablesRouter);
 
 // ── Error handler global ──────────────────────────────────────────────────────
 
@@ -140,5 +143,6 @@ app.listen(PORT, () => {
   console.log(`    Cartera Asesor:   http://localhost:${PORT}/api/cartera_por_asesor`);
   console.log(`    Costo por Orden:  http://localhost:${PORT}/api/costo_por_orden`);
   console.log(`    Margen Global:    http://localhost:${PORT}/api/margen_global`);
+  console.log(`    Análisis Responsable: http://localhost:${PORT}/api/analisis_responsables`);
   console.log(`    Setup:            POST http://localhost:${PORT}/api/setup\n`);
 });

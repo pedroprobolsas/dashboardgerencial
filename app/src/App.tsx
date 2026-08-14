@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import Layout from './components/Layout/Layout';
 import { type Vista } from './components/Layout/Sidebar';
 import KPICard, { KPICardSkeleton, KPICardError } from './components/Dashboard/KPICard';
+import { useState, useEffect } from 'react';
+import Layout from './components/Layout/Layout';
+import { type Vista } from './components/Layout/Sidebar';
+import KPICard, { KPICardSkeleton, KPICardError } from './components/Dashboard/KPICard';
 import AlertasPanel from './components/Dashboard/AlertasPanel';
 import CierreVentasForm from './components/Forms/CierreVentasForm';
 import CierreFinanzasForm from './components/Forms/CierreFinanzasForm';
@@ -10,6 +14,7 @@ import CierreCarteraForm from './components/Forms/CierreCarteraForm';
 import CierreTalentoHumanoForm from './components/Forms/CierreTalentoHumanoForm';
 import BandejaAprobacion from './components/Aprobaciones/BandejaAprobacion';
 import CostoProduccionDetalle from './components/Produccion/CostoProduccionDetalle';
+import AnalisisResponsables from './components/Produccion/AnalisisResponsables';
 import { type KPI, type AlertaColor, type FilaGrid } from './data/kpis';
 import { fetchKPIs, fetchVentasMes, fetchCarteraAsesor, fetchMargenGlobal, enviarCierre, actualizarEstadoCierre, fetchBandeja, type KPIReal, type KPIDiario } from './services/api';
 import VistazoDiario from './components/Dashboard/VistazoDiario';
@@ -522,6 +527,7 @@ export default function App() {
       {vistaActual === 'cierre-talento-humano'  && <CierreTalentoHumanoForm  onEnviar={registrarEnvio} />}
       {vistaActual === 'bandeja-aprobacion'     && <BandejaAprobacion informes={informes} onAprobar={aprobar} onRechazar={rechazar} />}
       {vistaActual === 'costo-produccion-detalle' && <CostoProduccionDetalle />}
+      {vistaActual === 'analisis-responsables'    && <AnalisisResponsables />}
     </Layout>
   );
 }
