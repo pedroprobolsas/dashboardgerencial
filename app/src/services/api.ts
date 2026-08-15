@@ -268,6 +268,8 @@ export interface OPDetalleData {
     referencia: string;
     fecha: string;
     margen_pct: number;
+    op_cantidad_cotizada: string | number | null;
+    op_cantidad_ejecutada: string | number | null;
   };
   detalle: LineaOPDetalle[];
 }

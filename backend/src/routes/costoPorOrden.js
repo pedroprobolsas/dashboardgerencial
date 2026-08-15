@@ -131,7 +131,9 @@ router.get('/:nro_op', asyncHandler(`${ENDPOINT}/:nro_op`, async (req, res) => {
 
   const sqlCabecera = `
     SELECT
-      nro_op, cliente, referencia, fecha, margen_pct
+      nro_op, cliente, referencia, fecha, margen_pct,
+      cantidad_cotizada AS op_cantidad_cotizada,
+      cantidad_ejecutada AS op_cantidad_ejecutada
     FROM crisolweb.costo_por_orden
     WHERE nro_op = $1
     LIMIT 1

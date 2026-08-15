@@ -93,7 +93,45 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
   // Cálculos resumen (parseando a float porque Postgres devuelve numeric como string)
   const sumaHoras = manoObra.reduce((sum, r) => sum + (parseFloat(r.efecto_horas as any) || 0), 0);
   const sumaTarifa = manoObra.reduce((sum, r) => sum + (parseFloat(r.efecto_tarifa as any) || 0), 0);
-  const sumaMateriales = materiales.reduce((sum, r) => sum + (parseFloat(r.cumplimiento as any) || 0), 0);
+  
+  const opCantCot = parseFloat(cabecera.op_cantidad_cotizada as any);
+  const opCantEjec = parseFloat(cabecera.op_cantidad_ejecutada as any);
+  const hasVolumen = !isNaN(opCantCot) && opCantCot > 0 && !isNaN(opCantEjec);
+
+  let sumaMaterialesCantidad = 0;
+  let sumaMaterialesPrecio = 0;
+
+  const materialesProcesados = materiales.map(r => {
+    let valCot = parseFloat(r.valor_cotizado as any) || 0;
+    let valEjec = parseFloat(r.valor_ejecutado as any) || 0;
+    let cumplimiento = parseFloat(r.cumplimiento as any) || 0;
+    let efectoPrecio = parseFloat(r.efecto_tarifa as any) || 0; // Para materiales, la tarifa calculada por DB es el precio
+
+    let costo_unit_cotizado: number | null = null;
+    let costo_unit_ejecutado: number | null = null;
+    let impacto_final = cumplimiento;
+
+    if (hasVolumen) {
+      costo_unit_cotizado = valCot / opCantCot;
+      costo_unit_ejecutado = opCantEjec > 0 ? valEjec / opCantEjec : 0;
+      impacto_final = (costo_unit_cotizado - costo_unit_ejecutado) * opCantEjec;
+    }
+
+    let efectoCantidad = impacto_final - efectoPrecio;
+
+    sumaMaterialesPrecio += efectoPrecio;
+    sumaMaterialesCantidad += efectoCantidad;
+
+    return {
+      ...r,
+      costo_unit_cotizado,
+      costo_unit_ejecutado,
+      impacto_final,
+      efecto_cantidad: efectoCantidad,
+      efecto_precio: efectoPrecio
+    };
+  });
+
   const fletesPendientes = terceros.reduce((sum, r) => sum + (r.valor_ejecutado === 0 ? (parseFloat(r.valor_cotizado as any) || 0) : 0), 0);
 
   // Formatear fecha
@@ -208,7 +246,8 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
           <div className="grid gap-3 mb-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
             {renderCard("Efecto horas — Jesús", sumaHoras)}
             {renderCard("Efecto tarifa — Cristian", sumaTarifa)}
-            {renderCard("Materiales — Franklin", sumaMateriales)}
+            {renderCard("Materiales · cantidad — Franklin", sumaMaterialesCantidad)}
+            {renderCard("Materiales · precio — compras", sumaMaterialesPrecio)}
             {renderCard("Fletes sin causar", fletesPendientes, true)}
           </div>
 
@@ -279,18 +318,20 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
               <table className="w-full text-left" style={{ tableLayout: 'fixed', fontSize: '12.5px' }}>
                 <thead>
                   <tr style={{ color: 'var(--text-secondary)', fontWeight: 500, borderBottom: '0.5px solid var(--border-strong)' }}>
-                    <th className="py-2 w-1/2">Material</th>
+                    <th className="py-2 w-1/3">Material</th>
                     <th className="py-2 text-right">Cot</th>
                     <th className="py-2 text-right">Ejec</th>
-                    <th className="py-2 text-right">Cumplimiento</th>
+                    <th className="py-2 text-right">Costo u. cot</th>
+                    <th className="py-2 text-right">Costo u. ejec</th>
+                    <th className="py-2 text-right">Cumplimiento bruto</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {materiales.length === 0 && (
-                    <tr><td colSpan={4} className="py-4 text-center text-slate-400">Sin registros</td></tr>
+                  {materialesProcesados.length === 0 && (
+                    <tr><td colSpan={6} className="py-4 text-center text-slate-400">Sin registros</td></tr>
                   )}
-                  {materiales.map((r, i) => {
-                    const rowStyle = { borderBottom: i === materiales.length -1 ? 'none' : '0.5px solid var(--border)' };
+                  {materialesProcesados.map((r, i) => {
+                    const rowStyle = { borderBottom: i === materialesProcesados.length -1 ? 'none' : '0.5px solid var(--border)' };
                     const cellColor = (val: number | null) => {
                       if (val == null || val === 0) return 'var(--text-main)';
                       return val < 0 ? 'var(--text-danger)' : 'var(--text-success)';
@@ -300,6 +341,8 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
                         <td className="py-2">{renderItemName(r.item, r)}</td>
                         <td className="py-2 text-right" style={{ color: 'var(--text-secondary)' }}>{formatNumber(r.cant_cotizada)}</td>
                         <td className="py-2 text-right font-medium">{formatNumber(r.cant_ejecutada)}</td>
+                        <td className="py-2 text-right" style={{ color: 'var(--text-secondary)' }}>{formatMoney(r.costo_unit_cotizado)}</td>
+                        <td className="py-2 text-right font-medium">{formatMoney(r.costo_unit_ejecutado)}</td>
                         <td className="py-2 text-right font-medium" style={{ color: cellColor(r.cumplimiento) }}>{formatMoney(r.cumplimiento)}</td>
                       </tr>
                     );
@@ -367,7 +410,7 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
           }
         >
           {/* Tarjetas de Resumen */}
-          <div className="grid grid-cols-4 gap-4 mb-8 mt-6">
+          <div className="grid grid-cols-5 gap-4 mb-8 mt-6">
             <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
               <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Efecto horas (Jesús)</span>
               <span className={`text-xl font-black ${sumaHoras < 0 ? 'text-red-600' : sumaHoras > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>{formatMoney(sumaHoras)}</span>
@@ -377,8 +420,12 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
               <span className={`text-xl font-black ${sumaTarifa < 0 ? 'text-red-600' : sumaTarifa > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>{formatMoney(sumaTarifa)}</span>
             </div>
             <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-              <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Materiales (Bodega)</span>
-              <span className={`text-xl font-black ${sumaMateriales < 0 ? 'text-red-600' : sumaMateriales > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>{formatMoney(sumaMateriales)}</span>
+              <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Materiales · cant</span>
+              <span className={`text-xl font-black ${sumaMaterialesCantidad < 0 ? 'text-red-600' : sumaMaterialesCantidad > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>{formatMoney(sumaMaterialesCantidad)}</span>
+            </div>
+            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+              <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Materiales · precio</span>
+              <span className={`text-xl font-black ${sumaMaterialesPrecio < 0 ? 'text-red-600' : sumaMaterialesPrecio > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>{formatMoney(sumaMaterialesPrecio)}</span>
             </div>
             <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
               <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Fletes sin causar</span>
@@ -426,15 +473,19 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
                   <th className="py-2">Material</th>
                   <th className="py-2 text-right">Cant. Cot</th>
                   <th className="py-2 text-right">Cant. Ejec</th>
-                  <th className="py-2 text-right">Cumplimiento ($)</th>
+                  <th className="py-2 text-right">Costo u. cot</th>
+                  <th className="py-2 text-right">Costo u. ejec</th>
+                  <th className="py-2 text-right">Cumplimiento bruto ($)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {materiales.map((r, i) => (
+                {materialesProcesados.map((r, i) => (
                   <tr key={i} className="print:break-inside-avoid">
                     <td className="py-1">{r.item}</td>
                     <td className="py-1 text-right text-slate-500">{formatNumber(r.cant_cotizada)}</td>
                     <td className="py-1 text-right">{formatNumber(r.cant_ejecutada)}</td>
+                    <td className="py-1 text-right text-slate-500">{formatMoney(r.costo_unit_cotizado)}</td>
+                    <td className="py-1 text-right">{formatMoney(r.costo_unit_ejecutado)}</td>
                     <td className={`py-1 text-right font-medium ${r.cumplimiento !== null && r.cumplimiento < 0 ? 'text-red-600' : ''}`}>{formatMoney(r.cumplimiento)}</td>
                   </tr>
                 ))}
