@@ -218,6 +218,37 @@ export async function fetchCostoPorOrden(fechaInicio: string, fechaFin: string, 
   };
 }
 
+export interface LineaOPDetalle {
+  item: string;
+  categoria: string;
+  cant_cotizada: number;
+  cant_ejecutada: number;
+  valor_cotizado: number;
+  valor_ejecutado: number;
+  cumplimiento: number;
+  diferencia_pct: number | null;
+  efecto_horas: number | null;
+  efecto_tarifa: number | null;
+}
+
+export interface OPDetalleData {
+  ok: boolean;
+  cabecera: {
+    nro_op: string;
+    cliente: string;
+    referencia: string;
+    fecha: string;
+    margen_pct: number;
+  };
+  detalle: LineaOPDetalle[];
+}
+
+export async function fetchCostoPorOrdenDetalle(nro_op: string): Promise<OPDetalleData> {
+  const res = await fetch(`/api/costo_por_orden/${nro_op}`);
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  return res.json();
+}
+
 export interface LineaResponsable {
   nro_op: string;
   referencia: string;

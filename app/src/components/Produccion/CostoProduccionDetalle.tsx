@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchCostoPorOrden, type OrdenProduccion, type CostoPorOrdenResumen } from '../../services/api';
+import OpTrazabilidadModal from './OpTrazabilidadModal';
 
 const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
@@ -23,6 +24,33 @@ export default function CostoProduccionDetalle() {
   const [resumen, setResumen] = useState<CostoPorOrdenResumen | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  const [opSeleccionada, setOpSeleccionada] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Sincronizar modal con la URL al cargar y al retroceder
+    const syncFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      setOpSeleccionada(params.get('op'));
+    };
+    syncFromUrl();
+    window.addEventListener('popstate', syncFromUrl);
+    return () => window.removeEventListener('popstate', syncFromUrl);
+  }, []);
+
+  const openModal = (nro_op: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('op', nro_op);
+    window.history.pushState({}, '', url);
+    setOpSeleccionada(nro_op);
+  };
+
+  const closeModal = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('op');
+    window.history.pushState({}, '', url);
+    setOpSeleccionada(null);
+  };
 
   const cargarDatos = async () => {
     setLoading(true);
@@ -55,7 +83,7 @@ export default function CostoProduccionDetalle() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 overflow-hidden">
+    <div className="flex flex-col h-full bg-slate-50 overflow-hidden relative">
       
       {/* Banner Superior de Actualización */}
       {resumen && (
@@ -173,7 +201,7 @@ export default function CostoProduccionDetalle() {
             ) : (
               <table className="w-full text-left border-collapse min-w-max">
                 <thead>
-                  <tr className="bg-slate-50 text-dashboard-textMuted text-[10px] uppercase tracking-wider border-b border-slate-100 sticky top-0 shadow-sm">
+                  <tr className="bg-slate-50 text-dashboard-textMuted text-[10px] uppercase tracking-wider border-b border-slate-100 sticky top-0 shadow-sm z-10">
                     <th className="px-5 py-3 font-semibold bg-slate-50">Nro OP</th>
                     <th className="px-5 py-3 font-semibold bg-slate-50">Cliente</th>
                     <th className="px-5 py-3 font-semibold bg-slate-50">Referencia</th>
@@ -186,11 +214,14 @@ export default function CostoProduccionDetalle() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {ordenes.map((op, i) => {
-                    // Pinta la fila completa si el margen es menor a la mitad del umbral
                     const isExtremelyCritical = op.margen_pct < (margenMinimo / 2);
                     return (
-                      <tr key={`${op.nro_op}-${op.referencia}-${i}`} className={`transition-colors ${isExtremelyCritical ? 'bg-red-50 hover:bg-red-100/70' : 'hover:bg-slate-50/50'}`}>
-                        <td className={`px-5 py-3 font-medium ${isExtremelyCritical ? 'text-red-900' : 'text-dashboard-textMain'}`}>{op.nro_op}</td>
+                      <tr 
+                        key={`${op.nro_op}-${op.referencia}-${i}`} 
+                        onClick={() => openModal(op.nro_op)}
+                        className={`transition-colors cursor-pointer ${isExtremelyCritical ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-100'}`}
+                      >
+                        <td className={`px-5 py-3 font-medium ${isExtremelyCritical ? 'text-red-900' : 'text-probolsas-navy'}`}>{op.nro_op}</td>
                         <td className={`px-5 py-3 max-w-xs truncate ${isExtremelyCritical ? 'text-red-800' : 'text-slate-600'}`} title={op.cliente}>{op.cliente}</td>
                         <td className={`px-5 py-3 max-w-[200px] truncate ${isExtremelyCritical ? 'text-red-800' : 'text-slate-600'}`} title={op.referencia}>{op.referencia}</td>
                         <td className={`px-5 py-3 text-xs whitespace-nowrap ${isExtremelyCritical ? 'text-red-700' : 'text-dashboard-textMuted'}`}>
@@ -217,6 +248,13 @@ export default function CostoProduccionDetalle() {
           </div>
         </div>
       </div>
+
+      {opSeleccionada && (
+        <OpTrazabilidadModal 
+          nro_op={opSeleccionada} 
+          onClose={closeModal} 
+        />
+      )}
     </div>
   );
 }

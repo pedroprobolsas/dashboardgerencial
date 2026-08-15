@@ -121,4 +121,61 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
   return res.json(resultado);
 }));
 
+/**
+ * GET /api/costo_por_orden/:nro_op
+ *
+ * Devuelve el detalle (trazabilidad) de una OP específica.
+ */
+router.get('/:nro_op', asyncHandler(`${ENDPOINT}/:nro_op`, async (req, res) => {
+  const { nro_op } = req.params;
+
+  const sqlCabecera = `
+    SELECT
+      nro_op, cliente, referencia, fecha, margen_pct
+    FROM crisolweb.costo_por_orden
+    WHERE nro_op = $1
+    LIMIT 1
+  `;
+
+  const sqlDetalle = `
+    SELECT
+      item,
+      categoria,
+      ROUND(cant_cotizada, 2) AS cant_cotizada,
+      ROUND(cant_ejecutada, 2) AS cant_ejecutada,
+      ROUND(valor_cotizado, 2) AS valor_cotizado,
+      ROUND(valor_ejecutado, 2) AS valor_ejecutado,
+      ROUND(cumplimiento, 2) AS cumplimiento,
+      
+      -- Diferencia horas % (positivo = se usaron más horas = sobrecosto)
+      CASE 
+        WHEN cant_cotizada > 0 THEN ROUND(((cant_ejecutada - cant_cotizada) / cant_cotizada) * 100, 2) 
+        ELSE NULL 
+      END AS diferencia_pct,
+      
+      -- Efectos (Multiplicados por -1 para que Ahorro = Positivo, Sobrecosto = Negativo)
+      ROUND((cant_cotizada - cant_ejecutada) * (valor_cotizado / NULLIF(cant_cotizada, 0)), 2) AS efecto_horas,
+      ROUND(((valor_cotizado / NULLIF(cant_cotizada, 0)) - (valor_ejecutado / NULLIF(cant_ejecutada, 0))) * cant_ejecutada, 2) AS efecto_tarifa
+      
+    FROM crisolweb.costo_por_orden_detalle
+    WHERE nro_op = $1
+    ORDER BY categoria, item
+  `;
+
+  const [cabeceraResult, detalleResult] = await Promise.all([
+    query(sqlCabecera, [nro_op]),
+    query(sqlDetalle, [nro_op])
+  ]);
+
+  if (cabeceraResult.rows.length === 0) {
+    return res.status(404).json({ ok: false, error: 'OP no encontrada' });
+  }
+
+  return res.json({
+    ok: true,
+    cabecera: cabeceraResult.rows[0],
+    detalle: detalleResult.rows,
+  });
+}));
+
 module.exports = router;

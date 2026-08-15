@@ -2,6 +2,23 @@
 @config "../tailwind.config.js";
 
 @layer base {
+  :root {
+    --bg-danger: #fee2e2;
+    --text-danger: #b91c1c;
+    --bg-warning: #fef3c7;
+    --text-warning: #b45309;
+    --bg-success: #dcfce7;
+    --text-success: #15803d;
+    --surface-1: #f8fafc;
+    --surface-2: #ffffff;
+    --text-main: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --radius: 12px;
+  }
+
   body {
     @apply bg-dashboard-canvas text-dashboard-textMain font-sans antialiased;
   }
