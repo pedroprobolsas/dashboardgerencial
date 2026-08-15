@@ -356,6 +356,8 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
           entidadLabel="Cliente:"
           entidadValue={cabecera.cliente}
           firmaLabel="Firma Autorizada"
+          firmaDerechaLabel="Firma responsable"
+          numeroInformeFijo={cabecera.nro_op}
           onClose={() => setInformeAbierto(false)}
           infoExtra={
             <>

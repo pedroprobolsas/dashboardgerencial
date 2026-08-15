@@ -8,6 +8,8 @@ interface Props {
   entidadValue: string;
   infoExtra?: ReactNode; // Por ejemplo, Periodo, Métrica...
   firmaLabel?: string;
+  firmaDerechaLabel?: string;
+  numeroInformeFijo?: string;
   onClose: () => void;
   children: ReactNode;
 }
@@ -20,18 +22,26 @@ export default function InformePDFModal({
   entidadValue, 
   infoExtra, 
   firmaLabel = 'Gerencia / Jefatura',
+  firmaDerechaLabel,
+  numeroInformeFijo,
   onClose, 
   children 
 }: Props) {
   
-  const [consecutivo, setConsecutivo] = useState<string>('[Borrador]');
+  const [consecutivo, setConsecutivo] = useState<string>(numeroInformeFijo || '[Borrador]');
   const [fechaInforme, setFechaInforme] = useState<string>(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
 
   const handlePrint = async () => {
-    // Si ya tiene número, solo imprimir
-    if (consecutivo !== '[Borrador]') {
+    // Si ya tiene número O es fijo, solo imprimir
+    if (consecutivo !== '[Borrador]' && !numeroInformeFijo) {
       document.title = `Informe ${consecutivo} - ${entidadValue}`;
+      window.print();
+      return;
+    }
+
+    if (numeroInformeFijo) {
+      document.title = `Informe ${numeroInformeFijo} - ${entidadValue}`;
       window.print();
       return;
     }
@@ -161,7 +171,7 @@ export default function InformePDFModal({
             <div className="border-t border-slate-800 pt-2 text-sm font-bold text-slate-800">{firmaLabel}</div>
           </div>
           <div className="w-64 text-center">
-            <div className="border-t border-slate-800 pt-2 text-sm font-bold text-slate-800">{entidadValue}</div>
+            <div className="border-t border-slate-800 pt-2 text-sm font-bold text-slate-800">{firmaDerechaLabel || entidadValue}</div>
           </div>
         </div>
 
