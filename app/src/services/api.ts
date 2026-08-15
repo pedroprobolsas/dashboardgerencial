@@ -363,34 +363,3 @@ export async function fetchPrefill(area: string, periodo: string): Promise<Respu
   if (!res.ok) throw new Error(`Error ${res.status} al obtener datos del sistema`);
   return res.json();
 }
-
- e x p o r t   i n t e r f a c e   L i n e a M a t e r i a l   { 
-     n r o _ o p :   s t r i n g ; 
-     r e f e r e n c i a :   s t r i n g ; 
-     m a t e r i a l :   s t r i n g ; 
-     c a n t _ c o t i z a d a :   n u m b e r ; 
-     c a n t _ e s p e r a d a :   n u m b e r   |   n u l l ; 
-     c a n t _ e j e c u t a d a :   n u m b e r ; 
-     d i f e r e n c i a _ c a n t _ p c t :   n u m b e r   |   s t r i n g   |   n u l l ; 
-     v a l o r _ c o t i z a d o :   n u m b e r ; 
-     v a l o r _ e j e c u t a d o :   n u m b e r ; 
-     c u m p l i m i e n t o :   n u m b e r ; 
-     p r e c i o _ c o t i z a d o :   n u m b e r   |   n u l l ; 
-     p r e c i o _ r e a l :   n u m b e r   |   n u l l ; 
-     e f e c t o _ v o l u m e n :   n u m b e r   |   n u l l ; 
-     e f e c t o _ r e n d i m i e n t o :   n u m b e r   |   n u l l ; 
-     e f e c t o _ p r e c i o :   n u m b e r   |   n u l l ; 
-     c a l c u l a b l e :   b o o l e a n ; 
- } 
- 
- e x p o r t   a s y n c   f u n c t i o n   f e t c h A n a l i s i s M a t e r i a l e s ( f e c h a I n i c i o :   s t r i n g ,   f e c h a F i n :   s t r i n g ) :   P r o m i s e < {   d e t a l l e :   L i n e a M a t e r i a l [ ] ,   t o t a l :   n u m b e r   } >   { 
-     c o n s t   r e s   =   a w a i t   f e t c h ( \ / a p i / a n a l i s i s _ m a t e r i a l e s ? f e c h a _ i n i c i o = \ & f e c h a _ f i n = \ \ ) ; 
-     i f   ( ! r e s . o k )   t h r o w   n e w   E r r o r ( \ E r r o r   \ \ ) ; 
-     c o n s t   d a t a   =   a w a i t   r e s . j s o n ( ) ; 
-     r e t u r n   { 
-         d e t a l l e :   d a t a . d e t a l l e   | |   [ ] , 
-         t o t a l :   d a t a . t o t a l   | |   0 , 
-     } ; 
- } 
-  
- 
