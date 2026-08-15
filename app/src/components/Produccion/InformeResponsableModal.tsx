@@ -34,7 +34,12 @@ export default function InformeResponsableModal({ detalle, fechaInicio, fechaFin
       const res = await fetch('/api/informes/consecutivo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ responsable, tipo_efecto: tipoEfecto })
+        body: JSON.stringify({ 
+          responsable, 
+          tipo_efecto: tipoEfecto,
+          periodo_inicio: fechaInicio,
+          periodo_fin: fechaFin
+        })
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Error al generar consecutivo');

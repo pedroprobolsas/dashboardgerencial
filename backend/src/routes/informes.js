@@ -9,44 +9,37 @@ const ENDPOINT = '/api/informes';
 
 /**
  * POST /api/informes/consecutivo
- * Obtiene o crea un nuevo consecutivo para los informes.
+ * Obtiene el consecutivo usando la secuencia app_ops.informes_numero_seq e inserta el trazo.
  */
 router.post('/consecutivo', asyncHandler(ENDPOINT, async (req, res) => {
-  const { responsable, tipo_efecto } = req.body;
+  const { responsable, tipo_efecto, periodo_inicio, periodo_fin } = req.body;
   
-  // Create table if it doesn't exist
-  const createTableSql = `
-    CREATE TABLE IF NOT EXISTS crisolweb.informes_consecutivo (
-      id SERIAL PRIMARY KEY,
-      consecutivo INT NOT NULL,
-      fecha TIMESTAMP NOT NULL DEFAULT NOW(),
-      responsable VARCHAR(255),
-      tipo_efecto VARCHAR(50)
-    );
-  `;
-  await query(createTableSql);
+  // Obtener el siguiente número de la secuencia
+  const seqQuery = await query(`SELECT nextval('app_ops.informes_numero_seq') AS next_num`);
+  const numero = parseInt(seqQuery.rows[0].next_num);
 
-  // Get max consecutivo
-  const maxQuery = await query(`SELECT MAX(consecutivo) as max_val FROM crisolweb.informes_consecutivo`);
-  let nextConsecutivo = 10001; // Empieza en 10001
-  
-  if (maxQuery.rows[0].max_val) {
-    nextConsecutivo = parseInt(maxQuery.rows[0].max_val) + 1;
-  }
-
-  // Insert the new consecutivo
+  // Insertar el registro en app_ops.informes para la traza
   const insertSql = `
-    INSERT INTO crisolweb.informes_consecutivo (consecutivo, responsable, tipo_efecto) 
-    VALUES ($1, $2, $3) RETURNING id, consecutivo, fecha
+    INSERT INTO app_ops.informes 
+    (numero, responsable, efecto, fecha_informe, periodo_inicio, periodo_fin, creado_en) 
+    VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, NOW())
+    RETURNING fecha_informe
   `;
-  const { rows } = await query(insertSql, [nextConsecutivo, responsable || null, tipo_efecto || null]);
+  
+  const { rows } = await query(insertSql, [
+    numero, 
+    responsable || 'Sin nombre', 
+    tipo_efecto || 'ambos', 
+    periodo_inicio || null, 
+    periodo_fin || null
+  ]);
 
-  logger.info(ENDPOINT, `Generado consecutivo ${nextConsecutivo} para ${responsable}`);
+  logger.info(ENDPOINT, `Generado informe N° ${numero} para ${responsable} (Período: ${periodo_inicio} a ${periodo_fin})`);
 
   return res.json({
     ok: true,
-    consecutivo: rows[0].consecutivo,
-    fecha: rows[0].fecha
+    consecutivo: numero,
+    fecha: rows[0].fecha_informe
   });
 }));
 
