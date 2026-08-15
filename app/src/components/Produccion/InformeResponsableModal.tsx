@@ -151,7 +151,7 @@ export default function InformeResponsableModal({ detalle, fechaInicio, fechaFin
         </div>
         <button 
           onClick={() => {
-            document.title = \`Informe \${consecutivo} - \${fechaInforme} - \${responsable}\`;
+            document.title = `Informe ${consecutivo} - ${fechaInforme} - ${responsable}`;
             window.print();
           }} 
           className="px-5 py-2 text-sm font-bold text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors shadow-sm flex items-center gap-2"
