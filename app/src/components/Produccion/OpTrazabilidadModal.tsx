@@ -142,7 +142,7 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
   // -------------------------------------------------------------
   // LÓGICA DE RESUMEN E IMPACTO (Bloques A, B y C)
   // -------------------------------------------------------------
-  const impactos = [
+  const impactos: { label: string, valor: number, tipo: string, contexto?: string }[] = [
     { label: 'Efecto Horas (Líder de Producción)', valor: sumaHoras, tipo: 'horas' },
     { label: 'Efecto Tarifa (Costeo y Presupuesto)', valor: sumaTarifa, tipo: 'tarifa' },
     { label: 'Consumo Materiales (Líder de Bodega)', valor: sumaMaterialesCantidad, tipo: 'consumo' },
@@ -204,7 +204,10 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
     } else if (imp.tipo === 'tarifa') {
       const actSobrecosto = manoObra.filter(m => (m.efecto_tarifa || 0) < 0);
       if (actSobrecosto.length > 0) {
-        const base = actSobrecosto.reduce((sum, r) => sum + (parseFloat(r.tarifa_cotizada as any) || 0) * (parseFloat(r.cant_ejecutada as any) || 0), 0);
+        const base = actSobrecosto.reduce((sum, r) => {
+          const tarifaCot = r.cant_cotizada > 0 ? (r.valor_cotizado / r.cant_cotizada) : 0;
+          return sum + (tarifaCot * (parseFloat(r.cant_ejecutada as any) || 0));
+        }, 0);
         const efecto = actSobrecosto.reduce((sum, r) => sum + (parseFloat(r.efecto_tarifa as any) || 0), 0);
         const pct = base ? Math.round(Math.abs(efecto) / base * 100) : 0;
         imp.contexto = `La hora real costó ${pct}% más que la cotizada, en ${actSobrecosto.length} de ${manoObra.length} actividades`;
@@ -267,18 +270,18 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
   }
 
   // Producción
-  let prodMaxAct: { item: string, pct: number, imp: number } | null = null;
-  manoObra.forEach(m => {
+  const prodMaxAct = manoObra.reduce<{ item: string, pct: number, imp: number } | null>((max, m) => {
     const cCot = parseFloat(m.cant_cotizada as any) || 0;
     const cEjec = parseFloat(m.cant_ejecutada as any) || 0;
     if (cCot > 0 && cEjec > cCot * 1.15) {
       const pct = Math.round(((cEjec - cCot) / cCot) * 100);
       const imp = Math.abs(m.efecto_horas || 0);
-      if (!prodMaxAct || imp > prodMaxAct.imp) {
-        prodMaxAct = { item: m.item, pct, imp };
+      if (!max || imp > max.imp) {
+        return { item: m.item, pct, imp };
       }
     }
-  });
+    return max;
+  }, null);
   if (prodMaxAct) {
     posiblesPreguntas.push({
       imp: prodMaxAct.imp,
@@ -292,35 +295,6 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
     .slice(0, 3)
     .map(p => p.texto);
 
-
-  // Lógica de tarjetas
-  const getCardStyle = (val: number, isFlete: boolean = false) => {
-    if (isFlete) {
-      if (val > 0) return { bg: 'var(--bg-warning)', text: 'var(--text-warning)' };
-      return { bg: 'var(--surface-1)', text: 'var(--text-secondary)' };
-    }
-    if (val < 0) return { bg: 'var(--bg-danger)', text: 'var(--text-danger)' }; // Sobrecosto
-    if (val > 0) return { bg: 'var(--bg-success)', text: 'var(--text-success)' }; // Ahorro
-    return { bg: 'var(--surface-1)', text: 'var(--text-secondary)' }; // Neutro
-  };
-
-  const renderCard = (label: string, value: number, isFlete: boolean = false) => {
-    const style = getCardStyle(value, isFlete);
-    return (
-      <div 
-        className="flex flex-col justify-center"
-        style={{ 
-          backgroundColor: style.bg,
-          color: style.text,
-          borderRadius: 'var(--radius)', 
-          padding: '0.85rem' 
-        }}
-      >
-        <span style={{ fontSize: '12px', marginBottom: '4px' }}>{label}</span>
-        <span style={{ fontSize: '20px', fontWeight: 500 }}>{formatMoney(value)}</span>
-      </div>
-    );
-  };
 
   // Resaltado de mano de obra (mayor Δ% positiva > 50%)
   let maxDif = 50;
