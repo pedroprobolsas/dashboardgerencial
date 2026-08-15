@@ -74,8 +74,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       ROUND(d.valor_cotizado / NULLIF(d.cant_cotizada, 0), 2) AS tarifa_cotizada,
       ROUND(d.valor_ejecutado / NULLIF(d.cant_ejecutada, 0), 2) AS tarifa_real,
       
-      ROUND((d.cant_ejecutada - d.cant_cotizada) * (d.valor_cotizado / NULLIF(d.cant_cotizada, 0)), 2) AS efecto_horas,
-      ROUND(((d.valor_ejecutado / NULLIF(d.cant_ejecutada, 0)) - (d.valor_cotizado / NULLIF(d.cant_cotizada, 0))) * d.cant_ejecutada, 2) AS efecto_tarifa
+      ROUND((d.cant_cotizada - d.cant_ejecutada) * (d.valor_cotizado / NULLIF(d.cant_cotizada, 0)), 2) AS efecto_horas,
+      ROUND(((d.valor_cotizado / NULLIF(d.cant_cotizada, 0)) - (d.valor_ejecutado / NULLIF(d.cant_ejecutada, 0))) * d.cant_ejecutada, 2) AS efecto_tarifa
       
     FROM crisolweb.costo_por_orden_detalle d
     JOIN crisolweb.costo_por_orden o ON d.nro_op = o.nro_op AND d.referencia = o.referencia

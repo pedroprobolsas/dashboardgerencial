@@ -81,7 +81,7 @@ export default function AnalisisResponsables() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 bg-slate-100 px-3 py-1 rounded-full">Efecto Horas (Jesús)</span>
-              <span className={`text-3xl font-black ${indicadores.jesus_efecto_horas > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+              <span className={`text-3xl font-black ${indicadores.jesus_efecto_horas < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                 {indicadores.jesus_efecto_horas > 0 ? '+' : ''}{fmtCOP.format(indicadores.jesus_efecto_horas)}
               </span>
               <span className="text-xs text-slate-400 mt-2">Impacto en pesos por variación en la cantidad de horas ejecutadas.</span>
@@ -89,7 +89,7 @@ export default function AnalisisResponsables() {
             
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 bg-slate-100 px-3 py-1 rounded-full">Efecto Tarifa (Cristian)</span>
-              <span className={`text-3xl font-black ${indicadores.cristian_efecto_tarifa > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+              <span className={`text-3xl font-black ${indicadores.cristian_efecto_tarifa < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                 {indicadores.cristian_efecto_tarifa > 0 ? '+' : ''}{fmtCOP.format(indicadores.cristian_efecto_tarifa)}
               </span>
               <span className="text-xs text-slate-400 mt-2">Impacto en pesos por variación en la tarifa ($/hora) ejecutada.</span>
@@ -127,15 +127,33 @@ export default function AnalisisResponsables() {
                   <tr className="bg-slate-50 text-dashboard-textMuted text-[10px] uppercase tracking-wider border-b border-slate-100 sticky top-0 shadow-sm z-10">
                     <th className="px-4 py-3 font-semibold bg-slate-50">OP / Referencia</th>
                     <th className="px-4 py-3 font-semibold bg-slate-50">Actividad</th>
-                    <th className="px-4 py-3 font-semibold text-right bg-slate-50 border-l border-slate-200">H. Cot.</th>
-                    <th className="px-4 py-3 font-semibold text-right bg-slate-50">H. Ejec.</th>
-                    <th className="px-4 py-3 font-semibold text-right bg-slate-50">Dif Horas</th>
-                    <th className="px-4 py-3 font-semibold text-right bg-slate-50 border-r border-slate-200">% Horas</th>
-                    <th className="px-4 py-3 font-semibold text-right bg-slate-50">Tarifa Cot.</th>
-                    <th className="px-4 py-3 font-semibold text-right bg-slate-50 border-r border-slate-200">Tarifa Real</th>
-                    <th className="px-4 py-3 font-semibold text-right bg-slate-50">Ef. Horas (Jesús)</th>
-                    <th className="px-4 py-3 font-semibold text-right bg-slate-50">Ef. Tarifa (Cris)</th>
-                    <th className="px-4 py-3 font-semibold text-right bg-slate-50 border-l border-slate-200">Cumplimiento Oficial</th>
+                    <th className="px-4 py-3 font-semibold text-right bg-slate-50 border-l border-slate-200">
+                      H. Cot. <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="horas presupuestadas vs realmente trabajadas"></i>
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-right bg-slate-50">
+                      H. Ejec. <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="horas presupuestadas vs realmente trabajadas"></i>
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-right bg-slate-50">
+                      Dif Horas <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="diferencia absoluta. Positivo = se usaron más horas de las previstas"></i>
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-right bg-slate-50 border-r border-slate-200">
+                      % Horas <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="la misma diferencia en porcentaje. Útil para comparar actividades de distinto tamaño"></i>
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-right bg-slate-50">
+                      Tarifa Cot. <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="costo por hora presupuestado vs real. Incluye operario + máquina (CW)"></i>
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-right bg-slate-50 border-r border-slate-200">
+                      Tarifa Real <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="costo por hora presupuestado vs real. Incluye operario + máquina (CW)"></i>
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-right bg-slate-50">
+                      Ef. Horas (Jesús) <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="impacto en pesos por trabajar más o menos horas de las previstas, valorado a la tarifa cotizada. Responsabilidad de planta"></i>
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-right bg-slate-50">
+                      Ef. Tarifa (Cris) <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="impacto en pesos porque la tarifa real difiere de la presupuestada. Responsabilidad del costeo"></i>
+                    </th>
+                    <th className="px-4 py-3 font-semibold text-right bg-slate-50 border-l border-slate-200">
+                      Cumplimiento Oficial <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="valor que reporta Crisolweb. Sirve de control: Ef. Horas + Ef. Tarifa debe dar exactamente este número"></i>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
@@ -191,10 +209,10 @@ export default function AnalisisResponsables() {
                         </td>
 
                         {/* Efectos */}
-                        <td className={`px-4 py-3 text-right font-bold tabular-nums ${!sinCotizar && efHoras > 0 ? 'text-red-600 bg-red-50/50' : 'text-slate-600'}`}>
+                        <td className={`px-4 py-3 text-right font-bold tabular-nums ${!sinCotizar && efHoras < 0 ? 'text-red-600 bg-red-50/50' : 'text-slate-600'}`}>
                           {sinCotizar ? <span className="text-[10px] text-slate-400 italic">—</span> : fmtCOP.format(efHoras)}
                         </td>
-                        <td className={`px-4 py-3 text-right font-bold tabular-nums ${!sinCotizar && efTarifa > 0 ? 'text-red-600 bg-red-50/50' : 'text-slate-600'}`}>
+                        <td className={`px-4 py-3 text-right font-bold tabular-nums ${!sinCotizar && efTarifa < 0 ? 'text-red-600 bg-red-50/50' : 'text-slate-600'}`}>
                           {sinCotizar ? <span className="text-[10px] text-slate-400 italic">—</span> : fmtCOP.format(efTarifa)}
                         </td>
 
@@ -203,7 +221,7 @@ export default function AnalisisResponsables() {
                           {invalidRow && (
                             <span className="text-xs text-red-500 mr-2" title={`Discrepancia en suma de efectos (Efectos: ${efHoras + efTarifa})`}>⚠️</span>
                           )}
-                          <span className={cumplimiento > 0 ? 'text-red-600' : 'text-emerald-600'}>
+                          <span className={cumplimiento < 0 ? 'text-red-600' : 'text-emerald-600'}>
                             {fmtCOP.format(cumplimiento)}
                           </span>
                         </td>
