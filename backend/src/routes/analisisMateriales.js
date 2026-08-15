@@ -40,6 +40,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       d.nro_op,
       d.referencia,
       d.item AS material,
+      o.cantidad_cotizada AS op_cantidad_cotizada,
+      o.cantidad_ejecutada AS op_cantidad_ejecutada,
       
       ROUND(d.cant_cotizada, 4) AS cant_cotizada,
       ROUND(d.cant_ejecutada, 4) AS cant_ejecutada,
@@ -107,6 +109,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       precio_real: isNaN(pReal) ? null : pReal,
       efecto_cantidad: calculable || (cantCot === 0 && cantEjec > 0) ? parseFloat(efectoCantidad.toFixed(2)) : null,
       efecto_precio: calculable && cantEjec > 0 ? parseFloat(efectoPrecio.toFixed(2)) : null,
+      op_cantidad_cotizada: r.op_cantidad_cotizada ? parseFloat(r.op_cantidad_cotizada) : null,
+      op_cantidad_ejecutada: r.op_cantidad_ejecutada !== null && r.op_cantidad_ejecutada !== undefined ? parseFloat(r.op_cantidad_ejecutada) : null,
       calculable
     };
   });

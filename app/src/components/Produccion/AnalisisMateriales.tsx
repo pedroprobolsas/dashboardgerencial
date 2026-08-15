@@ -44,8 +44,32 @@ export default function AnalisisMateriales() {
     fetchData();
   }, [fechaInicio, fechaFin]);
 
+  const dataProcesada = useMemo(() => {
+    return detalle.map(d => {
+      let isAjustado = false;
+      let costo_unit_cotizado: number | null = null;
+      let costo_unit_ejecutado: number | null = null;
+      let impacto_final = parseFloat(d.cumplimiento as any) || 0;
+
+      if (d.op_cantidad_cotizada !== null && d.op_cantidad_cotizada > 0 && d.op_cantidad_ejecutada !== null) {
+        costo_unit_cotizado = d.valor_cotizado / d.op_cantidad_cotizada;
+        costo_unit_ejecutado = d.op_cantidad_ejecutada > 0 ? d.valor_ejecutado / d.op_cantidad_ejecutada : 0;
+        impacto_final = (costo_unit_cotizado - costo_unit_ejecutado) * d.op_cantidad_ejecutada;
+        isAjustado = true;
+      }
+
+      return {
+        ...d,
+        isAjustado,
+        costo_unit_cotizado,
+        costo_unit_ejecutado,
+        impacto_final
+      };
+    });
+  }, [detalle]);
+
   const groupedData = useMemo(() => {
-    const groups: Record<string, { op: string, referencia: string, actividades: LineaMaterial[], subtotalCantidad: number, subtotalPrecio: number, subtotalCumplimiento: number }> = {};
+    const groups: Record<string, { op: string, referencia: string, actividades: typeof dataProcesada, subtotalCumplimiento: number }> = {};
     
     let cantidadSobrecosto = 0;
     let countSobrecosto = 0;
@@ -57,39 +81,36 @@ export default function AnalisisMateriales() {
 
     let efectoPrecioTotal = 0;
 
-    detalle.forEach(d => {
+    dataProcesada.forEach(d => {
       const opKey = String(d.nro_op);
       if (!groups[opKey]) {
         groups[opKey] = {
           op: opKey,
           referencia: d.referencia,
           actividades: [],
-          subtotalCantidad: 0,
-          subtotalPrecio: 0,
           subtotalCumplimiento: 0
         };
       }
       
       groups[opKey].actividades.push(d);
       
-      const cant = d.efecto_cantidad || 0;
       const pre = d.efecto_precio || 0;
       const cump = parseFloat(d.cumplimiento as any) || 0;
       
-      groups[opKey].subtotalCantidad += cant;
-      groups[opKey].subtotalPrecio += pre;
       groups[opKey].subtotalCumplimiento += cump;
 
       efectoPrecioTotal += pre;
 
+      const imp = d.impacto_final || 0;
+
       if (!d.calculable || d.cant_cotizada === 0 || d.cant_ejecutada === 0) {
         casosEspeciales++;
       } else {
-        if (cant < 0) {
-          cantidadSobrecosto += cant;
+        if (imp < 0) {
+          cantidadSobrecosto += imp;
           countSobrecosto++;
-        } else if (cant > 0) {
-          cantidadAhorro += cant;
+        } else if (imp > 0) {
+          cantidadAhorro += imp;
           countAhorro++;
         }
       }
@@ -101,6 +122,8 @@ export default function AnalisisMateriales() {
       g.actividades.sort((a, b) => (parseFloat(a.cumplimiento as any) || 0) - (parseFloat(b.cumplimiento as any) || 0));
     });
     
+    const showBanner = dataProcesada.some(d => !d.isAjustado) && dataProcesada.length > 0;
+
     return {
       grupos: sortedGroups,
       metricas: {
@@ -109,9 +132,10 @@ export default function AnalisisMateriales() {
         casosEspeciales,
         efectoPrecioTotal
       },
-      totalActividades: detalle.length
+      showBanner,
+      totalActividades: dataProcesada.length
     };
-  }, [detalle]);
+  }, [dataProcesada]);
 
   const toggleRow = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -186,20 +210,22 @@ export default function AnalisisMateriales() {
       ) : (
         <div className="space-y-8">
           
-          <div className="bg-amber-50/50 border border-amber-200 text-amber-800 p-4 rounded-xl flex gap-3 text-sm mb-6 items-start">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-            <div>
-              <p className="font-medium">
-                Este análisis compara consumo ejecutado contra cotizado sin ajustar por volumen de producción. Si una OP produjo más unidades de las cotizadas, parte del mayor consumo es esperado y no representa merma. El ajuste por volumen se habilitará cuando esté disponible el dato de cantidades producidas.
-              </p>
+          {groupedData.showBanner && (
+            <div className="bg-amber-50/50 border border-amber-200 text-amber-800 p-4 rounded-xl flex gap-3 text-sm mb-6 items-start">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+              <div>
+                <p className="font-medium">
+                  Este análisis compara consumo ejecutado contra cotizado sin ajustar por volumen de producción. Si una OP produjo más unidades de las cotizadas, parte del mayor consumo es esperado y no representa merma. El ajuste por volumen se habilitará cuando esté disponible el dato de cantidades producidas.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
             <div className="bg-red-50/50 p-6 rounded-2xl border border-red-100 shadow-sm flex flex-col items-center text-center relative overflow-hidden group hover:border-red-200 transition-colors">
               <div className="absolute -right-4 -top-4 w-24 h-24 bg-red-500/5 rounded-full blur-xl group-hover:bg-red-500/10 transition-colors"></div>
-              <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-2 bg-red-100 px-3 py-1 rounded-full relative z-10">Cantidad · Sobrecosto</span>
+              <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-2 bg-red-100 px-3 py-1 rounded-full relative z-10">Sobrecosto</span>
               <span className="text-3xl font-black text-red-600 relative z-10">
                 {fmtCOP.format(groupedData.metricas.cantidadSobrecosto)}
               </span>
@@ -208,7 +234,7 @@ export default function AnalisisMateriales() {
 
             <div className="bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100 shadow-sm flex flex-col items-center text-center relative overflow-hidden group hover:border-emerald-200 transition-colors">
               <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-colors"></div>
-              <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-2 bg-emerald-100 px-3 py-1 rounded-full relative z-10">Cantidad · Ahorro</span>
+              <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-2 bg-emerald-100 px-3 py-1 rounded-full relative z-10">Ahorro</span>
               <span className="text-3xl font-black text-emerald-600 relative z-10">
                 +{fmtCOP.format(groupedData.metricas.cantidadAhorro)}
               </span>
@@ -240,124 +266,130 @@ export default function AnalisisMateriales() {
             </div>
 
             {groupedData.grupos.length > 0 && (
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead>
-                  <tr className="bg-white border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px] font-bold">
-                    <th className="px-6 py-3 w-10"></th>
-                    <th className="px-6 py-3">OP / Referencia</th>
-                    <th className="px-6 py-3">Material</th>
-                    <th className="px-6 py-3 text-right">Cant. Cotizada</th>
-                    <th className="px-6 py-3 text-right">Cant. Ejecutada</th>
-                    <th className="px-6 py-3 text-right">Vr. Cotizado</th>
-                    <th className="px-6 py-3 text-right">Vr. Ejecutado</th>
-                    <th className="px-6 py-3 text-right">Cumplimiento</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {groupedData.grupos.map((grupo, gIndex) => (
-                    <Fragment key={`g-${gIndex}`}>
-                      
-                      <tr className="bg-slate-50/80 hover:bg-slate-100/80 transition-colors">
-                        <td colSpan={8} className="px-6 py-3">
-                          <div className="flex justify-between items-center w-full">
-                            <div className="flex items-center gap-3">
-                              <button 
-                                onClick={() => openModal(grupo.op)}
-                                className="font-black text-base text-probolsas-cyan hover:text-cyan-700 hover:underline transition-colors flex items-center gap-1.5"
-                                title="Ver trazabilidad completa de la OP"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>
-                                {grupo.op}
-                              </button>
-                              <span className="text-slate-300">|</span>
-                              <span className="font-medium text-slate-700 truncate max-w-xs">{grupo.referencia}</span>
-                              <span className="text-xs bg-slate-200/70 text-slate-600 px-2 py-0.5 rounded-full font-medium ml-2">
-                                {grupo.actividades.length} mat.
-                              </span>
-                            </div>
-                            <div className="flex gap-6 items-center">
-                              <span className="text-xs font-semibold text-slate-500">Subtotal OP</span>
-                              <span className={`font-black ${grupo.subtotalCumplimiento < -100 ? 'text-red-600' : grupo.subtotalCumplimiento > 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
-                                {grupo.subtotalCumplimiento > 0 ? '+' : ''}{fmtCOP.format(grupo.subtotalCumplimiento)}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-
-                      {grupo.actividades.map((d, i) => {
-                        const id = `${grupo.op}-${i}`;
-                        const isExpanded = opFilaDesplegada === id;
-                        const hasDescuadre = Math.abs((d.efecto_cantidad || 0) + (d.efecto_precio || 0) - parseFloat(d.cumplimiento as any)) > 100 && d.calculable;
-                        const esNoCotizado = d.cant_cotizada === 0;
-                        const esNoEjecutado = d.cant_ejecutada === 0;
-
-                        return (
-                          <Fragment key={id}>
-                            <tr 
-                              className={`hover:bg-slate-50 transition-colors group cursor-pointer ${isExpanded ? 'bg-slate-50' : ''}`}
-                              onClick={(e) => toggleRow(id, e)}
-                            >
-                              <td className="px-6 py-3">
-                                <button className={`p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all ${isExpanded ? 'rotate-180 bg-slate-200 text-slate-600' : ''}`}>
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm whitespace-nowrap min-w-max">
+                  <thead>
+                    <tr className="bg-white border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px] font-bold">
+                      <th className="px-4 py-3 w-10"></th>
+                      <th className="px-4 py-3">OP / Referencia</th>
+                      <th className="px-4 py-3">Material</th>
+                      <th className="px-4 py-3 text-right">Cant. Cotizada</th>
+                      <th className="px-4 py-3 text-right">Cant. Ejecutada</th>
+                      <th className="px-4 py-3 text-right">Costo unit. cotizado</th>
+                      <th className="px-4 py-3 text-right">Costo unit. ejecutado</th>
+                      <th className="px-4 py-3 text-right">Vr. Cotizado</th>
+                      <th className="px-4 py-3 text-right">Vr. Ejecutado</th>
+                      <th className="px-4 py-3 text-right">Cumplimiento</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {groupedData.grupos.map((grupo, gIndex) => (
+                      <Fragment key={`g-${gIndex}`}>
+                        
+                        <tr className="bg-slate-50/80 hover:bg-slate-100/80 transition-colors">
+                          <td colSpan={10} className="px-4 py-3">
+                            <div className="flex justify-between items-center w-full">
+                              <div className="flex items-center gap-3">
+                                <button 
+                                  onClick={() => openModal(grupo.op)}
+                                  className="font-black text-base text-probolsas-cyan hover:text-cyan-700 hover:underline transition-colors flex items-center gap-1.5"
+                                  title="Ver trazabilidad completa de la OP"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>
+                                  {grupo.op}
                                 </button>
-                              </td>
-                              <td className="px-6 py-3 text-slate-500 opacity-50">{d.nro_op}</td>
-                              <td className="px-6 py-3 text-slate-800 font-medium truncate max-w-[200px]" title={d.material}>
-                                {d.material}
-                                {esNoCotizado && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">No cotizado</span>}
-                                {esNoEjecutado && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600">No ejecutado</span>}
-                              </td>
-                              <td className="px-6 py-3 text-right tabular-nums text-slate-500">{fmtNum4.format(d.cant_cotizada)}</td>
-                              <td className="px-6 py-3 text-right tabular-nums font-medium text-slate-800">{fmtNum4.format(d.cant_ejecutada)}</td>
-                              <td className="px-6 py-3 text-right tabular-nums text-slate-500">{fmtCOP.format(d.valor_cotizado)}</td>
-                              <td className="px-6 py-3 text-right tabular-nums text-slate-700">{fmtCOP.format(d.valor_ejecutado)}</td>
-                              <td className={`px-6 py-3 text-right tabular-nums font-black flex items-center justify-end gap-1 ${d.cumplimiento < -100 ? 'text-red-600' : d.cumplimiento > 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
-                                {hasDescuadre && (
-                                  <span title="Descuadre en distribución de efectos" className="text-amber-500">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                                  </span>
-                                )}
-                                {d.cumplimiento > 0 ? '+' : ''}{fmtCOP.format(d.cumplimiento)}
-                              </td>
-                            </tr>
-                            
-                            {isExpanded && (
-                              <tr className="bg-slate-50 border-b border-slate-200">
-                                <td colSpan={8} className="px-14 py-4">
-                                  <div className="grid grid-cols-4 gap-4">
-                                    <div>
-                                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Precio Cotizado</span>
-                                      <span className="font-medium text-slate-700">{d.precio_cotizado ? fmtCOP.format(d.precio_cotizado) : '-'}</span>
-                                    </div>
-                                    <div>
-                                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Precio Real</span>
-                                      <span className="font-medium text-slate-700">{d.precio_real ? fmtCOP.format(d.precio_real) : '-'}</span>
-                                    </div>
-                                    <div className="bg-slate-100 p-2 rounded border border-slate-200">
-                                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Efecto Cantidad</span>
-                                      <span className={`font-bold ${d.efecto_cantidad && d.efecto_cantidad < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                                        {d.efecto_cantidad !== null ? fmtCOP.format(d.efecto_cantidad) : '-'}
-                                      </span>
-                                    </div>
-                                    <div className="bg-slate-100 p-2 rounded border border-slate-200">
-                                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Efecto Precio</span>
-                                      <span className={`font-bold ${d.efecto_precio && d.efecto_precio < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                                        {d.efecto_precio !== null ? fmtCOP.format(d.efecto_precio) : '-'}
-                                      </span>
-                                    </div>
-                                  </div>
+                                <span className="text-slate-300">|</span>
+                                <span className="font-medium text-slate-700 truncate max-w-xs">{grupo.referencia}</span>
+                                <span className="text-xs bg-slate-200/70 text-slate-600 px-2 py-0.5 rounded-full font-medium ml-2">
+                                  {grupo.actividades.length} mat.
+                                </span>
+                              </div>
+                              <div className="flex gap-6 items-center">
+                                <span className="text-xs font-semibold text-slate-500">Subtotal OP</span>
+                                <span className={`font-black ${grupo.subtotalCumplimiento < -100 ? 'text-red-600' : grupo.subtotalCumplimiento > 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                                  {grupo.subtotalCumplimiento > 0 ? '+' : ''}{fmtCOP.format(grupo.subtotalCumplimiento)}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {grupo.actividades.map((d, i) => {
+                          const id = `${grupo.op}-${i}`;
+                          const isExpanded = opFilaDesplegada === id;
+                          const hasDescuadre = Math.abs((d.efecto_cantidad || 0) + (d.efecto_precio || 0) - parseFloat(d.cumplimiento as any)) > 100 && d.calculable;
+                          const esNoCotizado = d.cant_cotizada === 0;
+                          const esNoEjecutado = d.cant_ejecutada === 0;
+
+                          return (
+                            <Fragment key={id}>
+                              <tr 
+                                className={`hover:bg-slate-50 transition-colors group cursor-pointer ${isExpanded ? 'bg-slate-50' : ''}`}
+                                onClick={(e) => toggleRow(id, e)}
+                              >
+                                <td className="px-4 py-3">
+                                  <button className={`p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all ${isExpanded ? 'rotate-180 bg-slate-200 text-slate-600' : ''}`}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                  </button>
+                                </td>
+                                <td className="px-4 py-3 text-slate-500 opacity-50">{d.nro_op}</td>
+                                <td className="px-4 py-3 text-slate-800 font-medium truncate max-w-[200px]" title={d.material}>
+                                  {d.material}
+                                  {esNoCotizado && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">No cotizado</span>}
+                                  {esNoEjecutado && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600">No ejecutado</span>}
+                                </td>
+                                <td className="px-4 py-3 text-right tabular-nums text-slate-500">{fmtNum4.format(d.cant_cotizada)}</td>
+                                <td className="px-4 py-3 text-right tabular-nums font-medium text-slate-800">{fmtNum4.format(d.cant_ejecutada)}</td>
+                                <td className="px-4 py-3 text-right tabular-nums text-slate-500">{d.costo_unit_cotizado !== null ? fmtCOP.format(d.costo_unit_cotizado) : '-'}</td>
+                                <td className="px-4 py-3 text-right tabular-nums font-medium text-slate-800">{d.costo_unit_ejecutado !== null ? fmtCOP.format(d.costo_unit_ejecutado) : '-'}</td>
+                                <td className="px-4 py-3 text-right tabular-nums text-slate-500">{fmtCOP.format(d.valor_cotizado)}</td>
+                                <td className="px-4 py-3 text-right tabular-nums text-slate-700">{fmtCOP.format(d.valor_ejecutado)}</td>
+                                <td className={`px-4 py-3 text-right tabular-nums font-black flex items-center justify-end gap-1 ${d.cumplimiento < -100 ? 'text-red-600' : d.cumplimiento > 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                                  {hasDescuadre && (
+                                    <span title="Descuadre en distribución de efectos" className="text-amber-500">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                    </span>
+                                  )}
+                                  {d.cumplimiento > 0 ? '+' : ''}{fmtCOP.format(d.cumplimiento)}
                                 </td>
                               </tr>
-                            )}
-                          </Fragment>
-                        );
-                      })}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
+                              
+                              {isExpanded && (
+                                <tr className="bg-slate-50 border-b border-slate-200">
+                                  <td colSpan={10} className="px-14 py-4">
+                                    <div className="grid grid-cols-4 gap-4">
+                                      <div>
+                                        <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Precio Cotizado</span>
+                                        <span className="font-medium text-slate-700">{d.precio_cotizado ? fmtCOP.format(d.precio_cotizado) : '-'}</span>
+                                      </div>
+                                      <div>
+                                        <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Precio Real</span>
+                                        <span className="font-medium text-slate-700">{d.precio_real ? fmtCOP.format(d.precio_real) : '-'}</span>
+                                      </div>
+                                      <div className="bg-slate-100 p-2 rounded border border-slate-200">
+                                        <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Efecto Cantidad</span>
+                                        <span className={`font-bold ${d.efecto_cantidad && d.efecto_cantidad < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                          {d.efecto_cantidad !== null ? fmtCOP.format(d.efecto_cantidad) : '-'}
+                                        </span>
+                                      </div>
+                                      <div className="bg-slate-100 p-2 rounded border border-slate-200">
+                                        <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Efecto Precio</span>
+                                        <span className={`font-bold ${d.efecto_precio && d.efecto_precio < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                          {d.efecto_precio !== null ? fmtCOP.format(d.efecto_precio) : '-'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          );
+                        })}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>

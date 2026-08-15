@@ -123,6 +123,8 @@ export interface LineaMaterial {
   precio_real: number | null;
   efecto_cantidad: number | null;
   efecto_precio: number | null;
+  op_cantidad_cotizada: number | null;
+  op_cantidad_ejecutada: number | null;
   calculable: boolean;
 }
 
