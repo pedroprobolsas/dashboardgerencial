@@ -69,7 +69,7 @@ export default function AnalisisMateriales() {
   }, [detalle]);
 
   const groupedData = useMemo(() => {
-    const groups: Record<string, { op: string, referencia: string, actividades: typeof dataProcesada, subtotalCumplimiento: number }> = {};
+    const groups: Record<string, { op: string, referencia: string, actividades: typeof dataProcesada, subtotalCumplimiento: number, subtotalImpacto: number }> = {};
     
     let cantidadSobrecosto = 0;
     let countSobrecosto = 0;
@@ -88,7 +88,8 @@ export default function AnalisisMateriales() {
           op: opKey,
           referencia: d.referencia,
           actividades: [],
-          subtotalCumplimiento: 0
+          subtotalCumplimiento: 0,
+          subtotalImpacto: 0
         };
       }
       
@@ -96,12 +97,12 @@ export default function AnalisisMateriales() {
       
       const pre = d.efecto_precio || 0;
       const cump = parseFloat(d.cumplimiento as any) || 0;
+      const imp = d.impacto_final || 0;
       
       groups[opKey].subtotalCumplimiento += cump;
+      groups[opKey].subtotalImpacto += imp;
 
       efectoPrecioTotal += pre;
-
-      const imp = d.impacto_final || 0;
 
       if (!d.calculable || d.cant_cotizada === 0 || d.cant_ejecutada === 0) {
         casosEspeciales++;
@@ -215,7 +216,7 @@ export default function AnalisisMateriales() {
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
               <div>
                 <p className="font-medium">
-                  Este análisis compara consumo ejecutado contra cotizado sin ajustar por volumen de producción. Si una OP produjo más unidades de las cotizadas, parte del mayor consumo es esperado y no representa merma. El ajuste por volumen se habilitará cuando esté disponible el dato de cantidades producidas.
+                  Hay Órdenes de Producción en este período sin dato de cantidades producidas. Para esas OP se muestra el cálculo bruto sin ajustar por volumen, lo cual no es preciso para medir mermas. El sistema cambiará automáticamente al método ajustado cuando la OP reciba sus datos de producción.
                 </p>
               </div>
             </div>
@@ -306,8 +307,8 @@ export default function AnalisisMateriales() {
                               </div>
                               <div className="flex gap-6 items-center">
                                 <span className="text-xs font-semibold text-slate-500">Subtotal OP</span>
-                                <span className={`font-black ${grupo.subtotalCumplimiento < -100 ? 'text-red-600' : grupo.subtotalCumplimiento > 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
-                                  {grupo.subtotalCumplimiento > 0 ? '+' : ''}{fmtCOP.format(grupo.subtotalCumplimiento)}
+                                <span className={`font-black ${grupo.subtotalImpacto < -100 ? 'text-red-600' : grupo.subtotalImpacto > 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                                  {grupo.subtotalImpacto > 0 ? '+' : ''}{fmtCOP.format(grupo.subtotalImpacto)}
                                 </span>
                               </div>
                             </div>

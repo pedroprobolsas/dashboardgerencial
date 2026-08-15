@@ -109,7 +109,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       precio_real: isNaN(pReal) ? null : pReal,
       efecto_cantidad: calculable || (cantCot === 0 && cantEjec > 0) ? parseFloat(efectoCantidad.toFixed(2)) : null,
       efecto_precio: calculable && cantEjec > 0 ? parseFloat(efectoPrecio.toFixed(2)) : null,
-      op_cantidad_cotizada: r.op_cantidad_cotizada ? parseFloat(r.op_cantidad_cotizada) : null,
+      op_cantidad_cotizada: r.op_cantidad_cotizada !== null && r.op_cantidad_cotizada !== undefined ? parseFloat(r.op_cantidad_cotizada) : null,
       op_cantidad_ejecutada: r.op_cantidad_ejecutada !== null && r.op_cantidad_ejecutada !== undefined ? parseFloat(r.op_cantidad_ejecutada) : null,
       calculable
     };
