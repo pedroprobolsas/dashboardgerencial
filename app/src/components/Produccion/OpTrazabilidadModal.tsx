@@ -132,7 +132,7 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
     };
   });
 
-  const fletesPendientes = terceros.reduce((sum, r) => sum + (r.valor_ejecutado === 0 ? (parseFloat(r.valor_cotizado as any) || 0) : 0), 0);
+  const fletesPendientes = terceros.reduce((sum, r) => sum + ((parseFloat(r.valor_ejecutado as any) || 0) === 0 ? (parseFloat(r.valor_cotizado as any) || 0) : 0), 0);
 
   // Formatear fecha
   const fechaFormateada = new Date(cabecera.fecha).toLocaleDateString('es-CO', {

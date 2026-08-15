@@ -337,7 +337,7 @@ export default function AnalisisMateriales() {
                         {grupo.actividades.map((d, i) => {
                           const id = `${grupo.op}-${i}`;
                           const isExpanded = opFilaDesplegada === id;
-                          const hasDescuadre = Math.abs((d.efecto_cantidad || 0) + (d.efecto_precio || 0) - parseFloat(d.cumplimiento as any)) > 100 && d.calculable;
+                          const hasDescuadre = Math.abs((d.efecto_cantidad || 0) + (d.efecto_precio || 0) - parseFloat(d.cumplimiento as any)) > 500 && d.calculable;
                           const esNoCotizado = d.cant_cotizada === 0;
                           const esNoEjecutado = d.cant_ejecutada === 0;
 
@@ -366,9 +366,14 @@ export default function AnalisisMateriales() {
                                 <td className="px-2 py-3 text-right tabular-nums text-slate-700">{fmtCOP.format(d.valor_ejecutado)}</td>
                                 <td className={`px-2 py-3 text-right tabular-nums font-black flex items-center justify-end gap-1 ${d.cumplimiento < -100 ? 'text-red-600' : d.cumplimiento > 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
                                   {hasDescuadre && (
-                                    <span title="Hay un descuadre entre los efectos calculados y el cumplimiento total que viene del sistema de costos. Revisar directamente en el OP." className="text-amber-500 cursor-help">
-                                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                                    </span>
+                                    <div className="relative group/tooltip flex items-center">
+                                      <span className="text-amber-500 cursor-help">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                      </span>
+                                      <div className="absolute right-0 bottom-full mb-1 hidden group-hover/tooltip:block w-48 p-2 bg-slate-800 text-white text-[10px] leading-tight font-normal rounded shadow-xl z-50 whitespace-normal text-left">
+                                        Hay un descuadre entre los efectos calculados y el cumplimiento total que viene del sistema de costos. Revisar directamente en el OP.
+                                      </div>
+                                    </div>
                                   )}
                                   {d.cumplimiento > 0 ? '+' : ''}{fmtCOP.format(d.cumplimiento)}
                                 </td>
