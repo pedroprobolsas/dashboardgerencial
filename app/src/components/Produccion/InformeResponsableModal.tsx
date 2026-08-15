@@ -31,7 +31,7 @@ export default function InformeResponsableModal({ detalle, fechaInicio, fechaFin
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(import.meta.env.VITE_API_URL + '/informes/consecutivo', {
+      const res = await fetch('/api/informes/consecutivo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ responsable, tipo_efecto: tipoEfecto })
