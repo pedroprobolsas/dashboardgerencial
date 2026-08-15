@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { fetchAnalisisResponsables, type LineaResponsable } from '../../services/api';
 import OpTrazabilidadModal from './OpTrazabilidadModal';
-import InformeResponsableModal from './InformeResponsableModal';
+import InformeResponsablePDF from './InformeResponsablePDF';
 
 const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 const fmtNum = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 });
@@ -425,7 +425,7 @@ export default function AnalisisResponsables() {
       )}
 
       {informeAbierto && (
-        <InformeResponsableModal
+        <InformeResponsablePDF
           detalle={detalle}
           fechaInicio={fechaInicio}
           fechaFin={fechaFin}

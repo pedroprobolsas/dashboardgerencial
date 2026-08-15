@@ -28,6 +28,7 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
   const [data, setData] = useState<OPDetalleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [informeAbierto, setInformeAbierto] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -176,7 +177,7 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
               {cabecera.referencia} · {fechaFormateada}
             </p>
           </div>
-          <div className="text-right mr-6">
+          <div className="text-right mr-16">
             <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider block">Margen</span>
             <span className={`text-2xl font-bold ${cabecera.margen_pct < 0 ? 'text-[var(--text-danger)]' : 'text-slate-800'}`}>
               {cabecera.margen_pct}%
@@ -184,6 +185,14 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
           </div>
           
           <button 
+            onClick={() => setInformeAbierto(true)}
+            className="absolute top-4 right-14 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+            title="Imprimir a PDF"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          </button>
+
+          <button  
             onClick={onClose}
             className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors"
           >
@@ -332,6 +341,129 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
 
         </div>
       </div>
+
+      {informeAbierto && (
+        <InformePDFModal
+          tipoInforme="OP"
+          requestData={{
+            responsable: `OP ${cabecera.nro_op}`,
+            tipo_efecto: 'Trazabilidad',
+            periodo_inicio: cabecera.fecha.split('T')[0],
+            periodo_fin: cabecera.fecha.split('T')[0]
+          }}
+          titulo={`Trazabilidad OP ${cabecera.nro_op}`}
+          entidadLabel="Cliente:"
+          entidadValue={cabecera.cliente}
+          firmaLabel="Firma Autorizada"
+          onClose={() => setInformeAbierto(false)}
+          infoExtra={
+            <>
+              <p><span className="font-semibold w-24 inline-block">Referencia:</span> {cabecera.referencia}</p>
+              <p><span className="font-semibold w-24 inline-block">Margen:</span> <span className={cabecera.margen_pct < 0 ? 'text-red-600 font-bold' : ''}>{cabecera.margen_pct}%</span></p>
+            </>
+          }
+        >
+          {/* Tarjetas de Resumen */}
+          <div className="grid grid-cols-4 gap-4 mb-8 mt-6">
+            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+              <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Efecto horas (Jesús)</span>
+              <span className={`text-xl font-black ${sumaHoras < 0 ? 'text-red-600' : sumaHoras > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>{formatMoney(sumaHoras)}</span>
+            </div>
+            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+              <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Efecto tarifa (Cris)</span>
+              <span className={`text-xl font-black ${sumaTarifa < 0 ? 'text-red-600' : sumaTarifa > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>{formatMoney(sumaTarifa)}</span>
+            </div>
+            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+              <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Materiales (Bodega)</span>
+              <span className={`text-xl font-black ${sumaMateriales < 0 ? 'text-red-600' : sumaMateriales > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>{formatMoney(sumaMateriales)}</span>
+            </div>
+            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+              <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Fletes sin causar</span>
+              <span className="text-xl font-black text-amber-600">{formatMoney(fletesPendientes)}</span>
+            </div>
+          </div>
+
+          <div className="text-sm text-slate-600 mb-6 bg-slate-100 p-3 rounded-lg print:bg-transparent print:p-0 print:border-b print:border-slate-200 print:rounded-none">
+            Contexto: Detalle de ejecución de costos de la orden de producción.
+          </div>
+
+          <div className="mb-8">
+            <h3 className="mb-2 font-bold text-lg text-slate-800 border-b border-slate-300 pb-1">Mano de obra</h3>
+            <table className="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr className="text-slate-500 uppercase tracking-wider text-xs border-b border-slate-200">
+                  <th className="py-2">Actividad</th>
+                  <th className="py-2 text-right">Cot. (h)</th>
+                  <th className="py-2 text-right">Ejec. (h)</th>
+                  <th className="py-2 text-center">Δ</th>
+                  <th className="py-2 text-right">Ef. horas</th>
+                  <th className="py-2 text-right">Ef. tarifa</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {manoObra.map((r, i) => (
+                  <tr key={i} className="print:break-inside-avoid">
+                    <td className="py-1">{r.item}</td>
+                    <td className="py-1 text-right text-slate-500">{formatNumber(r.cant_cotizada)}</td>
+                    <td className="py-1 text-right">{formatNumber(r.cant_ejecutada)}</td>
+                    <td className="py-1 text-center font-medium">{formatPct(r.diferencia_pct)}</td>
+                    <td className={`py-1 text-right font-medium ${r.efecto_horas !== null && r.efecto_horas < 0 ? 'text-red-600' : ''}`}>{formatMoney(r.efecto_horas)}</td>
+                    <td className={`py-1 text-right font-medium ${r.efecto_tarifa !== null && r.efecto_tarifa < 0 ? 'text-red-600' : ''}`}>{formatMoney(r.efecto_tarifa)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mb-8">
+            <h3 className="mb-2 font-bold text-lg text-slate-800 border-b border-slate-300 pb-1">Materiales</h3>
+            <table className="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr className="text-slate-500 uppercase tracking-wider text-xs border-b border-slate-200">
+                  <th className="py-2">Material</th>
+                  <th className="py-2 text-right">Cant. Cot</th>
+                  <th className="py-2 text-right">Cant. Ejec</th>
+                  <th className="py-2 text-right">Cumplimiento ($)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {materiales.map((r, i) => (
+                  <tr key={i} className="print:break-inside-avoid">
+                    <td className="py-1">{r.item}</td>
+                    <td className="py-1 text-right text-slate-500">{formatNumber(r.cant_cotizada)}</td>
+                    <td className="py-1 text-right">{formatNumber(r.cant_ejecutada)}</td>
+                    <td className={`py-1 text-right font-medium ${r.cumplimiento !== null && r.cumplimiento < 0 ? 'text-red-600' : ''}`}>{formatMoney(r.cumplimiento)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mb-8">
+            <h3 className="mb-2 font-bold text-lg text-slate-800 border-b border-slate-300 pb-1">Terceros</h3>
+            <table className="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr className="text-slate-500 uppercase tracking-wider text-xs border-b border-slate-200">
+                  <th className="py-2">Servicio</th>
+                  <th className="py-2 text-right">Cotizado ($)</th>
+                  <th className="py-2 text-right">Ejecutado ($)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {terceros.map((r, i) => (
+                  <tr key={i} className="print:break-inside-avoid">
+                    <td className="py-1">{r.item}</td>
+                    <td className="py-1 text-right text-slate-500">{formatMoney(r.valor_cotizado)}</td>
+                    <td className="py-1 text-right">{formatMoney(r.valor_ejecutado)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+        </InformePDFModal>
+      )}
+
     </div>
   );
 }

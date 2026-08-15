@@ -11,6 +11,7 @@ import CierreTalentoHumanoForm from './components/Forms/CierreTalentoHumanoForm'
 import BandejaAprobacion from './components/Aprobaciones/BandejaAprobacion';
 import CostoProduccionDetalle from './components/Produccion/CostoProduccionDetalle';
 import AnalisisResponsables from './components/Produccion/AnalisisResponsables';
+import AnalisisMateriales from './components/Produccion/AnalisisMateriales';
 import { type KPI, type AlertaColor, type FilaGrid } from './data/kpis';
 import { fetchKPIs, fetchVentasMes, fetchCarteraAsesor, fetchMargenGlobal, enviarCierre, actualizarEstadoCierre, fetchBandeja, type KPIReal, type KPIDiario } from './services/api';
 import VistazoDiario from './components/Dashboard/VistazoDiario';
@@ -524,6 +525,7 @@ export default function App() {
       {vistaActual === 'bandeja-aprobacion'     && <BandejaAprobacion informes={informes} onAprobar={aprobar} onRechazar={rechazar} />}
       {vistaActual === 'costo-produccion-detalle' && <CostoProduccionDetalle />}
       {vistaActual === 'analisis-responsables'    && <AnalisisResponsables />}
+      {vistaActual === 'analisis-materiales'      && <AnalisisMateriales />}
     </Layout>
   );
 }

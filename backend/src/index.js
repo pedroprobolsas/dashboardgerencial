@@ -17,6 +17,7 @@ const ventasMesRouter      = require('./routes/ventasMes');
 const carteraPorAsesorRouter = require('./routes/carteraPorAsesor');
 const margenGlobalRouter   = require('./routes/margenGlobal');
 const analisisResponsablesRouter = require('./routes/analisisResponsables');
+const analisisMaterialesRouter   = require('./routes/analisisMateriales');
 const informesRouter       = require('./routes/informes');
 
 const app  = express();
@@ -47,6 +48,8 @@ const ENDPOINTS_REGISTRADOS = [
   'GET  /api/costo_por_orden',
   'GET  /api/margen_global',
   'GET  /api/analisis_responsables',
+  'GET  /api/analisis_materiales',
+  'POST /api/informes/consecutivo',
   'POST /api/setup',
   'GET  /api/cierres/bandeja',
   'POST /api/cierres/:area',
@@ -115,6 +118,7 @@ app.use('/api/ventas_mes',        ventasMesRouter);
 app.use('/api/cartera_por_asesor', carteraPorAsesorRouter);
 app.use('/api/margen_global',     margenGlobalRouter);
 app.use('/api/analisis_responsables', analisisResponsablesRouter);
+app.use('/api/analisis_materiales', analisisMaterialesRouter);
 app.use('/api/informes',          informesRouter);
 
 // ── Error handler global ──────────────────────────────────────────────────────

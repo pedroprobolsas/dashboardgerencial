@@ -8,7 +8,8 @@ export type Vista =
   | 'cierre-talento-humano'
   | 'bandeja-aprobacion'
   | 'costo-produccion-detalle'
-  | 'analisis-responsables';
+  | 'analisis-responsables'
+  | 'analisis-materiales';
 
 interface Props {
   vistaActual: Vista;
@@ -27,6 +28,7 @@ const itemsDashboard: NavItem[] = [
   { id: 'vista-diaria', etiqueta: 'Vistazo Diario', icono: '📅' },
   { id: 'costo-produccion-detalle', etiqueta: 'Margen por OP', icono: '⚙️' },
   { id: 'analisis-responsables', etiqueta: 'Análisis Responsables', icono: '👥' },
+  { id: 'analisis-materiales', etiqueta: 'Análisis Materiales', icono: '📦' },
 ];
 
 const itemsCierre: NavItem[] = [

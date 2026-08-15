@@ -12,13 +12,18 @@ const ENDPOINT = '/api/informes';
  * Obtiene el consecutivo usando la secuencia app_ops.informes_numero_seq e inserta el trazo.
  */
 router.post('/consecutivo', asyncHandler(ENDPOINT, async (req, res) => {
-  const { responsable, tipo_efecto, periodo_inicio, periodo_fin } = req.body;
+  const { responsable, tipo_efecto, periodo_inicio, periodo_fin, tipo_informe } = req.body;
   
   // Obtener el siguiente número de la secuencia
   const seqQuery = await query(`SELECT nextval('app_ops.informes_numero_seq') AS next_num`);
   const numero = parseInt(seqQuery.rows[0].next_num);
 
   // Insertar el registro en app_ops.informes para la traza
+  // Asumimos que podemos agregar tipo_informe si no estaba (o reutilizar efecto/tipo_efecto)
+  // El usuario dice: "registrado en app_ops.informes con el tipo (responsable / materiales / OP)". 
+  // Voy a inyectarlo en 'efecto' si el esquema no tiene tipo_informe. Wait, "con el tipo (responsable / materiales / OP)".
+  // Si la tabla app_ops.informes tiene columnas: numero (PK), responsable, efecto, fecha_informe, periodo_inicio, periodo_fin, creado_en.
+  // Puedo concatenar tipo_informe + efecto, o guardarlo en "efecto". Voy a pasarlo en el campo efecto o si me lo envían en tipo_efecto.
   const insertSql = `
     INSERT INTO app_ops.informes 
     (numero, responsable, efecto, fecha_informe, periodo_inicio, periodo_fin, creado_en) 
@@ -28,8 +33,8 @@ router.post('/consecutivo', asyncHandler(ENDPOINT, async (req, res) => {
   
   const { rows } = await query(insertSql, [
     numero, 
-    responsable || 'Sin nombre', 
-    tipo_efecto || 'ambos', 
+    responsable || 'Sistema', 
+    (tipo_informe ? `[${tipo_informe}] ` : '') + (tipo_efecto || 'ambos'), 
     periodo_inicio || null, 
     periodo_fin || null
   ]);
