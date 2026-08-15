@@ -280,16 +280,28 @@ export default function AnalisisMateriales() {
                       <th className="px-4 py-3 text-right">Costo unit. ejecutado</th>
                       <th className="px-4 py-3 text-right">Vr. Cotizado</th>
                       <th className="px-4 py-3 text-right">Vr. Ejecutado</th>
-                      <th className="px-4 py-3 text-right">Cumplimiento</th>
+                      <th className="px-4 py-3 text-right">Cumplimiento bruto</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {groupedData.grupos.map((grupo, gIndex) => (
-                      <Fragment key={`g-${gIndex}`}>
-                        
-                        <tr className="bg-slate-50/80 hover:bg-slate-100/80 transition-colors">
-                          <td colSpan={10} className="px-4 py-3">
-                            <div className="flex justify-between items-center w-full">
+                    {groupedData.grupos.map((grupo, gIndex) => {
+                      const firstAjustado = grupo.actividades.find(a => a.isAjustado);
+                      let txtVolumen = null;
+                      if (firstAjustado && Math.abs(grupo.subtotalImpacto - grupo.subtotalCumplimiento) > 0.01) {
+                        const cantEjecutada = firstAjustado.op_cantidad_ejecutada || 0;
+                        const cantCotizada = firstAjustado.op_cantidad_cotizada || 0;
+                        const difUnd = cantEjecutada - cantCotizada;
+                        const txtUnd = difUnd >= 0 ? `${fmtNum4.format(difUnd)} und. de más` : `${fmtNum4.format(-difUnd)} und. menos`;
+                        const efectoVolumen = grupo.subtotalImpacto - grupo.subtotalCumplimiento;
+                        txtVolumen = `Bruto ${grupo.subtotalCumplimiento < 0 ? '-' : ''}${fmtCOP.format(Math.abs(grupo.subtotalCumplimiento))} · efecto volumen ${efectoVolumen > 0 ? '+' : ''}${fmtCOP.format(efectoVolumen)} (${txtUnd})`;
+                      }
+
+                      return (
+                        <Fragment key={`g-${gIndex}`}>
+                          
+                          <tr className="bg-slate-50/80 hover:bg-slate-100/80 transition-colors">
+                            <td colSpan={10} className="px-4 py-3">
+                              <div className="flex justify-between items-center w-full">
                               <div className="flex items-center gap-3">
                                 <button 
                                   onClick={() => openModal(grupo.op)}
@@ -305,11 +317,18 @@ export default function AnalisisMateriales() {
                                   {grupo.actividades.length} mat.
                                 </span>
                               </div>
-                              <div className="flex gap-6 items-center">
-                                <span className="text-xs font-semibold text-slate-500">Subtotal OP</span>
-                                <span className={`font-black ${grupo.subtotalImpacto < -100 ? 'text-red-600' : grupo.subtotalImpacto > 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
-                                  {grupo.subtotalImpacto > 0 ? '+' : ''}{fmtCOP.format(grupo.subtotalImpacto)}
-                                </span>
+                              <div className="flex flex-col items-end">
+                                <div className="flex gap-6 items-center">
+                                  <span className="text-xs font-semibold text-slate-500">Subtotal OP</span>
+                                  <span className={`font-black ${grupo.subtotalImpacto < -100 ? 'text-red-600' : grupo.subtotalImpacto > 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                                    {grupo.subtotalImpacto > 0 ? '+' : ''}{fmtCOP.format(grupo.subtotalImpacto)}
+                                  </span>
+                                </div>
+                                {txtVolumen && (
+                                  <span className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                                    {txtVolumen}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -347,7 +366,7 @@ export default function AnalisisMateriales() {
                                 <td className="px-4 py-3 text-right tabular-nums text-slate-700">{fmtCOP.format(d.valor_ejecutado)}</td>
                                 <td className={`px-4 py-3 text-right tabular-nums font-black flex items-center justify-end gap-1 ${d.cumplimiento < -100 ? 'text-red-600' : d.cumplimiento > 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
                                   {hasDescuadre && (
-                                    <span title="Descuadre en distribución de efectos" className="text-amber-500">
+                                    <span title="Hay un descuadre entre los efectos calculados y el cumplimiento total que viene del sistema de costos. Revisar directamente en el OP." className="text-amber-500 cursor-help">
                                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
                                     </span>
                                   )}
@@ -387,7 +406,8 @@ export default function AnalisisMateriales() {
                           );
                         })}
                       </Fragment>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>
