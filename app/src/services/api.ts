@@ -109,6 +109,35 @@ export async function fetchKPIs(periodo?: string, fecha?: string): Promise<Respu
   return res.json();
 }
 
+export interface LineaMaterial {
+  nro_op: string;
+  referencia: string;
+  material: string;
+  cant_cotizada: number;
+  cant_esperada: number | null;
+  cant_ejecutada: number;
+  diferencia_cant_pct: number | string | null;
+  valor_cotizado: number;
+  valor_ejecutado: number;
+  cumplimiento: number;
+  precio_cotizado: number | null;
+  precio_real: number | null;
+  efecto_volumen: number | null;
+  efecto_rendimiento: number | null;
+  efecto_precio: number | null;
+  calculable: boolean;
+}
+
+export async function fetchAnalisisMateriales(fechaInicio: string, fechaFin: string): Promise<{ detalle: LineaMaterial[], total: number }> {
+  const res = await fetch(`/api/analisis_materiales?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`);
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  const data = await res.json();
+  return {
+    detalle: data.detalle || [],
+    total: data.total || 0,
+  };
+}
+
 
 // ── Endpoints REST independientes ─────────────────────────────────────────────
 
