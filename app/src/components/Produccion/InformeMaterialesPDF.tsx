@@ -40,14 +40,14 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
     <InformePDFModal
       tipoInforme="Materiales"
       requestData={{
-        responsable: 'Franklin', 
+        responsable: 'Líder de Bodega', 
         tipo_efecto: 'cantidad',
         periodo_inicio: fechaInicio,
         periodo_fin: fechaFin
       }}
       titulo="Análisis de Consumo de Materiales"
       entidadLabel="Responsable:"
-      entidadValue="Franklin"
+      entidadValue="Líder de Bodega"
       infoExtra={infoExtra}
       firmaLabel="Bodega / Inventario"
       onClose={onClose}

@@ -41,7 +41,7 @@ export default function InformeResponsablePDF({ detalle, fechaInicio, fechaFin, 
                 type="text" 
                 value={responsable} 
                 onChange={e => setResponsable(e.target.value)}
-                placeholder="Ej. Jesús, Cristian, Área Planta..."
+                placeholder="Ej. Líder de Producción, Costeo y Presupuesto..."
                 className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-probolsas-cyan"
                 autoFocus
               />

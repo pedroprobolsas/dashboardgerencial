@@ -258,6 +258,7 @@ export interface LineaOPDetalle {
   diferencia_pct: number | null;
   efecto_horas: number | null;
   efecto_tarifa: number | null;
+  unidad?: string | null;
 }
 
 export interface OPDetalleData {

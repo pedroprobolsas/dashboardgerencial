@@ -203,7 +203,7 @@ export default function AnalisisResponsables() {
           
           {/* Jesús Sobrecosto */}
           <div className="bg-red-50/50 p-5 rounded-2xl border border-red-100 shadow-sm flex flex-col items-center text-center">
-            <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-2 bg-red-100 px-3 py-1 rounded-full">Efecto Horas (Jesús) · Sobrecosto</span>
+            <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-2 bg-red-100 px-3 py-1 rounded-full">Efecto Horas (Líder de Producción) · Sobrecosto</span>
             <span className="text-3xl font-black text-red-600">
               {fmtCOP.format(groupedData.metricas.jesusSobrecosto)}
             </span>
@@ -213,7 +213,7 @@ export default function AnalisisResponsables() {
 
           {/* Jesús Ahorro */}
           <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 shadow-sm flex flex-col items-center text-center">
-            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-2 bg-emerald-100 px-3 py-1 rounded-full">Efecto Horas (Jesús) · Ahorro</span>
+            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-2 bg-emerald-100 px-3 py-1 rounded-full">Efecto Horas (Líder de Producción) · Ahorro</span>
             <span className="text-3xl font-black text-emerald-600">
               +{fmtCOP.format(groupedData.metricas.jesusAhorro)}
             </span>
@@ -223,7 +223,7 @@ export default function AnalisisResponsables() {
           
           {/* Cristian Sobrecosto */}
           <div className="bg-red-50/50 p-5 rounded-2xl border border-red-100 shadow-sm flex flex-col items-center text-center">
-            <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-2 bg-red-100 px-3 py-1 rounded-full">Efecto Tarifa (Cris) · Sobrecosto</span>
+            <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-2 bg-red-100 px-3 py-1 rounded-full">Efecto Tarifa (Costeo y Presupuesto) · Sobrecosto</span>
             <span className="text-3xl font-black text-red-600">
               {fmtCOP.format(groupedData.metricas.cristianSobrecosto)}
             </span>
@@ -233,7 +233,7 @@ export default function AnalisisResponsables() {
 
           {/* Cristian Ahorro */}
           <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 shadow-sm flex flex-col items-center text-center">
-            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-2 bg-emerald-100 px-3 py-1 rounded-full">Efecto Tarifa (Cris) · Ahorro</span>
+            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-2 bg-emerald-100 px-3 py-1 rounded-full">Efecto Tarifa (Costeo y Presupuesto) · Ahorro</span>
             <span className="text-3xl font-black text-emerald-600">
               +{fmtCOP.format(groupedData.metricas.cristianAhorro)}
             </span>
@@ -283,10 +283,10 @@ export default function AnalisisResponsables() {
                       % Horas <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="la misma diferencia en porcentaje. Útil para comparar actividades de distinto tamaño"></i>
                     </th>
                     <th className="px-4 py-3 font-semibold text-right bg-slate-50">
-                      Ef. Horas (Jesús) <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="impacto en pesos por trabajar más o menos horas de las previstas, valorado a la tarifa cotizada. Responsabilidad de planta"></i>
+                      Ef. Horas (Líder de Producción) <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="impacto en pesos por trabajar más o menos horas de las previstas, valorado a la tarifa cotizada. Responsabilidad de planta"></i>
                     </th>
                     <th className="px-4 py-3 font-semibold text-right bg-slate-50">
-                      Ef. Tarifa (Cris) <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="impacto en pesos porque la tarifa real difiere de la presupuestada. Responsabilidad del costeo"></i>
+                      Ef. Tarifa (Costeo y Presupuesto) <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="impacto en pesos porque la tarifa real difiere de la presupuestada. Responsabilidad del costeo"></i>
                     </th>
                     <th className="px-4 py-3 font-semibold text-right bg-slate-50 border-l border-slate-200">
                       Cumplimiento Oficial <i className="ti ti-help-circle text-slate-400 ml-0.5 cursor-help" title="valor que reporta Crisolweb. Sirve de control: Ef. Horas + Ef. Tarifa debe dar exactamente este número"></i>

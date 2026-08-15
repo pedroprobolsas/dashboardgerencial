@@ -157,7 +157,7 @@ export default function AnalisisMateriales() {
       <div className="mb-8">
         <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
           <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-probolsas-cyan"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>
-          Análisis de Materiales — Franklin
+          Análisis de Materiales — Líder de Bodega
         </h1>
         <p className="text-slate-500 mt-2 font-medium">Impacto en costos de materiales, aislando los efectos de cantidad y precio.</p>
       </div>
@@ -271,16 +271,16 @@ export default function AnalisisMateriales() {
                 <table className="w-full text-left text-sm whitespace-nowrap min-w-max">
                   <thead>
                     <tr className="bg-white border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px] font-bold">
-                      <th className="px-4 py-3 w-10"></th>
-                      <th className="px-4 py-3">OP / Referencia</th>
-                      <th className="px-4 py-3">Material</th>
-                      <th className="px-4 py-3 text-right">Cant. Cotizada</th>
-                      <th className="px-4 py-3 text-right">Cant. Ejecutada</th>
-                      <th className="px-4 py-3 text-right">Costo unit. cotizado</th>
-                      <th className="px-4 py-3 text-right">Costo unit. ejecutado</th>
-                      <th className="px-4 py-3 text-right">Vr. Cotizado</th>
-                      <th className="px-4 py-3 text-right">Vr. Ejecutado</th>
-                      <th className="px-4 py-3 text-right">Cumplimiento bruto</th>
+                      <th className="px-2 py-3 w-8"></th>
+                      <th className="px-2 py-3">OP / Referencia</th>
+                      <th className="px-2 py-3">Material</th>
+                      <th className="px-2 py-3 text-right">Cant. Cot</th>
+                      <th className="px-2 py-3 text-right">Cant. Ejec</th>
+                      <th className="px-2 py-3 text-right">Costo u. cot</th>
+                      <th className="px-2 py-3 text-right">Costo u. ejec</th>
+                      <th className="px-2 py-3 text-right">Vr. Cot</th>
+                      <th className="px-2 py-3 text-right">Vr. Ejec</th>
+                      <th className="px-2 py-3 text-right">Cumplimiento</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -347,24 +347,24 @@ export default function AnalisisMateriales() {
                                 className={`hover:bg-slate-50 transition-colors group cursor-pointer ${isExpanded ? 'bg-slate-50' : ''}`}
                                 onClick={(e) => toggleRow(id, e)}
                               >
-                                <td className="px-4 py-3">
+                                <td className="px-2 py-3">
                                   <button className={`p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-all ${isExpanded ? 'rotate-180 bg-slate-200 text-slate-600' : ''}`}>
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                                   </button>
                                 </td>
-                                <td className="px-4 py-3 text-slate-500 opacity-50">{d.nro_op}</td>
-                                <td className="px-4 py-3 text-slate-800 font-medium truncate max-w-[200px]" title={d.material}>
+                                <td className="px-2 py-3 text-slate-500 opacity-50">{d.nro_op}</td>
+                                <td className="px-2 py-3 text-slate-800 font-medium truncate max-w-[200px]" title={d.material}>
                                   {d.material}
                                   {esNoCotizado && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">No cotizado</span>}
                                   {esNoEjecutado && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600">No ejecutado</span>}
                                 </td>
-                                <td className="px-4 py-3 text-right tabular-nums text-slate-500">{fmtNum4.format(d.cant_cotizada)}</td>
-                                <td className="px-4 py-3 text-right tabular-nums font-medium text-slate-800">{fmtNum4.format(d.cant_ejecutada)}</td>
-                                <td className="px-4 py-3 text-right tabular-nums text-slate-500">{d.costo_unit_cotizado !== null ? fmtCOP.format(d.costo_unit_cotizado) : '-'}</td>
-                                <td className="px-4 py-3 text-right tabular-nums font-medium text-slate-800">{d.costo_unit_ejecutado !== null ? fmtCOP.format(d.costo_unit_ejecutado) : '-'}</td>
-                                <td className="px-4 py-3 text-right tabular-nums text-slate-500">{fmtCOP.format(d.valor_cotizado)}</td>
-                                <td className="px-4 py-3 text-right tabular-nums text-slate-700">{fmtCOP.format(d.valor_ejecutado)}</td>
-                                <td className={`px-4 py-3 text-right tabular-nums font-black flex items-center justify-end gap-1 ${d.cumplimiento < -100 ? 'text-red-600' : d.cumplimiento > 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                                <td className="px-2 py-3 text-right tabular-nums text-slate-500">{fmtNum4.format(d.cant_cotizada)}</td>
+                                <td className="px-2 py-3 text-right tabular-nums font-medium text-slate-800">{fmtNum4.format(d.cant_ejecutada)}</td>
+                                <td className="px-2 py-3 text-right tabular-nums text-slate-500">{d.costo_unit_cotizado !== null ? fmtCOP.format(d.costo_unit_cotizado) : '-'}</td>
+                                <td className="px-2 py-3 text-right tabular-nums font-medium text-slate-800">{d.costo_unit_ejecutado !== null ? fmtCOP.format(d.costo_unit_ejecutado) : '-'}</td>
+                                <td className="px-2 py-3 text-right tabular-nums text-slate-500">{fmtCOP.format(d.valor_cotizado)}</td>
+                                <td className="px-2 py-3 text-right tabular-nums text-slate-700">{fmtCOP.format(d.valor_ejecutado)}</td>
+                                <td className={`px-2 py-3 text-right tabular-nums font-black flex items-center justify-end gap-1 ${d.cumplimiento < -100 ? 'text-red-600' : d.cumplimiento > 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
                                   {hasDescuadre && (
                                     <span title="Hay un descuadre entre los efectos calculados y el cumplimiento total que viene del sistema de costos. Revisar directamente en el OP." className="text-amber-500 cursor-help">
                                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>

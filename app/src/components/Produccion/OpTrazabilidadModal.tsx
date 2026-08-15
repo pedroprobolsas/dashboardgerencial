@@ -139,6 +139,160 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
     day: 'numeric', month: 'short', year: 'numeric'
   }).replace('.', ''); // remover punto de 'ago.' si existe
 
+  // -------------------------------------------------------------
+  // LÓGICA DE RESUMEN E IMPACTO (Bloques A, B y C)
+  // -------------------------------------------------------------
+  const impactos = [
+    { label: 'Efecto Horas (Líder de Producción)', valor: sumaHoras, tipo: 'horas' },
+    { label: 'Efecto Tarifa (Costeo y Presupuesto)', valor: sumaTarifa, tipo: 'tarifa' },
+    { label: 'Consumo Materiales (Líder de Bodega)', valor: sumaMaterialesCantidad, tipo: 'consumo' },
+    { label: 'Precio Materiales (Compras)', valor: sumaMaterialesPrecio, tipo: 'precio' }
+  ];
+
+  const totalImpacto = sumaHoras + sumaTarifa + sumaMaterialesCantidad + sumaMaterialesPrecio;
+  
+  // Ordenar impactos por magnitud absoluta (para el bloque B)
+  const impactosOrdenados = [...impactos].sort((a, b) => Math.abs(b.valor) - Math.abs(a.valor));
+  const maxImpacto = Math.abs(impactosOrdenados[0]?.valor || 0);
+
+  // Generar texto resumen (Bloque A)
+  let textoResumen = "";
+  if (totalImpacto < 0) { // Sobrecosto
+    const cat1 = impactosOrdenados[0];
+    const cat2 = impactosOrdenados[1];
+    
+    textoResumen = `La orden costó ${fmtCOP.format(Math.abs(totalImpacto))} más de lo presupuestado. El grueso vino de ${cat1.label.split('(')[0].trim()}: ${fmtCOP.format(Math.abs(cat1.valor))}.`;
+    
+    // Solo agregar la segunda categoría si supera el 15% del total del sobrecosto
+    if (cat2 && cat2.valor < 0 && Math.abs(cat2.valor) > Math.abs(totalImpacto) * 0.15) {
+      textoResumen += ` ${cat2.label.split('(')[0].trim()} aportó ${fmtCOP.format(Math.abs(cat2.valor))}.`;
+    }
+  } else { // Ahorro
+    const cat1 = impactosOrdenados[0];
+    textoResumen = `La orden cerró ${fmtCOP.format(totalImpacto)} por debajo del presupuesto, principalmente por ${cat1.label.split('(')[0].trim()}.`;
+  }
+
+  // Generar líneas de contexto (Bloque B)
+  impactosOrdenados.forEach(imp => {
+    if (imp.tipo === 'precio') {
+      const matsOrdenados = [...materialesProcesados]
+        .filter(m => m.costo_unit_cotizado && m.costo_unit_ejecutado && m.costo_unit_ejecutado > m.costo_unit_cotizado)
+        .sort((a, b) => ((b.costo_unit_ejecutado! - b.costo_unit_cotizado!) / b.costo_unit_cotizado!) - ((a.costo_unit_ejecutado! - a.costo_unit_cotizado!) / a.costo_unit_cotizado!));
+      
+      if (matsOrdenados.length > 0) {
+        const top1 = matsOrdenados[0];
+        const top2 = matsOrdenados[1];
+        const pct1 = Math.round(((top1.costo_unit_ejecutado! - top1.costo_unit_cotizado!) / top1.costo_unit_cotizado!) * 100);
+        let ctx = `${top1.item} +${pct1}%`;
+        if (top2) {
+          const pct2 = Math.round(((top2.costo_unit_ejecutado! - top2.costo_unit_cotizado!) / top2.costo_unit_cotizado!) * 100);
+          ctx += ` y ${top2.item} +${pct2}%`;
+        }
+        ctx += " sobre el precio cotizado";
+        imp.contexto = ctx;
+      }
+    } else if (imp.tipo === 'consumo') {
+      if (hasVolumen) {
+        if (opCantEjec > opCantCot) {
+          imp.contexto = `Ya descontadas las ${new Intl.NumberFormat('es-CO').format(opCantEjec - opCantCot)} unidades producidas de más`;
+        } else {
+          imp.contexto = "Ajustado al volumen producido";
+        }
+      } else {
+        imp.contexto = "Sin ajuste por volumen — falta dato de cantidades";
+      }
+    } else if (imp.tipo === 'tarifa') {
+      const actSobrecosto = manoObra.filter(m => (m.efecto_tarifa || 0) < 0);
+      if (actSobrecosto.length > 0) {
+        const base = actSobrecosto.reduce((sum, r) => sum + (parseFloat(r.tarifa_cotizada as any) || 0) * (parseFloat(r.cant_ejecutada as any) || 0), 0);
+        const efecto = actSobrecosto.reduce((sum, r) => sum + (parseFloat(r.efecto_tarifa as any) || 0), 0);
+        const pct = base ? Math.round(Math.abs(efecto) / base * 100) : 0;
+        imp.contexto = `La hora real costó ${pct}% más que la cotizada, en ${actSobrecosto.length} de ${manoObra.length} actividades`;
+      }
+    } else if (imp.tipo === 'horas') {
+      let maxPct = 0;
+      let maxAct = null;
+      let horasExtra = 0;
+      manoObra.forEach(m => {
+        const cCot = parseFloat(m.cant_cotizada as any) || 0;
+        const cEjec = parseFloat(m.cant_ejecutada as any) || 0;
+        if (cCot > 0 && cEjec > cCot) {
+          const pct = ((cEjec - cCot) / cCot) * 100;
+          if (pct > maxPct) {
+            maxPct = pct;
+            maxAct = m.item;
+            horasExtra = cEjec - cCot;
+          }
+        }
+      });
+      if (maxAct) {
+        imp.contexto = `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 }).format(horasExtra)} horas sobre las cotizadas · ${maxAct} se pasó ${Math.round(maxPct)}%`;
+      }
+    }
+  });
+
+  // Generar preguntas (Bloque C)
+  let posiblesPreguntas: { imp: number, texto: string }[] = [];
+
+  // Compras
+  const matCompras = materialesProcesados.find(m => m.costo_unit_cotizado && m.costo_unit_ejecutado && m.costo_unit_ejecutado > m.costo_unit_cotizado * 1.05);
+  if (matCompras) {
+    const pct = Math.round(((matCompras.costo_unit_ejecutado! - matCompras.costo_unit_cotizado!) / matCompras.costo_unit_cotizado!) * 100);
+    posiblesPreguntas.push({
+      imp: Math.abs(matCompras.efecto_precio || 0),
+      texto: `A Compras — ¿por qué ${matCompras.item} subió ${pct}% sin recotizar la orden?`
+    });
+  }
+
+  // Bodega
+  const matBodega = materialesProcesados.find(m => (m.efecto_cantidad || 0) < 0);
+  if (matBodega) {
+    const cCot = parseFloat(matBodega.cant_cotizada as any) || 0;
+    const cEjec = parseFloat(matBodega.cant_ejecutada as any) || 0;
+    const unidadStr = matBodega.unidad ? ` ${matBodega.unidad}` : '';
+    posiblesPreguntas.push({
+      imp: Math.abs(matBodega.efecto_cantidad || 0),
+      texto: `A Líder de Bodega — ${matBodega.item} consumió ${new Intl.NumberFormat('es-CO').format(cEjec - cCot)}${unidadStr} más de lo que correspondía. ¿Merma de proceso o registro?`
+    });
+  }
+
+  // Costeo
+  const actTarifa = manoObra.filter(m => (m.efecto_tarifa || 0) < 0);
+  if (actTarifa.length > manoObra.length / 2) {
+    const sumTarifa = actTarifa.reduce((sum, r) => sum + Math.abs(r.efecto_tarifa || 0), 0);
+    posiblesPreguntas.push({
+      imp: sumTarifa,
+      texto: `A Costeo y Presupuesto — las tarifas están por encima en ${actTarifa.length} de ${manoObra.length} actividades. ¿Cuándo se actualizaron?`
+    });
+  }
+
+  // Producción
+  let prodMaxAct: { item: string, pct: number, imp: number } | null = null;
+  manoObra.forEach(m => {
+    const cCot = parseFloat(m.cant_cotizada as any) || 0;
+    const cEjec = parseFloat(m.cant_ejecutada as any) || 0;
+    if (cCot > 0 && cEjec > cCot * 1.15) {
+      const pct = Math.round(((cEjec - cCot) / cCot) * 100);
+      const imp = Math.abs(m.efecto_horas || 0);
+      if (!prodMaxAct || imp > prodMaxAct.imp) {
+        prodMaxAct = { item: m.item, pct, imp };
+      }
+    }
+  });
+  if (prodMaxAct) {
+    posiblesPreguntas.push({
+      imp: prodMaxAct.imp,
+      texto: `A Líder de Producción — ${prodMaxAct.item} se pasó ${prodMaxAct.pct}% de las horas cotizadas. ¿Qué pasó?`
+    });
+  }
+
+  // Ordenar y seleccionar top 3
+  const preguntas = posiblesPreguntas
+    .sort((a, b) => b.imp - a.imp)
+    .slice(0, 3)
+    .map(p => p.texto);
+
+
   // Lógica de tarjetas
   const getCardStyle = (val: number, isFlete: boolean = false) => {
     if (isFlete) {
@@ -212,8 +366,21 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
             <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2" style={{ letterSpacing: '-0.02em' }}>
               OP {cabecera.nro_op} — {cabecera.cliente}
             </h2>
-            <p className="text-sm text-slate-500 mt-1">
-              {cabecera.referencia} · {fechaFormateada}
+            <p className="text-sm text-slate-500 mt-1 flex items-center">
+              <span>{cabecera.referencia}</span>
+              <span className="mx-2 text-slate-300">•</span>
+              <span>{fechaFormateada}</span>
+              {hasVolumen && (
+                <>
+                  <span className="mx-2 text-slate-300">|</span>
+                  <span>
+                    {new Intl.NumberFormat('es-CO').format(opCantCot)} cotizadas → <strong className="text-slate-700">{new Intl.NumberFormat('es-CO').format(opCantEjec)} producidas</strong> 
+                    <span className={`ml-1 text-[11px] font-bold ${opCantEjec > opCantCot ? 'text-emerald-600' : opCantEjec < opCantCot ? 'text-amber-600' : 'text-slate-400'}`}>
+                      ({opCantEjec > opCantCot ? '+' : ''}{new Intl.NumberFormat('es-CO').format(opCantEjec - opCantCot)}, {opCantEjec > opCantCot ? '+' : ''}{new Intl.NumberFormat('es-CO', {maximumFractionDigits: 1}).format(((opCantEjec - opCantCot) / opCantCot) * 100)}%)
+                    </span>
+                  </span>
+                </>
+              )}
             </p>
           </div>
           <div className="text-right mr-16">
@@ -221,6 +388,7 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
             <span className={`text-2xl font-bold ${cabecera.margen_pct < 0 ? 'text-[var(--text-danger)]' : 'text-slate-800'}`}>
               {cabecera.margen_pct}%
             </span>
+            <span className="text-[10px] text-slate-400 font-medium tracking-wide block mt-0.5">meta 29,5%</span>
           </div>
           
           <button 
@@ -242,14 +410,68 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto" style={{ backgroundColor: 'var(--surface-1)' }}>
           
-          {/* Tarjetas de Resumen */}
-          <div className="grid gap-3 mb-8" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-            {renderCard("Efecto horas — Jesús", sumaHoras)}
-            {renderCard("Efecto tarifa — Cristian", sumaTarifa)}
-            {renderCard("Materiales · cantidad — Franklin", sumaMaterialesCantidad)}
-            {renderCard("Materiales · precio — compras", sumaMaterialesPrecio)}
-            {renderCard("Fletes sin causar", fletesPendientes, true)}
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-xl font-bold text-slate-800">Resumen de Impacto</h2>
           </div>
+
+          {/* Bloque A: Resumen Explicativo */}
+          <div className="mb-6 p-4 rounded-xl" style={{ backgroundColor: totalImpacto < 0 ? 'var(--bg-danger)' : 'var(--bg-success)' }}>
+            <p className="text-[14px]" style={{ color: totalImpacto < 0 ? 'var(--text-danger)' : 'var(--text-success)' }}>
+              {textoResumen}
+            </p>
+          </div>
+
+          {/* Bloque B: Barras de impacto */}
+          <div className="mb-8 space-y-4">
+            {impactosOrdenados.map((item, idx) => {
+              if (item.valor === 0) return null;
+              const isNegative = item.valor < 0;
+              const isTop2 = idx < 2 && isNegative;
+              const barColor = isNegative ? (isTop2 ? '#E24B4A' : '#EF9F27') : '#10B981';
+              const width = maxImpacto > 0 ? (Math.abs(item.valor) / maxImpacto) * 100 : 0;
+              
+              return (
+                <div key={item.label} className="relative">
+                  <div className="flex justify-between items-baseline mb-1">
+                    <span className="text-sm font-semibold text-slate-700">{item.label}</span>
+                    <span className="text-sm font-bold" style={{ color: barColor }}>
+                      {item.valor > 0 ? '+' : ''}{fmtCOP.format(item.valor)}
+                    </span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mb-1">
+                    <div 
+                      className="h-full rounded-full transition-all duration-500" 
+                      style={{ width: `${width}%`, backgroundColor: barColor }}
+                    />
+                  </div>
+                  {item.contexto && (
+                    <p className="text-[11px] text-slate-500">{item.contexto}</p>
+                  )}
+                </div>
+              );
+            })}
+            
+            {fletesPendientes > 0 && (
+              <div className="mt-4 p-3 rounded-lg text-sm bg-yellow-50 text-yellow-800 border border-yellow-200">
+                ⚠️ <strong>Fletes sin causar:</strong> {fmtCOP.format(fletesPendientes)}. El costo real de esta OP será mayor cuando se registren.
+              </div>
+            )}
+          </div>
+
+          {/* Bloque C: Qué preguntar */}
+          {preguntas.length > 0 && (
+            <div className="mb-8 pt-6 border-t border-slate-200">
+              <h3 className="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider">Qué preguntar en esta OP</h3>
+              <ul className="space-y-2">
+                {preguntas.map((p, i) => (
+                  <li key={i} className="text-sm text-slate-600 flex gap-2">
+                    <span className="text-probolsas-cyan mt-0.5">•</span>
+                    <span>{p}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Mano de Obra */}
           <div className="mb-8">
@@ -339,8 +561,12 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
                     return (
                       <tr key={r.item} style={rowStyle}>
                         <td className="py-2">{renderItemName(r.item, r)}</td>
-                        <td className="py-2 text-right" style={{ color: 'var(--text-secondary)' }}>{formatNumber(r.cant_cotizada)}</td>
-                        <td className="py-2 text-right font-medium">{formatNumber(r.cant_ejecutada)}</td>
+                        <td className="py-2 text-right" style={{ color: 'var(--text-secondary)' }}>
+                          {formatNumber(r.cant_cotizada)}{r.unidad ? ` ${r.unidad}` : ''}
+                        </td>
+                        <td className="py-2 text-right font-medium">
+                          {formatNumber(r.cant_ejecutada)}{r.unidad ? ` ${r.unidad}` : ''}
+                        </td>
                         <td className="py-2 text-right" style={{ color: 'var(--text-secondary)' }}>{formatMoney(r.costo_unit_cotizado)}</td>
                         <td className="py-2 text-right font-medium">{formatMoney(r.costo_unit_ejecutado)}</td>
                         <td className="py-2 text-right font-medium" style={{ color: cellColor(r.cumplimiento) }}>{formatMoney(r.cumplimiento)}</td>
@@ -405,36 +631,75 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
           infoExtra={
             <>
               <p><span className="font-semibold w-24 inline-block">Referencia:</span> {cabecera.referencia}</p>
-              <p><span className="font-semibold w-24 inline-block">Margen:</span> <span className={cabecera.margen_pct < 0 ? 'text-red-600 font-bold' : ''}>{cabecera.margen_pct}%</span></p>
+              {hasVolumen && (
+                <p><span className="font-semibold w-24 inline-block">Producción:</span> {new Intl.NumberFormat('es-CO').format(opCantCot)} cotizadas → {new Intl.NumberFormat('es-CO').format(opCantEjec)} producidas</p>
+              )}
+              <p><span className="font-semibold w-24 inline-block">Margen:</span> <span className={cabecera.margen_pct < 0 ? 'text-red-600 font-bold' : ''}>{cabecera.margen_pct}% (meta 29,5%)</span></p>
             </>
           }
         >
-          {/* Tarjetas de Resumen */}
-          <div className="grid grid-cols-5 gap-4 mb-8 mt-6">
-            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-              <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Efecto horas (Jesús)</span>
-              <span className={`text-xl font-black ${sumaHoras < 0 ? 'text-red-600' : sumaHoras > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>{formatMoney(sumaHoras)}</span>
-            </div>
-            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-              <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Efecto tarifa (Cris)</span>
-              <span className={`text-xl font-black ${sumaTarifa < 0 ? 'text-red-600' : sumaTarifa > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>{formatMoney(sumaTarifa)}</span>
-            </div>
-            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-              <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Materiales · cant</span>
-              <span className={`text-xl font-black ${sumaMaterialesCantidad < 0 ? 'text-red-600' : sumaMaterialesCantidad > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>{formatMoney(sumaMaterialesCantidad)}</span>
-            </div>
-            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-              <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Materiales · precio</span>
-              <span className={`text-xl font-black ${sumaMaterialesPrecio < 0 ? 'text-red-600' : sumaMaterialesPrecio > 0 ? 'text-emerald-600' : 'text-slate-800'}`}>{formatMoney(sumaMaterialesPrecio)}</span>
-            </div>
-            <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-              <span className="text-xs font-bold text-slate-600 uppercase block mb-1">Fletes sin causar</span>
-              <span className="text-xl font-black text-amber-600">{formatMoney(fletesPendientes)}</span>
-            </div>
+          {/* Bloque A: Resumen Explicativo en PDF */}
+          <div className="mb-6 p-4 rounded-xl print:border print:border-slate-200" style={{ backgroundColor: totalImpacto < 0 ? 'var(--bg-danger)' : 'var(--bg-success)' }}>
+            <p className="text-[14px] font-medium" style={{ color: totalImpacto < 0 ? 'var(--text-danger)' : 'var(--text-success)' }}>
+              {textoResumen}
+            </p>
           </div>
 
+          {/* Bloque B: Barras de impacto en PDF */}
+          <div className="mb-8 space-y-4 print:break-inside-avoid">
+            <h3 className="text-sm font-bold text-slate-700 mb-4 uppercase tracking-wider border-b border-slate-200 pb-2">Desglose de Impacto</h3>
+            {impactosOrdenados.map((item, idx) => {
+              if (item.valor === 0) return null;
+              const isNegative = item.valor < 0;
+              const isTop2 = idx < 2 && isNegative;
+              const barColor = isNegative ? (isTop2 ? '#E24B4A' : '#EF9F27') : '#10B981';
+              const width = maxImpacto > 0 ? (Math.abs(item.valor) / maxImpacto) * 100 : 0;
+              
+              return (
+                <div key={item.label} className="relative">
+                  <div className="flex justify-between items-baseline mb-1">
+                    <span className="text-sm font-semibold text-slate-700">{item.label}</span>
+                    <span className="text-sm font-bold" style={{ color: barColor }}>
+                      {item.valor > 0 ? '+' : ''}{fmtCOP.format(item.valor)}
+                    </span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden mb-1 print:border print:border-slate-200">
+                    <div 
+                      className="h-full rounded-full print:bg-slate-800" 
+                      style={{ width: `${width}%`, backgroundColor: barColor }}
+                    />
+                  </div>
+                  {item.contexto && (
+                    <p className="text-[11px] text-slate-500">{item.contexto}</p>
+                  )}
+                </div>
+              );
+            })}
+            
+            {fletesPendientes > 0 && (
+              <div className="mt-4 p-3 rounded-lg text-sm bg-yellow-50 text-yellow-800 border border-yellow-200 print:bg-transparent print:border-slate-300 print:text-slate-700">
+                ⚠️ <strong>Fletes sin causar:</strong> {fmtCOP.format(fletesPendientes)}. El costo real de esta OP será mayor cuando se registren.
+              </div>
+            )}
+          </div>
+
+          {/* Bloque C: Qué preguntar en PDF */}
+          {preguntas.length > 0 && (
+            <div className="mb-8 pt-6 border-t border-slate-200 print:break-inside-avoid">
+              <h3 className="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider">Puntos de atención detectados</h3>
+              <ul className="space-y-2">
+                {preguntas.map((p, i) => (
+                  <li key={i} className="text-sm text-slate-600 flex gap-2">
+                    <span className="text-probolsas-cyan print:text-slate-800 mt-0.5">•</span>
+                    <span>{p}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="text-sm text-slate-600 mb-6 bg-slate-100 p-3 rounded-lg print:bg-transparent print:p-0 print:border-b print:border-slate-200 print:rounded-none">
-            Contexto: Detalle de ejecución de costos de la orden de producción.
+            Contexto: Detalle de ejecución de costos de la orden de producción comparado con la cotización.
           </div>
 
           <div className="mb-8">
