@@ -73,6 +73,12 @@ export default function InformeResponsableModal({ detalle, fechaInicio, fechaFin
 
   const totalSobrecosto = sobrecostos.reduce((acc, curr) => acc + curr.impacto, 0);
   const totalAhorro = ahorros.reduce((acc, curr) => acc + curr.impacto, 0);
+
+  const horasSobrecosto = sobrecostos.reduce((acc, curr) => acc + (parseFloat(curr.cant_ejecutada as any) || 0) - (parseFloat(curr.cant_cotizada as any) || 0), 0);
+  const horasAhorro = ahorros.reduce((acc, curr) => acc + (parseFloat(curr.cant_ejecutada as any) || 0) - (parseFloat(curr.cant_cotizada as any) || 0), 0);
+  
+  const baseSobrecosto = sobrecostos.reduce((acc, curr) => acc + (parseFloat(curr.tarifa_cotizada as any) || 0) * (parseFloat(curr.cant_ejecutada as any) || 0), 0);
+  const baseAhorro = ahorros.reduce((acc, curr) => acc + (parseFloat(curr.tarifa_cotizada as any) || 0) * (parseFloat(curr.cant_ejecutada as any) || 0), 0);
   
   const uniqueOps = new Set(actividades.map(a => a.nro_op)).size;
 
@@ -199,11 +205,23 @@ export default function InformeResponsableModal({ detalle, fechaInicio, fechaFin
             <span className="text-sm font-bold text-red-600 uppercase tracking-wider block mb-2">Total Sobrecosto</span>
             <span className="text-4xl font-black text-red-600 tracking-tight">{fmtCOP.format(totalSobrecosto)}</span>
             <span className="text-sm font-medium text-slate-600 block mt-2">En {sobrecostos.length} de {actividades.length} actividades</span>
+            {tipoEfecto === 'horas' && (
+              <span className="text-xs text-slate-500 mt-1 block">+{fmtNum.format(horasSobrecosto)} horas de más</span>
+            )}
+            {tipoEfecto === 'tarifa' && (
+              <span className="text-xs text-slate-500 mt-1 block">tarifa real +{baseSobrecosto ? fmtNum.format(-totalSobrecosto / baseSobrecosto * 100) : 0}% sobre la cotizada</span>
+            )}
           </div>
           <div className="border-2 border-emerald-100 rounded-xl p-6 bg-emerald-50/50 print:bg-transparent print:border-emerald-600">
             <span className="text-sm font-bold text-emerald-600 uppercase tracking-wider block mb-2">Total Ahorro</span>
             <span className="text-4xl font-black text-emerald-600 tracking-tight">+{fmtCOP.format(totalAhorro)}</span>
             <span className="text-sm font-medium text-slate-600 block mt-2">En {ahorros.length} de {actividades.length} actividades</span>
+            {tipoEfecto === 'horas' && (
+              <span className="text-xs text-slate-500 mt-1 block">{fmtNum.format(horasAhorro)} horas</span>
+            )}
+            {tipoEfecto === 'tarifa' && (
+              <span className="text-xs text-slate-500 mt-1 block">tarifa real {baseAhorro ? fmtNum.format(-totalAhorro / baseAhorro * 100) : 0}% sobre la cotizada</span>
+            )}
           </div>
         </div>
 

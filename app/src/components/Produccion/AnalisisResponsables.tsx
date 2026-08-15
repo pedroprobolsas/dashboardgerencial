@@ -87,6 +87,9 @@ export default function AnalisisResponsables() {
     let countJesusSobrecosto = 0, countJesusAhorro = 0;
     let countCristianSobrecosto = 0, countCristianAhorro = 0;
 
+    let horasJesusSobrecosto = 0, horasJesusAhorro = 0;
+    let sumBaseCristianSobrecosto = 0, sumBaseCristianAhorro = 0;
+
     detalle.forEach(d => {
       const opKey = String(d.nro_op);
       if (!groups[opKey]) {
@@ -109,20 +112,27 @@ export default function AnalisisResponsables() {
       groups[opKey].subtotalTarifa += efTarifa;
       groups[opKey].subtotalCumplimiento += cumplimiento;
 
+      const difHoras = (parseFloat(d.cant_ejecutada as any) || 0) - (parseFloat(d.cant_cotizada as any) || 0);
+      const baseTarifa = (parseFloat(d.tarifa_cotizada as any) || 0) * (parseFloat(d.cant_ejecutada as any) || 0);
+
       if (efHoras < 0) {
         jesusSobrecosto += efHoras;
         countJesusSobrecosto++;
+        horasJesusSobrecosto += difHoras;
       } else if (efHoras > 0) {
         jesusAhorro += efHoras;
         countJesusAhorro++;
+        horasJesusAhorro += difHoras;
       }
 
       if (efTarifa < 0) {
         cristianSobrecosto += efTarifa;
         countCristianSobrecosto++;
+        sumBaseCristianSobrecosto += baseTarifa;
       } else if (efTarifa > 0) {
         cristianAhorro += efTarifa;
         countCristianAhorro++;
+        sumBaseCristianAhorro += baseTarifa;
       }
     });
 
@@ -139,6 +149,8 @@ export default function AnalisisResponsables() {
         cristianSobrecosto, cristianAhorro,
         countJesusSobrecosto, countJesusAhorro,
         countCristianSobrecosto, countCristianAhorro,
+        horasJesusSobrecosto, horasJesusAhorro,
+        sumBaseCristianSobrecosto, sumBaseCristianAhorro,
       },
       totalActividades: detalle.length
     };
@@ -196,6 +208,7 @@ export default function AnalisisResponsables() {
               {fmtCOP.format(groupedData.metricas.jesusSobrecosto)}
             </span>
             <span className="text-xs text-slate-500 mt-2 font-medium">En {groupedData.metricas.countJesusSobrecosto} de {groupedData.totalActividades} actividades</span>
+            <span className="text-[10px] text-slate-400 mt-1 font-semibold">+{fmtNum.format(groupedData.metricas.horasJesusSobrecosto)} horas de más</span>
           </div>
 
           {/* Jesús Ahorro */}
@@ -205,6 +218,7 @@ export default function AnalisisResponsables() {
               +{fmtCOP.format(groupedData.metricas.jesusAhorro)}
             </span>
             <span className="text-xs text-slate-500 mt-2 font-medium">En {groupedData.metricas.countJesusAhorro} de {groupedData.totalActividades} actividades</span>
+            <span className="text-[10px] text-slate-400 mt-1 font-semibold">{fmtNum.format(groupedData.metricas.horasJesusAhorro)} horas</span>
           </div>
           
           {/* Cristian Sobrecosto */}
@@ -214,6 +228,7 @@ export default function AnalisisResponsables() {
               {fmtCOP.format(groupedData.metricas.cristianSobrecosto)}
             </span>
             <span className="text-xs text-slate-500 mt-2 font-medium">En {groupedData.metricas.countCristianSobrecosto} de {groupedData.totalActividades} actividades</span>
+            <span className="text-[10px] text-slate-400 mt-1 font-semibold">tarifa real +{groupedData.metricas.sumBaseCristianSobrecosto ? fmtNum.format(-groupedData.metricas.cristianSobrecosto / groupedData.metricas.sumBaseCristianSobrecosto * 100) : 0}% sobre la cotizada</span>
           </div>
 
           {/* Cristian Ahorro */}
@@ -223,6 +238,7 @@ export default function AnalisisResponsables() {
               +{fmtCOP.format(groupedData.metricas.cristianAhorro)}
             </span>
             <span className="text-xs text-slate-500 mt-2 font-medium">En {groupedData.metricas.countCristianAhorro} de {groupedData.totalActividades} actividades</span>
+            <span className="text-[10px] text-slate-400 mt-1 font-semibold">tarifa real {groupedData.metricas.sumBaseCristianAhorro ? fmtNum.format(-groupedData.metricas.cristianAhorro / groupedData.metricas.sumBaseCristianAhorro * 100) : 0}% sobre la cotizada</span>
           </div>
 
         </div>
