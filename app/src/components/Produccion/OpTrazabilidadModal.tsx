@@ -25,6 +25,11 @@ const formatPct = (val: number | null | undefined) => {
   return `${sign}${val}%`;
 };
 
+const shortName = (name: string, max: number = 30) => {
+  if (!name) return '';
+  return name.length > max ? name.substring(0, max).trim() + '…' : name;
+};
+
 export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
   const [data, setData] = useState<OPDetalleData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -183,10 +188,10 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
         const top1 = matsOrdenados[0];
         const top2 = matsOrdenados[1];
         const pct1 = Math.round(((top1.costo_unit_ejecutado! - top1.costo_unit_cotizado!) / top1.costo_unit_cotizado!) * 100);
-        let ctx = `${top1.item} +${pct1}%`;
+        let ctx = `${shortName(top1.item)} +${pct1}%`;
         if (top2) {
           const pct2 = Math.round(((top2.costo_unit_ejecutado! - top2.costo_unit_cotizado!) / top2.costo_unit_cotizado!) * 100);
-          ctx += ` y ${top2.item} +${pct2}%`;
+          ctx += ` y ${shortName(top2.item)} +${pct2}%`;
         }
         ctx += " sobre el precio cotizado";
         imp.contexto = ctx;
@@ -229,7 +234,7 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
         }
       });
       if (maxAct) {
-        imp.contexto = `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 }).format(horasExtra)} horas sobre las cotizadas · ${maxAct} se pasó ${Math.round(maxPct)}%`;
+        imp.contexto = `${new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 }).format(horasExtra)} horas sobre las cotizadas · ${shortName(maxAct)} se pasó ${Math.round(maxPct)}%`;
       }
     }
   });
@@ -243,7 +248,7 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
     const pct = Math.round(((matCompras.costo_unit_ejecutado! - matCompras.costo_unit_cotizado!) / matCompras.costo_unit_cotizado!) * 100);
     posiblesPreguntas.push({
       imp: Math.abs(matCompras.efecto_precio || 0),
-      texto: `A Compras — ¿por qué ${matCompras.item} subió ${pct}% sin recotizar la orden?`
+      texto: `A Compras — ¿por qué ${shortName(matCompras.item)} subió ${pct}% sin recotizar la orden?`
     });
   }
 
@@ -255,7 +260,7 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
     const unidadStr = matBodega.unidad ? ` ${matBodega.unidad}` : '';
     posiblesPreguntas.push({
       imp: Math.abs(matBodega.efecto_cantidad || 0),
-      texto: `A Líder de Bodega — ${matBodega.item} consumió ${new Intl.NumberFormat('es-CO').format(cEjec - cCot)}${unidadStr} más de lo que correspondía. ¿Merma de proceso o registro?`
+      texto: `A Líder de Bodega — ${shortName(matBodega.item)} consumió ${new Intl.NumberFormat('es-CO').format(cEjec - cCot)}${unidadStr} más de lo que correspondía. ¿Merma de proceso o registro?`
     });
   }
 
@@ -285,7 +290,7 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
   if (prodMaxAct) {
     posiblesPreguntas.push({
       imp: prodMaxAct.imp,
-      texto: `A Líder de Producción — ${prodMaxAct.item} se pasó ${prodMaxAct.pct}% de las horas cotizadas. ¿Qué pasó?`
+      texto: `A Líder de Producción — ${shortName(prodMaxAct.item)} se pasó ${prodMaxAct.pct}% de las horas cotizadas. ¿Qué pasó?`
     });
   }
 
