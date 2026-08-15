@@ -140,13 +140,17 @@ export default function AnalisisResponsables() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {detalle.map((d, i) => {
-                    const sinCotizar = d.cant_cotizada === 0;
+                    const sinCotizar = parseFloat(d.cant_cotizada as any) === 0;
+                    
+                    const efHoras = parseFloat(d.efecto_horas as any);
+                    const efTarifa = parseFloat(d.efecto_tarifa as any);
+                    const cumplimiento = parseFloat(d.cumplimiento as any);
                     
                     // Validación cruzada
                     let invalidRow = false;
-                    if (!sinCotizar && d.efecto_horas !== null && d.efecto_tarifa !== null) {
-                      const suma = d.efecto_horas + d.efecto_tarifa;
-                      if (Math.abs(suma - d.cumplimiento) > 100) {
+                    if (!sinCotizar && !isNaN(efHoras) && !isNaN(efTarifa)) {
+                      const suma = efHoras + efTarifa;
+                      if (Math.abs(suma - cumplimiento) > 100) {
                         invalidRow = true;
                       }
                     }
@@ -162,8 +166,8 @@ export default function AnalisisResponsables() {
                         {/* Horas */}
                         <td className="px-4 py-3 text-right text-slate-500 tabular-nums border-l border-slate-100">{fmtNum.format(d.cant_cotizada)}</td>
                         <td className="px-4 py-3 text-right font-medium text-slate-700 tabular-nums">{fmtNum.format(d.cant_ejecutada)}</td>
-                        <td className={`px-4 py-3 text-right font-bold tabular-nums ${d.diferencia_horas > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                          {d.diferencia_horas > 0 ? '+' : ''}{fmtNum.format(d.diferencia_horas)}
+                        <td className={`px-4 py-3 text-right font-bold tabular-nums ${parseFloat(d.diferencia_horas as any) > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                          {parseFloat(d.diferencia_horas as any) > 0 ? '+' : ''}{fmtNum.format(d.diferencia_horas)}
                         </td>
                         <td className="px-4 py-3 text-right font-semibold tabular-nums border-r border-slate-100">
                           {sinCotizar ? (
@@ -187,20 +191,20 @@ export default function AnalisisResponsables() {
                         </td>
 
                         {/* Efectos */}
-                        <td className={`px-4 py-3 text-right font-bold tabular-nums ${!sinCotizar && d.efecto_horas! > 0 ? 'text-red-600 bg-red-50/50' : 'text-slate-600'}`}>
-                          {sinCotizar ? <span className="text-[10px] text-slate-400 italic">—</span> : fmtCOP.format(d.efecto_horas!)}
+                        <td className={`px-4 py-3 text-right font-bold tabular-nums ${!sinCotizar && efHoras > 0 ? 'text-red-600 bg-red-50/50' : 'text-slate-600'}`}>
+                          {sinCotizar ? <span className="text-[10px] text-slate-400 italic">—</span> : fmtCOP.format(efHoras)}
                         </td>
-                        <td className={`px-4 py-3 text-right font-bold tabular-nums ${!sinCotizar && d.efecto_tarifa! > 0 ? 'text-red-600 bg-red-50/50' : 'text-slate-600'}`}>
-                          {sinCotizar ? <span className="text-[10px] text-slate-400 italic">—</span> : fmtCOP.format(d.efecto_tarifa!)}
+                        <td className={`px-4 py-3 text-right font-bold tabular-nums ${!sinCotizar && efTarifa > 0 ? 'text-red-600 bg-red-50/50' : 'text-slate-600'}`}>
+                          {sinCotizar ? <span className="text-[10px] text-slate-400 italic">—</span> : fmtCOP.format(efTarifa)}
                         </td>
 
                         {/* Oficial */}
                         <td className="px-4 py-3 text-right font-bold tabular-nums border-l border-slate-100 bg-slate-50/50">
                           {invalidRow && (
-                            <span className="text-xs text-red-500 mr-2" title={`Discrepancia en suma de efectos (Efectos: ${d.efecto_horas! + d.efecto_tarifa!})`}>⚠️</span>
+                            <span className="text-xs text-red-500 mr-2" title={`Discrepancia en suma de efectos (Efectos: ${efHoras + efTarifa})`}>⚠️</span>
                           )}
-                          <span className={d.cumplimiento > 0 ? 'text-red-600' : 'text-emerald-600'}>
-                            {fmtCOP.format(d.cumplimiento)}
+                          <span className={cumplimiento > 0 ? 'text-red-600' : 'text-emerald-600'}>
+                            {fmtCOP.format(cumplimiento)}
                           </span>
                         </td>
                       </tr>

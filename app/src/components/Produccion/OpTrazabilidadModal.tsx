@@ -88,11 +88,16 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
   const materiales = detalle.filter(d => d.categoria === 'material');
   const terceros = detalle.filter(d => d.categoria === 'tercero');
 
-  // Cálculos resumen
-  const sumaHoras = manoObra.reduce((sum, r) => sum + (r.efecto_horas || 0), 0);
-  const sumaTarifa = manoObra.reduce((sum, r) => sum + (r.efecto_tarifa || 0), 0);
-  const sumaMateriales = materiales.reduce((sum, r) => sum + (r.cumplimiento || 0), 0);
-  const fletesPendientes = terceros.reduce((sum, r) => sum + (r.valor_ejecutado === 0 ? (r.valor_cotizado || 0) : 0), 0);
+  // Cálculos resumen (parseando a float porque Postgres devuelve numeric como string)
+  const sumaHoras = manoObra.reduce((sum, r) => sum + (parseFloat(r.efecto_horas as any) || 0), 0);
+  const sumaTarifa = manoObra.reduce((sum, r) => sum + (parseFloat(r.efecto_tarifa as any) || 0), 0);
+  const sumaMateriales = materiales.reduce((sum, r) => sum + (parseFloat(r.cumplimiento as any) || 0), 0);
+  const fletesPendientes = terceros.reduce((sum, r) => sum + (r.valor_ejecutado === 0 ? (parseFloat(r.valor_cotizado as any) || 0) : 0), 0);
+
+  // Formatear fecha
+  const fechaFormateada = new Date(cabecera.fecha).toLocaleDateString('es-CO', {
+    day: 'numeric', month: 'short', year: 'numeric'
+  }).replace('.', ''); // remover punto de 'ago.' si existe
 
   // Lógica de tarjetas
   const getCardStyle = (val: number, isFlete: boolean = false) => {
@@ -127,22 +132,27 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
   let maxDif = 50;
   let highlightItem: string | null = null;
   manoObra.forEach(r => {
-    if (r.diferencia_pct != null && r.diferencia_pct > maxDif) {
-      maxDif = r.diferencia_pct;
+    const dif = parseFloat(r.diferencia_pct as any);
+    if (!isNaN(dif) && dif > maxDif) {
+      maxDif = dif;
       highlightItem = r.item;
     }
   });
 
   // Detección sustitución materiales
-  const hasSustitucion = materiales.some(m => m.cant_cotizada === 0 && m.cant_ejecutada > 0) &&
-                         materiales.some(m => m.cant_cotizada > 0 && m.cant_ejecutada === 0);
+  const hasSustitucion = materiales.some(m => parseFloat(m.cant_cotizada as any) === 0 && parseFloat(m.cant_ejecutada as any) > 0) &&
+                         materiales.some(m => parseFloat(m.cant_cotizada as any) > 0 && parseFloat(m.cant_ejecutada as any) === 0);
 
   // Helper de etiquetas
   const renderItemName = (item: string, r: any) => {
     let tag = null;
-    if (r.cant_cotizada === 0 && r.cant_ejecutada > 0) tag = "no cotizado";
-    else if (r.cant_ejecutada === 0 && r.cant_cotizada > 0) tag = "no ejecutado";
-    else if (r.categoria === 'tercero' && r.valor_ejecutado === 0) tag = "pendiente de causar";
+    const cCotizada = parseFloat(r.cant_cotizada);
+    const cEjecutada = parseFloat(r.cant_ejecutada);
+    const vEjecutado = parseFloat(r.valor_ejecutado);
+
+    if (cCotizada === 0 && cEjecutada > 0) tag = "no cotizado";
+    else if (cEjecutada === 0 && cCotizada > 0) tag = "no ejecutado";
+    else if (r.categoria === 'tercero' && vEjecutado === 0) tag = "pendiente de causar";
 
     return (
       <span>
@@ -163,7 +173,7 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
               OP {cabecera.nro_op} — {cabecera.cliente}
             </h2>
             <p className="text-sm text-slate-500 mt-1">
-              {cabecera.referencia} · {cabecera.fecha}
+              {cabecera.referencia} · {fechaFormateada}
             </p>
           </div>
           <div className="text-right mr-6">
