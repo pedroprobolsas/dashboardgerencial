@@ -15,9 +15,9 @@ interface Props {
 export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, onClose }: Props) {
   
   const actividades = detalle.map(d => {
-    // Para el informe nos centramos en el efecto rendimiento
-    const ren = d.efecto_rendimiento || 0;
-    return { ...d, impacto: ren };
+    // Para el informe nos centramos en el efecto cantidad
+    const cant = d.efecto_cantidad || 0;
+    return { ...d, impacto: cant };
   });
 
   const sobrecostos = actividades.filter(a => a.calculable && a.impacto < 0).sort((a, b) => a.impacto - b.impacto);
@@ -41,7 +41,7 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
       tipoInforme="Materiales"
       requestData={{
         responsable: 'Franklin', 
-        tipo_efecto: 'rendimiento',
+        tipo_efecto: 'cantidad',
         periodo_inicio: fechaInicio,
         periodo_fin: fechaFin
       }}
@@ -55,12 +55,12 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
       {/* Global Cards */}
       <div className="grid grid-cols-3 gap-6 mb-8 mt-6">
         <div className="border-2 border-red-100 rounded-xl p-6 bg-red-50/50 print:bg-transparent print:border-red-600">
-          <span className="text-sm font-bold text-red-600 uppercase tracking-wider block mb-2">Sobrecosto Rend.</span>
+          <span className="text-sm font-bold text-red-600 uppercase tracking-wider block mb-2">Sobrecosto Cant.</span>
           <span className="text-3xl font-black text-red-600 tracking-tight">{fmtCOP.format(totalSobrecosto)}</span>
           <span className="text-sm font-medium text-slate-600 block mt-2">En {sobrecostos.length} consumos</span>
         </div>
         <div className="border-2 border-emerald-100 rounded-xl p-6 bg-emerald-50/50 print:bg-transparent print:border-emerald-600">
-          <span className="text-sm font-bold text-emerald-600 uppercase tracking-wider block mb-2">Ahorro Rend.</span>
+          <span className="text-sm font-bold text-emerald-600 uppercase tracking-wider block mb-2">Ahorro Cant.</span>
           <span className="text-3xl font-black text-emerald-600 tracking-tight">+{fmtCOP.format(totalAhorro)}</span>
           <span className="text-sm font-medium text-slate-600 block mt-2">En {ahorros.length} consumos</span>
         </div>
@@ -72,19 +72,19 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
       </div>
 
       <div className="text-sm text-slate-600 mb-6 bg-slate-100 p-3 rounded-lg print:bg-transparent print:p-0 print:border-b print:border-slate-200 print:rounded-none">
-        Contexto: Se analizaron un total de <strong>{actividades.length}</strong> movimientos de materiales correspondientes a <strong>{uniqueOps}</strong> Órdenes de Producción (OP), aislando los efectos de volumen y precio.
+        Contexto: Se analizaron un total de <strong>{actividades.length}</strong> movimientos de materiales correspondientes a <strong>{uniqueOps}</strong> Órdenes de Producción (OP). Los consumos ejecutados se comparan directamente contra los cotizados sin ajuste por volumen de producción.
       </div>
 
       {/* Table - Sobrecostos */}
       {sobrecostos.length > 0 && (
         <div className="mb-10">
-          <h3 className="text-lg font-bold text-red-700 border-b border-red-200 pb-2 mb-4">Materiales con sobrecosto de rendimiento</h3>
+          <h3 className="text-lg font-bold text-red-700 border-b border-red-200 pb-2 mb-4">Materiales con sobrecosto por cantidad</h3>
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="text-slate-500 uppercase tracking-wider text-xs border-b-2 border-slate-200">
                 <th className="py-2">OP</th>
                 <th className="py-2">Material</th>
-                <th className="py-2 text-right">Cant. Esp.</th>
+                <th className="py-2 text-right">Cant. Cot.</th>
                 <th className="py-2 text-right">Cant. Ejec.</th>
                 <th className="py-2 text-right">Efecto ($)</th>
               </tr>
@@ -94,7 +94,7 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
                 <tr key={i} className="print:break-inside-avoid">
                   <td className="py-2 font-semibold">{a.nro_op}</td>
                   <td className="py-2 text-slate-700 truncate max-w-[200px]">{a.material}</td>
-                  <td className="py-2 text-right tabular-nums text-slate-500">{a.cant_esperada ? fmtNum4.format(a.cant_esperada) : '-'}</td>
+                  <td className="py-2 text-right tabular-nums text-slate-500">{fmtNum4.format(a.cant_cotizada)}</td>
                   <td className="py-2 text-right tabular-nums font-medium">{fmtNum4.format(a.cant_ejecutada)}</td>
                   <td className="py-2 text-right tabular-nums font-bold text-red-600">{fmtCOP.format(a.impacto)}</td>
                 </tr>
@@ -107,13 +107,13 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
       {/* Table - Ahorros */}
       {ahorros.length > 0 && (
         <div className="mb-10 print:break-before-auto">
-          <h3 className="text-lg font-bold text-emerald-700 border-b border-emerald-200 pb-2 mb-4">Materiales con ahorro</h3>
+          <h3 className="text-lg font-bold text-emerald-700 border-b border-emerald-200 pb-2 mb-4">Materiales con ahorro por cantidad</h3>
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="text-slate-500 uppercase tracking-wider text-xs border-b-2 border-slate-200">
                 <th className="py-2">OP</th>
                 <th className="py-2">Material</th>
-                <th className="py-2 text-right">Cant. Esp.</th>
+                <th className="py-2 text-right">Cant. Cot.</th>
                 <th className="py-2 text-right">Cant. Ejec.</th>
                 <th className="py-2 text-right">Efecto ($)</th>
               </tr>
@@ -123,7 +123,7 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
                 <tr key={i} className="print:break-inside-avoid">
                   <td className="py-2 font-semibold">{a.nro_op}</td>
                   <td className="py-2 text-slate-700 truncate max-w-[200px]">{a.material}</td>
-                  <td className="py-2 text-right tabular-nums text-slate-500">{a.cant_esperada ? fmtNum4.format(a.cant_esperada) : '-'}</td>
+                  <td className="py-2 text-right tabular-nums text-slate-500">{fmtNum4.format(a.cant_cotizada)}</td>
                   <td className="py-2 text-right tabular-nums font-medium">{fmtNum4.format(a.cant_ejecutada)}</td>
                   <td className="py-2 text-right tabular-nums font-bold text-emerald-600">+{fmtCOP.format(a.impacto)}</td>
                 </tr>

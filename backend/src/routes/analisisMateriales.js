@@ -31,10 +31,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     return res.json(cached);
   }
 
-  // Se traen las cantidades de OP, se calcula factor_volumen, cant_esperada, y los tres efectos.
   // Convención: efecto negativo = sobrecosto.
-  // efecto_volumen = (cant_cot - cant_esp) * Pcot
-  // efecto_rendimiento = (cant_esp - cant_ejec) * Pcot
+  // efecto_cantidad = (cant_cot - cant_ejec) * Pcot
   // efecto_precio = (Pcot - Preal) * cant_ejec
   
   const sql = `
@@ -42,8 +40,6 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       d.nro_op,
       d.referencia,
       d.item AS material,
-      o.cantidades_cotizado AS op_cant_cotizada,
-      o.cantidades_ejecutado AS op_cant_ejecutada,
       
       ROUND(d.cant_cotizada, 4) AS cant_cotizada,
       ROUND(d.cant_ejecutada, 4) AS cant_ejecutada,
@@ -74,40 +70,26 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     const pReal = parseFloat(r.precio_real);
     const cantCot = parseFloat(r.cant_cotizada) || 0;
     const cantEjec = parseFloat(r.cant_ejecutada) || 0;
-    const opCantCot = parseFloat(r.op_cant_cotizada) || 0;
-    const opCantEjec = parseFloat(r.op_cant_ejecutada) || 0;
     const valCot = parseFloat(r.valor_cotizado) || 0;
     const valEjec = parseFloat(r.valor_ejecutado) || 0;
     const cump = parseFloat(r.cumplimiento) || 0;
 
-    let factorVolumen = 1;
-    let cantEsperada = cantCot;
-    let efectoVolumen = 0;
-    let efectoRendimiento = 0;
+    let efectoCantidad = 0;
     let efectoPrecio = 0;
     let calculable = false;
 
-    // Si hay datos para hacer los cálculos
-    if (opCantCot > 0 && cantCot > 0 && !isNaN(pCot)) {
+    if (cantCot > 0 && !isNaN(pCot)) {
       calculable = true;
-      factorVolumen = opCantEjec / opCantCot;
-      cantEsperada = cantCot * factorVolumen;
-      
-      efectoVolumen = (cantCot - cantEsperada) * pCot;
-      efectoRendimiento = (cantEsperada - cantEjec) * pCot;
+      efectoCantidad = (cantCot - cantEjec) * pCot;
       
       if (!isNaN(pReal) && cantEjec > 0) {
         efectoPrecio = (pCot - pReal) * cantEjec;
       } else if (cantEjec === 0) {
-        // No ejecutado, efecto precio no aplica
         efectoPrecio = 0;
       }
     } else if (cantCot === 0 && cantEjec > 0) {
-      // No cotizado (Sustituido o añadido) -> Todo el valor ejecutado es sobrecosto de rendimiento (pérdida)
-      efectoRendimiento = -valEjec;
-      calculable = false;
-    } else if (opCantCot === 0) {
-      // OP sin cotizar, no se puede medir rendimiento esperado
+      // No cotizado -> Todo el valor ejecutado es sobrecosto de cantidad
+      efectoCantidad = -valEjec;
       calculable = false;
     }
 
@@ -116,7 +98,6 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       referencia: r.referencia,
       material: r.material,
       cant_cotizada: cantCot,
-      cant_esperada: calculable ? parseFloat(cantEsperada.toFixed(4)) : null,
       cant_ejecutada: cantEjec,
       diferencia_cant_pct: r.diferencia_cant_pct,
       valor_cotizado: valCot,
@@ -124,8 +105,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       cumplimiento: cump,
       precio_cotizado: isNaN(pCot) ? null : pCot,
       precio_real: isNaN(pReal) ? null : pReal,
-      efecto_volumen: calculable ? parseFloat(efectoVolumen.toFixed(2)) : null,
-      efecto_rendimiento: calculable || (cantCot === 0 && cantEjec > 0) ? parseFloat(efectoRendimiento.toFixed(2)) : null,
+      efecto_cantidad: calculable || (cantCot === 0 && cantEjec > 0) ? parseFloat(efectoCantidad.toFixed(2)) : null,
       efecto_precio: calculable && cantEjec > 0 ? parseFloat(efectoPrecio.toFixed(2)) : null,
       calculable
     };

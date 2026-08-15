@@ -45,17 +45,16 @@ export default function AnalisisMateriales() {
   }, [fechaInicio, fechaFin]);
 
   const groupedData = useMemo(() => {
-    const groups: Record<string, { op: string, referencia: string, actividades: LineaMaterial[], subtotalVolumen: number, subtotalRendimiento: number, subtotalPrecio: number, subtotalCumplimiento: number }> = {};
+    const groups: Record<string, { op: string, referencia: string, actividades: LineaMaterial[], subtotalCantidad: number, subtotalPrecio: number, subtotalCumplimiento: number }> = {};
     
-    let rendimientoSobrecosto = 0;
+    let cantidadSobrecosto = 0;
     let countSobrecosto = 0;
     
-    let rendimientoAhorro = 0;
+    let cantidadAhorro = 0;
     let countAhorro = 0;
     
     let casosEspeciales = 0;
 
-    let efectoVolumenTotal = 0;
     let efectoPrecioTotal = 0;
 
     detalle.forEach(d => {
@@ -65,8 +64,7 @@ export default function AnalisisMateriales() {
           op: opKey,
           referencia: d.referencia,
           actividades: [],
-          subtotalVolumen: 0,
-          subtotalRendimiento: 0,
+          subtotalCantidad: 0,
           subtotalPrecio: 0,
           subtotalCumplimiento: 0
         };
@@ -74,27 +72,24 @@ export default function AnalisisMateriales() {
       
       groups[opKey].actividades.push(d);
       
-      const vol = d.efecto_volumen || 0;
-      const ren = d.efecto_rendimiento || 0;
+      const cant = d.efecto_cantidad || 0;
       const pre = d.efecto_precio || 0;
       const cump = parseFloat(d.cumplimiento as any) || 0;
       
-      groups[opKey].subtotalVolumen += vol;
-      groups[opKey].subtotalRendimiento += ren;
+      groups[opKey].subtotalCantidad += cant;
       groups[opKey].subtotalPrecio += pre;
       groups[opKey].subtotalCumplimiento += cump;
 
-      efectoVolumenTotal += vol;
       efectoPrecioTotal += pre;
 
       if (!d.calculable || d.cant_cotizada === 0 || d.cant_ejecutada === 0) {
         casosEspeciales++;
       } else {
-        if (ren < 0) {
-          rendimientoSobrecosto += ren;
+        if (cant < 0) {
+          cantidadSobrecosto += cant;
           countSobrecosto++;
-        } else if (ren > 0) {
-          rendimientoAhorro += ren;
+        } else if (cant > 0) {
+          cantidadAhorro += cant;
           countAhorro++;
         }
       }
@@ -109,10 +104,9 @@ export default function AnalisisMateriales() {
     return {
       grupos: sortedGroups,
       metricas: {
-        rendimientoSobrecosto, countSobrecosto,
-        rendimientoAhorro, countAhorro,
+        cantidadSobrecosto, countSobrecosto,
+        cantidadAhorro, countAhorro,
         casosEspeciales,
-        efectoVolumenTotal,
         efectoPrecioTotal
       },
       totalActividades: detalle.length
@@ -140,7 +134,7 @@ export default function AnalisisMateriales() {
           <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-probolsas-cyan"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>
           Análisis de Materiales — Franklin
         </h1>
-        <p className="text-slate-500 mt-2 font-medium">Impacto en costos de materiales, aislando los efectos de volumen y precio.</p>
+        <p className="text-slate-500 mt-2 font-medium">Impacto en costos de materiales, aislando los efectos de cantidad y precio.</p>
       </div>
 
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/60 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -192,29 +186,35 @@ export default function AnalisisMateriales() {
       ) : (
         <div className="space-y-8">
           
+          <div className="bg-amber-50/50 border border-amber-200 text-amber-800 p-4 rounded-xl flex gap-3 text-sm mb-6 items-start">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <div>
+              <p className="font-medium">
+                Este análisis compara consumo ejecutado contra cotizado sin ajustar por volumen de producción. Si una OP produjo más unidades de las cotizadas, parte del mayor consumo es esperado y no representa merma. El ajuste por volumen se habilitará cuando esté disponible el dato de cantidades producidas.
+              </p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            {/* Rendimiento Sobrecosto */}
             <div className="bg-red-50/50 p-6 rounded-2xl border border-red-100 shadow-sm flex flex-col items-center text-center relative overflow-hidden group hover:border-red-200 transition-colors">
               <div className="absolute -right-4 -top-4 w-24 h-24 bg-red-500/5 rounded-full blur-xl group-hover:bg-red-500/10 transition-colors"></div>
-              <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-2 bg-red-100 px-3 py-1 rounded-full relative z-10">Rendimiento · Sobrecosto</span>
+              <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-2 bg-red-100 px-3 py-1 rounded-full relative z-10">Cantidad · Sobrecosto</span>
               <span className="text-3xl font-black text-red-600 relative z-10">
-                {fmtCOP.format(groupedData.metricas.rendimientoSobrecosto)}
+                {fmtCOP.format(groupedData.metricas.cantidadSobrecosto)}
               </span>
               <span className="text-xs text-slate-500 mt-2 font-medium relative z-10">En {groupedData.metricas.countSobrecosto} actividades de producción</span>
             </div>
 
-            {/* Rendimiento Ahorro */}
             <div className="bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100 shadow-sm flex flex-col items-center text-center relative overflow-hidden group hover:border-emerald-200 transition-colors">
               <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-colors"></div>
-              <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-2 bg-emerald-100 px-3 py-1 rounded-full relative z-10">Rendimiento · Ahorro</span>
+              <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-2 bg-emerald-100 px-3 py-1 rounded-full relative z-10">Cantidad · Ahorro</span>
               <span className="text-3xl font-black text-emerald-600 relative z-10">
-                +{fmtCOP.format(groupedData.metricas.rendimientoAhorro)}
+                +{fmtCOP.format(groupedData.metricas.cantidadAhorro)}
               </span>
               <span className="text-xs text-slate-500 mt-2 font-medium relative z-10">En {groupedData.metricas.countAhorro} actividades de producción</span>
             </div>
 
-            {/* Casos Especiales */}
             <div className="bg-amber-50/50 p-6 rounded-2xl border border-amber-100 shadow-sm flex flex-col items-center text-center relative overflow-hidden group hover:border-amber-200 transition-colors">
               <div className="absolute -right-4 -top-4 w-24 h-24 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-colors"></div>
               <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-2 bg-amber-100 px-3 py-1 rounded-full relative z-10">Casos Especiales</span>
@@ -227,7 +227,6 @@ export default function AnalisisMateriales() {
           </div>
 
           <div className="text-center text-sm font-medium text-slate-500 bg-slate-100/50 py-3 rounded-xl border border-slate-200/50">
-            <span className="inline-block mr-4">Efecto volumen: <strong className="text-slate-700">{fmtCOP.format(groupedData.metricas.efectoVolumenTotal)}</strong> (esperado por mayor producción)</span>
             <span className="inline-block">Efecto precio: <strong className="text-slate-700">{fmtCOP.format(groupedData.metricas.efectoPrecioTotal)}</strong> (compras)</span>
           </div>
 
@@ -248,7 +247,6 @@ export default function AnalisisMateriales() {
                     <th className="px-6 py-3">OP / Referencia</th>
                     <th className="px-6 py-3">Material</th>
                     <th className="px-6 py-3 text-right">Cant. Cotizada</th>
-                    <th className="px-6 py-3 text-right bg-slate-50/50" title="Consumo Esperado (ajustado por factor volumen)">Consumo Esp.</th>
                     <th className="px-6 py-3 text-right">Cant. Ejecutada</th>
                     <th className="px-6 py-3 text-right">Vr. Cotizado</th>
                     <th className="px-6 py-3 text-right">Vr. Ejecutado</th>
@@ -260,7 +258,7 @@ export default function AnalisisMateriales() {
                     <Fragment key={`g-${gIndex}`}>
                       
                       <tr className="bg-slate-50/80 hover:bg-slate-100/80 transition-colors">
-                        <td colSpan={9} className="px-6 py-3">
+                        <td colSpan={8} className="px-6 py-3">
                           <div className="flex justify-between items-center w-full">
                             <div className="flex items-center gap-3">
                               <button 
@@ -290,7 +288,7 @@ export default function AnalisisMateriales() {
                       {grupo.actividades.map((d, i) => {
                         const id = `${grupo.op}-${i}`;
                         const isExpanded = opFilaDesplegada === id;
-                        const hasDescuadre = Math.abs((d.efecto_volumen || 0) + (d.efecto_rendimiento || 0) + (d.efecto_precio || 0) - parseFloat(d.cumplimiento as any)) > 100 && d.calculable;
+                        const hasDescuadre = Math.abs((d.efecto_cantidad || 0) + (d.efecto_precio || 0) - parseFloat(d.cumplimiento as any)) > 100 && d.calculable;
                         const esNoCotizado = d.cant_cotizada === 0;
                         const esNoEjecutado = d.cant_ejecutada === 0;
 
@@ -312,9 +310,6 @@ export default function AnalisisMateriales() {
                                 {esNoEjecutado && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600">No ejecutado</span>}
                               </td>
                               <td className="px-6 py-3 text-right tabular-nums text-slate-500">{fmtNum4.format(d.cant_cotizada)}</td>
-                              <td className="px-6 py-3 text-right tabular-nums font-semibold text-slate-700 bg-slate-50/50">
-                                {d.calculable ? fmtNum4.format(d.cant_esperada!) : '-'}
-                              </td>
                               <td className="px-6 py-3 text-right tabular-nums font-medium text-slate-800">{fmtNum4.format(d.cant_ejecutada)}</td>
                               <td className="px-6 py-3 text-right tabular-nums text-slate-500">{fmtCOP.format(d.valor_cotizado)}</td>
                               <td className="px-6 py-3 text-right tabular-nums text-slate-700">{fmtCOP.format(d.valor_ejecutado)}</td>
@@ -330,8 +325,8 @@ export default function AnalisisMateriales() {
                             
                             {isExpanded && (
                               <tr className="bg-slate-50 border-b border-slate-200">
-                                <td colSpan={9} className="px-14 py-4">
-                                  <div className="grid grid-cols-5 gap-4">
+                                <td colSpan={8} className="px-14 py-4">
+                                  <div className="grid grid-cols-4 gap-4">
                                     <div>
                                       <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Precio Cotizado</span>
                                       <span className="font-medium text-slate-700">{d.precio_cotizado ? fmtCOP.format(d.precio_cotizado) : '-'}</span>
@@ -341,15 +336,9 @@ export default function AnalisisMateriales() {
                                       <span className="font-medium text-slate-700">{d.precio_real ? fmtCOP.format(d.precio_real) : '-'}</span>
                                     </div>
                                     <div className="bg-slate-100 p-2 rounded border border-slate-200">
-                                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Efecto Volumen</span>
-                                      <span className={`font-bold ${d.efecto_volumen && d.efecto_volumen < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                                        {d.efecto_volumen !== null ? fmtCOP.format(d.efecto_volumen) : '-'}
-                                      </span>
-                                    </div>
-                                    <div className="bg-slate-100 p-2 rounded border border-slate-200">
-                                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Efecto Rendimiento</span>
-                                      <span className={`font-bold ${d.efecto_rendimiento && d.efecto_rendimiento < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                                        {d.efecto_rendimiento !== null ? fmtCOP.format(d.efecto_rendimiento) : '-'}
+                                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold block mb-1">Efecto Cantidad</span>
+                                      <span className={`font-bold ${d.efecto_cantidad && d.efecto_cantidad < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                        {d.efecto_cantidad !== null ? fmtCOP.format(d.efecto_cantidad) : '-'}
                                       </span>
                                     </div>
                                     <div className="bg-slate-100 p-2 rounded border border-slate-200">

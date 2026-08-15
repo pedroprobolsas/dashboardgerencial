@@ -114,7 +114,6 @@ export interface LineaMaterial {
   referencia: string;
   material: string;
   cant_cotizada: number;
-  cant_esperada: number | null;
   cant_ejecutada: number;
   diferencia_cant_pct: number | string | null;
   valor_cotizado: number;
@@ -122,8 +121,7 @@ export interface LineaMaterial {
   cumplimiento: number;
   precio_cotizado: number | null;
   precio_real: number | null;
-  efecto_volumen: number | null;
-  efecto_rendimiento: number | null;
+  efecto_cantidad: number | null;
   efecto_precio: number | null;
   calculable: boolean;
 }
