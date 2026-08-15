@@ -2,7 +2,7 @@ import type { LineaMaterial } from '../../services/api';
 import InformePDFModal from './InformePDFModal';
 
 const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
-const fmtNum = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 });
+
 const fmtNum4 = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 4 });
 
 interface Props {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchCostoPorOrdenDetalle, type OPDetalleData } from '../../services/api';
+import InformePDFModal from './InformePDFModal';
 
 interface Props {
   nro_op: string;

@@ -4,7 +4,7 @@ import OpTrazabilidadModal from './OpTrazabilidadModal';
 import InformeMaterialesPDF from './InformeMaterialesPDF';
 
 const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
-const fmtNum = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 });
+
 const fmtNum4 = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 4 });
 
 export default function AnalisisMateriales() {
