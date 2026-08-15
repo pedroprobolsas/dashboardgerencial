@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
-import { fetchAnalisisResponsables, type LineaResponsable, type IndicadoresResponsables } from '../../services/api';
+import { fetchAnalisisResponsables, type LineaResponsable } from '../../services/api';
 import OpTrazabilidadModal from './OpTrazabilidadModal';
+import InformeResponsableModal from './InformeResponsableModal';
 
 const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 const fmtNum = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 });
@@ -19,11 +20,12 @@ export default function AnalisisResponsables() {
   });
   
   const [detalle, setDetalle] = useState<LineaResponsable[]>([]);
-  const [indicadores, setIndicadores] = useState<IndicadoresResponsables | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  
   const [opSeleccionada, setOpSeleccionada] = useState<string | null>(null);
+  const [informeAbierto, setInformeAbierto] = useState(false);
 
   useEffect(() => {
     const syncFromUrl = () => {
@@ -55,7 +57,6 @@ export default function AnalisisResponsables() {
     try {
       const data = await fetchAnalisisResponsables(fechaInicio, fechaFin);
       setDetalle(data.detalle);
-      setIndicadores(data.indicadores);
     } catch (err: any) {
       setError(err.message || 'Error de conexión');
     } finally {
@@ -80,8 +81,11 @@ export default function AnalisisResponsables() {
   const groupedData = useMemo(() => {
     const groups: Record<string, { op: string, referencia: string, actividades: any[], subtotalHoras: number, subtotalTarifa: number, subtotalCumplimiento: number }> = {};
     
-    let overcostHorasCount = 0;
-    let overcostTarifaCount = 0;
+    let jesusSobrecosto = 0, jesusAhorro = 0;
+    let cristianSobrecosto = 0, cristianAhorro = 0;
+    
+    let countJesusSobrecosto = 0, countJesusAhorro = 0;
+    let countCristianSobrecosto = 0, countCristianAhorro = 0;
 
     detalle.forEach(d => {
       const opKey = String(d.nro_op);
@@ -105,8 +109,21 @@ export default function AnalisisResponsables() {
       groups[opKey].subtotalTarifa += efTarifa;
       groups[opKey].subtotalCumplimiento += cumplimiento;
 
-      if (efHoras < 0) overcostHorasCount++;
-      if (efTarifa < 0) overcostTarifaCount++;
+      if (efHoras < 0) {
+        jesusSobrecosto += efHoras;
+        countJesusSobrecosto++;
+      } else if (efHoras > 0) {
+        jesusAhorro += efHoras;
+        countJesusAhorro++;
+      }
+
+      if (efTarifa < 0) {
+        cristianSobrecosto += efTarifa;
+        countCristianSobrecosto++;
+      } else if (efTarifa > 0) {
+        cristianAhorro += efTarifa;
+        countCristianAhorro++;
+      }
     });
 
     const sortedGroups = Object.values(groups).sort((a, b) => a.subtotalCumplimiento - b.subtotalCumplimiento);
@@ -117,8 +134,12 @@ export default function AnalisisResponsables() {
     
     return {
       grupos: sortedGroups,
-      overcostHorasCount,
-      overcostTarifaCount,
+      metricas: {
+        jesusSobrecosto, jesusAhorro,
+        cristianSobrecosto, cristianAhorro,
+        countJesusSobrecosto, countJesusAhorro,
+        countCristianSobrecosto, countCristianAhorro,
+      },
       totalActividades: detalle.length
     };
   }, [detalle]);
@@ -127,7 +148,7 @@ export default function AnalisisResponsables() {
     <div className="flex flex-col h-full bg-slate-50 overflow-hidden">
       
       {/* Header */}
-      <header className="px-8 py-6 bg-white border-b border-slate-200 shrink-0 flex flex-wrap gap-4 justify-between items-end">
+      <header className="px-8 py-6 bg-white border-b border-slate-200 shrink-0 flex flex-wrap gap-4 justify-between items-end print:hidden">
         <div>
           <h2 className="text-2xl font-bold text-dashboard-textMain">Análisis por Responsable</h2>
           <p className="text-sm text-dashboard-textMuted mt-1">Variación de costos (Efecto Horas vs Efecto Tarifa) en Mano de Obra</p>
@@ -152,34 +173,59 @@ export default function AnalisisResponsables() {
               className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-dashboard-textMain bg-slate-50 focus:outline-none focus:ring-2 focus:ring-probolsas-cyan"
             />
           </div>
+          <button 
+            onClick={() => setInformeAbierto(true)}
+            className="ml-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold rounded-lg shadow-sm flex items-center gap-2 transition-colors self-end"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 18H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9l5 5v2"></path><rect x="14" y="14" width="8" height="8" rx="2"></rect><line x1="18" y1="14" x2="18" y2="22"></line><line x1="14" y1="18" x2="22" y2="18"></line></svg>
+            Generar Informe
+          </button>
         </div>
       </header>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto p-8 flex flex-col gap-6">
+      <div className="flex-1 overflow-auto p-8 flex flex-col gap-6 print:hidden">
 
-        {/* Tarjetas de Métricas Globales */}
-        {indicadores && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 bg-slate-100 px-3 py-1 rounded-full">Efecto Horas (Jesús)</span>
-              <span className={`text-3xl font-black ${indicadores.jesus_efecto_horas < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                {indicadores.jesus_efecto_horas > 0 ? '+' : ''}{fmtCOP.format(indicadores.jesus_efecto_horas)}
-              </span>
-              <span className="text-xs text-slate-400 mt-2 font-medium">En {groupedData.overcostHorasCount} de {groupedData.totalActividades} actividades se usaron más horas de las cotizadas</span>
-              <span className="text-xs text-slate-400 mt-1">Impacto en pesos por variación en la cantidad de horas ejecutadas.</span>
-            </div>
-            
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 bg-slate-100 px-3 py-1 rounded-full">Efecto Tarifa (Cristian)</span>
-              <span className={`text-3xl font-black ${indicadores.cristian_efecto_tarifa < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                {indicadores.cristian_efecto_tarifa > 0 ? '+' : ''}{fmtCOP.format(indicadores.cristian_efecto_tarifa)}
-              </span>
-              <span className="text-xs text-slate-400 mt-2 font-medium">En {groupedData.overcostTarifaCount} de {groupedData.totalActividades} actividades la tarifa superó el presupuesto</span>
-              <span className="text-xs text-slate-400 mt-1">Impacto en pesos por variación en la tarifa ($/hora) ejecutada.</span>
-            </div>
+        {/* Tarjetas de Métricas Separadas */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          {/* Jesús Sobrecosto */}
+          <div className="bg-red-50/50 p-5 rounded-2xl border border-red-100 shadow-sm flex flex-col items-center text-center">
+            <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-2 bg-red-100 px-3 py-1 rounded-full">Efecto Horas (Jesús) · Sobrecosto</span>
+            <span className="text-3xl font-black text-red-600">
+              {fmtCOP.format(groupedData.metricas.jesusSobrecosto)}
+            </span>
+            <span className="text-xs text-slate-500 mt-2 font-medium">En {groupedData.metricas.countJesusSobrecosto} de {groupedData.totalActividades} actividades</span>
           </div>
-        )}
+
+          {/* Jesús Ahorro */}
+          <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 shadow-sm flex flex-col items-center text-center">
+            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-2 bg-emerald-100 px-3 py-1 rounded-full">Efecto Horas (Jesús) · Ahorro</span>
+            <span className="text-3xl font-black text-emerald-600">
+              +{fmtCOP.format(groupedData.metricas.jesusAhorro)}
+            </span>
+            <span className="text-xs text-slate-500 mt-2 font-medium">En {groupedData.metricas.countJesusAhorro} de {groupedData.totalActividades} actividades</span>
+          </div>
+          
+          {/* Cristian Sobrecosto */}
+          <div className="bg-red-50/50 p-5 rounded-2xl border border-red-100 shadow-sm flex flex-col items-center text-center">
+            <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-2 bg-red-100 px-3 py-1 rounded-full">Efecto Tarifa (Cris) · Sobrecosto</span>
+            <span className="text-3xl font-black text-red-600">
+              {fmtCOP.format(groupedData.metricas.cristianSobrecosto)}
+            </span>
+            <span className="text-xs text-slate-500 mt-2 font-medium">En {groupedData.metricas.countCristianSobrecosto} de {groupedData.totalActividades} actividades</span>
+          </div>
+
+          {/* Cristian Ahorro */}
+          <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 shadow-sm flex flex-col items-center text-center">
+            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-2 bg-emerald-100 px-3 py-1 rounded-full">Efecto Tarifa (Cris) · Ahorro</span>
+            <span className="text-3xl font-black text-emerald-600">
+              +{fmtCOP.format(groupedData.metricas.cristianAhorro)}
+            </span>
+            <span className="text-xs text-slate-500 mt-2 font-medium">En {groupedData.metricas.countCristianAhorro} de {groupedData.totalActividades} actividades</span>
+          </div>
+
+        </div>
 
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col">
           
@@ -359,6 +405,15 @@ export default function AnalisisResponsables() {
         <OpTrazabilidadModal
           nro_op={opSeleccionada}
           onClose={closeModal}
+        />
+      )}
+
+      {informeAbierto && (
+        <InformeResponsableModal
+          detalle={detalle}
+          fechaInicio={fechaInicio}
+          fechaFin={fechaFin}
+          onClose={() => setInformeAbierto(false)}
         />
       )}
     </div>

@@ -23,3 +23,20 @@
     @apply bg-dashboard-canvas text-dashboard-textMain font-sans antialiased;
   }
 }
+
+@media print {
+  @page {
+    margin: 1.5cm;
+    size: portrait;
+  }
+  body, html {
+    background: transparent !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  #root {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
