@@ -19,6 +19,7 @@ const margenGlobalRouter   = require('./routes/margenGlobal');
 const analisisResponsablesRouter = require('./routes/analisisResponsables');
 const analisisMaterialesRouter   = require('./routes/analisisMateriales');
 const informesRouter       = require('./routes/informes');
+const parametrosRouter     = require('./routes/parametros');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -54,6 +55,7 @@ const ENDPOINTS_REGISTRADOS = [
   'GET  /api/cierres/bandeja',
   'POST /api/cierres/:area',
   'GET  /api/cierres/prefill/:area',
+  'GET  /api/parametros',
 ];
 
 app.get('/api/health', async (_req, res) => {
@@ -120,6 +122,7 @@ app.use('/api/margen_global',     margenGlobalRouter);
 app.use('/api/analisis_responsables', analisisResponsablesRouter);
 app.use('/api/analisis_materiales', analisisMaterialesRouter);
 app.use('/api/informes',          informesRouter);
+app.use('/api/parametros',        parametrosRouter);
 
 // ── Error handler global ──────────────────────────────────────────────────────
 

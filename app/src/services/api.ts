@@ -111,6 +111,7 @@ export async function fetchKPIs(periodo?: string, fecha?: string): Promise<Respu
 
 export interface LineaMaterial {
   nro_op: string;
+  fecha: string;
   referencia: string;
   material: string;
   cant_cotizada: number;
@@ -138,6 +139,48 @@ export async function fetchAnalisisMateriales(fechaInicio: string, fechaFin: str
     detalle: data.detalle || [],
     total: data.total || 0,
   };
+}
+
+// ── Parámetros y Configuración ────────────────────────────────────────────────
+
+export interface Parametro {
+  valor: number;
+  unidad?: string;
+  descripcion?: string;
+  categoria?: string;
+  vigente_desde: string;
+  vigente_hasta?: string;
+  modificado_por: string;
+  modificado_en?: string;
+  clave?: string;
+  id?: number;
+}
+
+export async function fetchParametros(fecha?: string): Promise<Record<string, Parametro>> {
+  const url = fecha ? `/api/parametros?fecha=${fecha}` : '/api/parametros';
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  const data = await res.json();
+  return data.parametros || {};
+}
+
+export async function fetchHistorialParametros(): Promise<Parametro[]> {
+  const res = await fetch('/api/parametros/historico');
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  const data = await res.json();
+  return data.historico || [];
+}
+
+export async function updateParametro(clave: string, valor: number, modificado_por: string): Promise<void> {
+  const res = await fetch('/api/parametros', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clave, valor, modificado_por }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Error ${res.status} al actualizar parámetro`);
+  }
 }
 
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
-import { fetchAnalisisMateriales, type LineaMaterial } from '../../services/api';
+import { fetchAnalisisMateriales, type LineaMaterial, fetchParametros, fetchHistorialParametros, type Parametro } from '../../services/api';
 import OpTrazabilidadModal from './OpTrazabilidadModal';
 import InformeMaterialesPDF from './InformeMaterialesPDF';
 
@@ -21,6 +21,9 @@ export default function AnalisisMateriales() {
   const [detalle, setDetalle] = useState<LineaMaterial[]>([]);
   const [totalItems, setTotalItems] = useState(0);
 
+  const [parametrosFin, setParametrosFin] = useState<Record<string, Parametro>>({});
+  const [historialParams, setHistorialParams] = useState<Parametro[]>([]);
+
   const [opSeleccionada, setOpSeleccionada] = useState<string | null>(null);
   const [opFilaDesplegada, setOpFilaDesplegada] = useState<string | null>(null);
   const [filtroEspecial, setFiltroEspecial] = useState<'alias' | 'cotizado_sin_usar' | 'sustitucion' | 'consumo_extra' | null>(null);
@@ -31,9 +34,15 @@ export default function AnalisisMateriales() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchAnalisisMateriales(fechaInicio, fechaFin);
+      const [data, pFin, hist] = await Promise.all([
+        fetchAnalisisMateriales(fechaInicio, fechaFin),
+        fetchParametros(fechaFin),
+        fetchHistorialParametros()
+      ]);
       setDetalle(data.detalle);
       setTotalItems(data.total);
+      setParametrosFin(pFin);
+      setHistorialParams(hist);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -44,6 +53,18 @@ export default function AnalisisMateriales() {
   useEffect(() => {
     fetchData();
   }, [fechaInicio, fechaFin]);
+
+  const getParamValor = (clave: string, fecha?: string) => {
+    if (!fecha) return parametrosFin[clave]?.valor;
+    const dateStr = new Date(fecha).toISOString().split('T')[0];
+    const history = historialParams.filter(p => p.clave === clave);
+    const matched = history.find(p => {
+      const from = p.vigente_desde.split('T')[0];
+      const to = p.vigente_hasta ? p.vigente_hasta.split('T')[0] : null;
+      return dateStr >= from && (!to || dateStr <= to);
+    });
+    return matched?.valor ?? parametrosFin[clave]?.valor;
+  };
 
   const dataProcesada = useMemo(() => {
     const getWords = (name: string) => {
@@ -113,7 +134,8 @@ export default function AnalisisMateriales() {
           if (matchedEjec.has(e)) continue;
           if (hasSharedWord(c.material, e.material)) {
             const diff = Math.abs(e.cant_ejecutada - c.cant_cotizada) / c.cant_cotizada;
-            if (diff < 0.05) {
+            const tol = (getParamValor('alias_tolerancia_cantidad', c.fecha) ?? 5) / 100;
+            if (diff <= tol) {
               c.tipo_especial = 'alias';
               e.tipo_especial = 'alias';
               c.par_id = e.material;
@@ -159,7 +181,7 @@ export default function AnalisisMateriales() {
     }
 
     return result;
-  }, [detalle]);
+  }, [detalle, parametrosFin, historialParams]);
 
   const groupedData = useMemo(() => {
     const groups: Record<string, { op: string, referencia: string, actividades: typeof dataProcesada, subtotalCumplimiento: number, subtotalImpacto: number }> = {};
@@ -183,6 +205,10 @@ export default function AnalisisMateriales() {
     let countConsumoExtra = 0;
 
     let efectoPrecioTotal = 0;
+    
+    // exactitud presupuesto
+    let sumErroresPrec = 0;
+    let countErroresPrec = 0;
 
     dataProcesada.forEach(d => {
       const opKey = String(d.nro_op);
@@ -206,6 +232,11 @@ export default function AnalisisMateriales() {
       groups[opKey].subtotalImpacto += imp;
 
       efectoPrecioTotal += pre;
+      
+      if (d.costo_unit_cotizado && d.costo_unit_cotizado > 0 && d.costo_unit_ejecutado !== null) {
+        sumErroresPrec += Math.abs(d.costo_unit_ejecutado - d.costo_unit_cotizado) / d.costo_unit_cotizado;
+        countErroresPrec++;
+      }
 
       if (d.tipo_especial === 'alias') {
         cantidadAlias += imp;
@@ -239,6 +270,25 @@ export default function AnalisisMateriales() {
     });
     
     const showBanner = dataProcesada.some(d => !d.isAjustado) && dataProcesada.length > 0;
+    
+    const exactitudPresupuesto = countErroresPrec > 0 ? (1 - (sumErroresPrec / countErroresPrec)) * 100 : 100;
+    
+    let opsConAlias = 0;
+    let opsConCsu = 0;
+    let opsConSustitucion = 0;
+    let opsLimpias = 0;
+
+    sortedGroups.forEach(g => {
+      const hasAlias = g.actividades.some(a => a.tipo_especial === 'alias');
+      const hasCsu = g.actividades.some(a => a.tipo_especial === 'cotizado_sin_usar');
+      const hasSus = g.actividades.some(a => a.tipo_especial === 'sustitucion');
+      const hasAnySpecial = g.actividades.some(a => a.tipo_especial && a.tipo_especial !== 'normal');
+      
+      if (hasAlias) opsConAlias++;
+      if (hasCsu) opsConCsu++;
+      if (hasSus) opsConSustitucion++;
+      if (!hasAnySpecial) opsLimpias++;
+    });
 
     return {
       grupos: sortedGroups,
@@ -250,6 +300,14 @@ export default function AnalisisMateriales() {
         cantidadSustitucion, countSustitucion,
         cantidadConsumoExtra, countConsumoExtra,
         efectoPrecioTotal
+      },
+      calidad: {
+        opsTotal: sortedGroups.length,
+        opsLimpias,
+        opsConAlias,
+        opsConCsu,
+        opsConSustitucion,
+        exactitudPresupuesto
       },
       showBanner,
       totalActividades: dataProcesada.length
@@ -339,6 +397,71 @@ export default function AnalisisMateriales() {
               </div>
             </div>
           )}
+          
+          {(() => {
+            const opsTotal = groupedData.calidad.opsTotal;
+            const pctLimpias = opsTotal ? (groupedData.calidad.opsLimpias / opsTotal) * 100 : 0;
+            const pctAlias = opsTotal ? (groupedData.calidad.opsConAlias / opsTotal) * 100 : 0;
+            const pctCsu = opsTotal ? (groupedData.calidad.opsConCsu / opsTotal) * 100 : 0;
+            const pctSus = opsTotal ? (groupedData.calidad.opsConSustitucion / opsTotal) * 100 : 0;
+
+            const metaLimpias = getParamValor('meta_ops_limpias') ?? 80;
+            const metaAlias = getParamValor('meta_ops_con_alias') ?? 0;
+            const metaCsu = getParamValor('meta_ops_cotizado_sin_usar') ?? 10;
+            const metaSus = getParamValor('meta_ops_sustitucion') ?? 15;
+
+            return (
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm mb-6">
+                <h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider flex items-center gap-2">
+                  <span className="text-xl">🎯</span> Calidad de registro del período
+                </h3>
+                
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  
+                  <div className="md:col-span-1 flex flex-col justify-center border-r border-slate-100 pr-4">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Exactitud Presup.</span>
+                    <span className={`text-2xl font-black ${groupedData.calidad.exactitudPresupuesto >= 95 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {groupedData.calidad.exactitudPresupuesto.toFixed(1)}%
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-1 leading-tight">Costo real vs cotizado</span>
+                  </div>
+                  
+                  <div className="flex flex-col border-r border-slate-100 pr-4">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">% OPs Limpias</span>
+                    <span className={`text-xl font-black ${pctLimpias >= metaLimpias ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {pctLimpias.toFixed(1)}%
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-1">Meta: {metaLimpias}%</span>
+                  </div>
+                  
+                  <div className="flex flex-col border-r border-slate-100 pr-4">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">% con Alias</span>
+                    <span className={`text-xl font-black ${pctAlias <= metaAlias ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {pctAlias.toFixed(1)}%
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-1">Meta: {metaAlias}%</span>
+                  </div>
+                  
+                  <div className="flex flex-col border-r border-slate-100 pr-4">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">% Cot. sin usar</span>
+                    <span className={`text-xl font-black ${pctCsu <= metaCsu ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {pctCsu.toFixed(1)}%
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-1">Meta: {metaCsu}%</span>
+                  </div>
+                  
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">% Sustitución</span>
+                    <span className={`text-xl font-black ${pctSus <= metaSus ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {pctSus.toFixed(1)}%
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-1">Meta: {metaSus}%</span>
+                  </div>
+
+                </div>
+              </div>
+            );
+          })()}
 
           {groupedData.metricas.countAliasPares > 0 && (
             <div className="bg-indigo-50/80 border border-indigo-200 text-indigo-800 p-4 rounded-xl flex gap-3 text-sm mb-6 items-start">
@@ -509,7 +632,8 @@ export default function AnalisisMateriales() {
                         {actividadesFiltradas.map((d, i) => {
                           const id = `${grupo.op}-${i}`;
                           const isExpanded = opFilaDesplegada === id;
-                          const hasDescuadre = Math.abs((d.efecto_cantidad || 0) + (d.efecto_precio || 0) - parseFloat(d.cumplimiento as any)) > 500 && d.calculable;
+                          const umbral = getParamValor('descuadre_umbral', d.fecha) ?? 500;
+                          const hasDescuadre = Math.abs((d.efecto_cantidad || 0) + (d.efecto_precio || 0) - parseFloat(d.cumplimiento as any)) > umbral && d.calculable;
                           
                           let tag = null;
                           if (d.tipo_especial === 'alias') tag = <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">Alias</span>;

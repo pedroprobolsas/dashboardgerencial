@@ -7,9 +7,9 @@ export type Vista =
   | 'cierre-cartera'
   | 'cierre-talento-humano'
   | 'bandeja-aprobacion'
-  | 'costo-produccion-detalle'
   | 'analisis-responsables'
-  | 'analisis-materiales';
+  | 'analisis-materiales'
+  | 'configuracion';
 
 interface Props {
   vistaActual: Vista;
@@ -95,6 +95,14 @@ export default function Sidebar({ vistaActual, onNavegar, pendientesAprobacion }
                 {pendientesAprobacion}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => onNavegar('configuracion')}
+            className={`w-full text-left flex items-center gap-2.5 p-3 rounded-xl text-sm transition-colors duration-200
+              ${vistaActual === 'configuracion' ? 'bg-slate-700 text-white font-medium' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+          >
+            <span className="text-base leading-none">⚙️</span>
+            <span>Configuración</span>
           </button>
         </div>
 

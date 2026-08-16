@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchCostoPorOrden, type OrdenProduccion, type CostoPorOrdenResumen } from '../../services/api';
+import { fetchCostoPorOrden, type OrdenProduccion, type CostoPorOrdenResumen, fetchParametros } from '../../services/api';
 import OpTrazabilidadModal from './OpTrazabilidadModal';
 
 const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
@@ -52,13 +52,23 @@ export default function CostoProduccionDetalle() {
     setOpSeleccionada(null);
   };
 
-  const cargarDatos = async () => {
+  const cargarDatos = async (usarParametro = false) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchCostoPorOrden(fechaInicio, fechaFin, margenMinimo);
+      let margenToUse = margenMinimo;
+      
+      if (usarParametro) {
+        const parametros = await fetchParametros(fechaFin);
+        margenToUse = parametros['margen_umbral_critico']?.valor ?? 12.5;
+        setMargenMinimo(margenToUse);
+      }
+      
+      const data = await fetchCostoPorOrden(fechaInicio, fechaFin, margenToUse);
+      
       setOrdenes(data.ordenes);
       setResumen(data.resumen);
+      
     } catch (err: any) {
       setError(err.message || 'Error de conexión');
     } finally {
@@ -67,9 +77,14 @@ export default function CostoProduccionDetalle() {
   };
 
   useEffect(() => {
-    cargarDatos();
+    cargarDatos(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fechaInicio, fechaFin, margenMinimo]);
+  }, [fechaInicio, fechaFin]);
+
+  useEffect(() => {
+    cargarDatos(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [margenMinimo]);
 
   // Validar desactualización (> 7 días)
   let esDesactualizado = false;

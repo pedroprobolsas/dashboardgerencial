@@ -55,7 +55,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       END AS diferencia_cant_pct,
       
       ROUND(d.valor_cotizado / NULLIF(d.cant_cotizada, 0), 2) AS precio_cotizado,
-      ROUND(d.valor_ejecutado / NULLIF(d.cant_ejecutada, 0), 2) AS precio_real
+      ROUND(d.valor_ejecutado / NULLIF(d.cant_ejecutada, 0), 2) AS precio_real,
+      o.fecha
       
     FROM crisolweb.costo_por_orden_detalle d
     JOIN crisolweb.costo_por_orden o ON d.nro_op = o.nro_op AND d.referencia = o.referencia
@@ -97,6 +98,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
 
     return {
       nro_op: r.nro_op,
+      fecha: r.fecha,
       referencia: r.referencia,
       material: r.material,
       cant_cotizada: cantCot,
