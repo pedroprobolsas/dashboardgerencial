@@ -40,6 +40,60 @@ function checkAuthError(res: Response) {
   }
 }
 
+// ── Usuarios (CRUD) ──────────────────────────────────────────────────────────
+
+export async function fetchUsuarios(): Promise<Usuario[]> {
+  const res = await fetch('/api/usuarios');
+  checkAuthError(res);
+  if (!res.ok) throw new Error(`Error ${res.status}`);
+  const data = await res.json();
+  return data.usuarios || [];
+}
+
+export async function createUsuario(datos: Omit<Usuario, 'id'> & { password?: string }): Promise<Usuario> {
+  const res = await fetch('/api/usuarios', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos),
+  });
+  checkAuthError(res);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Error ${res.status}`);
+  }
+  const data = await res.json();
+  return data.usuario;
+}
+
+export async function updateUsuario(id: number, datos: Partial<Usuario> & { activo?: boolean }): Promise<Usuario> {
+  const res = await fetch(`/api/usuarios/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos),
+  });
+  checkAuthError(res);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Error ${res.status}`);
+  }
+  const data = await res.json();
+  return data.usuario;
+}
+
+export async function resetPassword(id: number, newPassword: string): Promise<void> {
+  const res = await fetch(`/api/usuarios/${id}/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ newPassword }),
+  });
+  checkAuthError(res);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Error ${res.status}`);
+  }
+}
+
+
 
 export interface KPIReal {
   id: string;

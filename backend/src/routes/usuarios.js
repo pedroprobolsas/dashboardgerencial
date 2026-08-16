@@ -66,6 +66,17 @@ router.patch('/:id', asyncHandler(ENDPOINT, async (req, res) => {
     updates.push(`nombre = $${paramIdx++}`);
     values.push(nombre);
   }
+  
+  // Protección de último admin
+  if (rol === 'usuario' || activo === false) {
+    // Si estoy intentando quitarle rol de admin o desactivarlo, verifico que no sea el último
+    const { rows: adminRows } = await query('SELECT id FROM app_ops.usuarios WHERE rol = $1 AND activo = true', ['admin']);
+    const isActiveAdmin = adminRows.some(a => String(a.id) === String(id));
+    if (isActiveAdmin && adminRows.length <= 1) {
+      return res.status(400).json({ ok: false, error: 'No puedes desactivar ni cambiar el rol del único administrador activo del sistema.' });
+    }
+  }
+
   if (rol !== undefined) {
     updates.push(`rol = $${paramIdx++}`);
     values.push(rol);
