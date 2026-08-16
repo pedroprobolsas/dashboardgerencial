@@ -1,6 +1,46 @@
 // Cliente HTTP para el backend Express en /api/*
 // En desarrollo, Vite proxía /api → http://localhost:3001
 
+// ── Auth ───────────────────────────────────────────────────────────────────────
+
+export interface Usuario {
+  id: number;
+  email: string;
+  nombre: string;
+  rol: 'admin' | 'usuario';
+}
+
+export async function login(email: string, password: string): Promise<Usuario> {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) throw new Error(data.error || 'Credenciales inválidas');
+  return data.user;
+}
+
+export async function logout(): Promise<void> {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  // Opcional: limpiar cache si es necesario
+}
+
+export async function fetchMe(): Promise<Usuario> {
+  const res = await fetch('/api/auth/me');
+  if (!res.ok) throw new Error('No autenticado');
+  const data = await res.json();
+  return data.user;
+}
+
+// Interceptor simple de errores: si una llamada a la API retorna 401, se dispara un evento global
+function checkAuthError(res: Response) {
+  if (res.status === 401) {
+    window.dispatchEvent(new Event('auth-error'));
+  }
+}
+
+
 export interface KPIReal {
   id: string;
   nombre: string;
@@ -86,6 +126,7 @@ export interface InformeBandeja {
 
 export async function fetchBandeja(): Promise<{ informes: InformeBandeja[] }> {
   const res = await fetch('/api/cierres/bandeja');
+  checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status} al cargar bandeja`);
   return res.json();
 }
@@ -105,6 +146,7 @@ export async function fetchKPIs(periodo?: string, fecha?: string): Promise<Respu
   const url = queryString ? `/api/kpis?${queryString}` : '/api/kpis';
   
   const res = await fetch(url);
+  checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status} al leer KPIs`);
   return res.json();
 }
@@ -133,6 +175,7 @@ export interface LineaMaterial {
 
 export async function fetchAnalisisMateriales(fechaInicio: string, fechaFin: string): Promise<{ detalle: LineaMaterial[], total: number }> {
   const res = await fetch(`/api/analisis_materiales?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`);
+  checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status}`);
   const data = await res.json();
   return {
@@ -159,6 +202,7 @@ export interface Parametro {
 export async function fetchParametros(fecha?: string): Promise<Record<string, Parametro>> {
   const url = fecha ? `/api/parametros?fecha=${fecha}` : '/api/parametros';
   const res = await fetch(url);
+  checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status}`);
   const data = await res.json();
   return data.parametros || {};
@@ -166,17 +210,19 @@ export async function fetchParametros(fecha?: string): Promise<Record<string, Pa
 
 export async function fetchHistorialParametros(): Promise<Parametro[]> {
   const res = await fetch('/api/parametros/historico');
+  checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status}`);
   const data = await res.json();
   return data.historico || [];
 }
 
-export async function updateParametro(clave: string, valor: number, modificado_por: string): Promise<void> {
+export async function updateParametro(clave: string, valor: number): Promise<void> {
   const res = await fetch('/api/parametros', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clave, valor, modificado_por }),
+    body: JSON.stringify({ clave, valor }),
   });
+  checkAuthError(res);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Error ${res.status} al actualizar parámetro`);
@@ -200,6 +246,7 @@ function periodoToRango(periodo: string): { fecha_inicio: string; fecha_fin: str
 export async function fetchVentasMes(periodo: string): Promise<KPIReal> {
   const { fecha_inicio, fecha_fin } = periodoToRango(periodo);
   const res = await fetch(`/api/ventas_mes?fecha_inicio=${fecha_inicio}&fecha_fin=${fecha_fin}`);
+  checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status}`);
   const data = await res.json();
   const bruto = data.resumen.total_bruto;
@@ -223,6 +270,7 @@ export async function fetchVentasMes(periodo: string): Promise<KPIReal> {
 
 export async function fetchCarteraAsesor(): Promise<KPIReal> {
   const res = await fetch('/api/cartera_por_asesor');
+  checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status}`);
   const data = await res.json();
   const { total, vencido, corriente, pct_vencido } = data.resumen;
@@ -247,6 +295,7 @@ export async function fetchCarteraAsesor(): Promise<KPIReal> {
 export async function fetchMargenGlobal(periodo: string): Promise<KPIReal> {
   const { fecha_inicio, fecha_fin } = periodoToRango(periodo);
   const res = await fetch(`/api/margen_global?fecha_inicio=${fecha_inicio}&fecha_fin=${fecha_fin}`);
+  checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status}`);
   const data = await res.json();
   return {
@@ -283,6 +332,7 @@ export interface CostoPorOrdenResumen {
 
 export async function fetchCostoPorOrden(fechaInicio: string, fechaFin: string, margenMinimo: number): Promise<{ ordenes: OrdenProduccion[], total: number, resumen: CostoPorOrdenResumen }> {
   const res = await fetch(`/api/costo_por_orden?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&margen_minimo=${margenMinimo}`);
+  checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status}`);
   const data = await res.json();
   return {
@@ -322,6 +372,7 @@ export interface OPDetalleData {
 
 export async function fetchCostoPorOrdenDetalle(nro_op: string): Promise<OPDetalleData> {
   const res = await fetch(`/api/costo_por_orden/${nro_op}`);
+  checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status}`);
   return res.json();
 }
@@ -350,6 +401,7 @@ export interface IndicadoresResponsables {
 
 export async function fetchAnalisisResponsables(fechaInicio: string, fechaFin: string): Promise<{ detalle: LineaResponsable[], indicadores: IndicadoresResponsables, total: number }> {
   const res = await fetch(`/api/analisis_responsables?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`);
+  checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status}`);
   const data = await res.json();
   return {
@@ -368,6 +420,7 @@ export async function enviarCierre(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(datos),
   });
+  checkAuthError(res);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Error ${res.status} al enviar cierre`);
@@ -386,6 +439,7 @@ export async function actualizarEstadoCierre(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ estado, comentario_gerencia: comentarioGerencia }),
   });
+  checkAuthError(res);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Error ${res.status} al actualizar estado`);
@@ -408,6 +462,7 @@ export interface RespuestaPrefill {
 
 export async function fetchPrefill(area: string, periodo: string): Promise<RespuestaPrefill> {
   const res = await fetch(`/api/cierres/prefill/${area}?periodo=${periodo}`);
+  checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status} al obtener datos del sistema`);
   return res.json();
 }

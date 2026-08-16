@@ -13,8 +13,11 @@ import CostoProduccionDetalle from './components/Produccion/CostoProduccionDetal
 import AnalisisResponsables from './components/Produccion/AnalisisResponsables';
 import AnalisisMateriales from './components/Produccion/AnalisisMateriales';
 import ConfiguracionMetas from './components/Gerencia/ConfiguracionMetas';
+import Usuarios from './components/Gerencia/Usuarios';
+import Login from './components/Auth/Login';
+import { AuthContext } from './components/Auth/AuthContext';
 import { type KPI, type AlertaColor, type FilaGrid } from './data/kpis';
-import { fetchKPIs, fetchVentasMes, fetchCarteraAsesor, fetchMargenGlobal, enviarCierre, actualizarEstadoCierre, fetchBandeja, type KPIReal, type KPIDiario } from './services/api';
+import { fetchKPIs, fetchVentasMes, fetchCarteraAsesor, fetchMargenGlobal, enviarCierre, actualizarEstadoCierre, fetchBandeja, fetchMe, logout as apiLogout, type KPIReal, type KPIDiario, type Usuario } from './services/api';
 import VistazoDiario from './components/Dashboard/VistazoDiario';
 import type { InformeCierre, AreaCierre } from './types/cierres';
 
@@ -428,6 +431,28 @@ export default function App() {
   const [informes, setInformes]       = useState<InformeCierre[]>([]);
   const [errorEnvio, setErrorEnvio]   = useState<string | null>(null);
 
+  // Auth State
+  const [user, setUser] = useState<Usuario | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMe()
+      .then(u => setUser(u))
+      .catch(() => setUser(null))
+      .finally(() => setAuthLoading(false));
+
+    const onAuthError = () => {
+      setUser(null);
+    };
+    window.addEventListener('auth-error', onAuthError);
+    return () => window.removeEventListener('auth-error', onAuthError);
+  }, []);
+
+  async function handleLogout() {
+    await apiLogout();
+    setUser(null);
+  }
+
   // Carga los informes históricos desde Sheets al abrir la bandeja
   useEffect(() => {
     if (vistaActual !== 'bandeja-aprobacion') return;
@@ -509,8 +534,24 @@ export default function App() {
 
   const pendientes = informes.filter(i => i.estado === 'ENVIADO').length;
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="w-16 h-16 bg-probolsas-navy/20 rounded-2xl mb-4"></div>
+          <p className="text-slate-500 font-medium">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login onLogin={setUser} />;
+  }
+
   return (
-    <Layout vistaActual={vistaActual} onNavegar={setVistaActual} pendientesAprobacion={pendientes}>
+    <AuthContext.Provider value={{ user, logout: handleLogout }}>
+      <Layout vistaActual={vistaActual} onNavegar={setVistaActual} pendientesAprobacion={pendientes}>
       {errorEnvio && (
         <div className="fixed bottom-4 right-4 bg-amber-50 border border-amber-200 text-amber-700 text-sm px-4 py-3 rounded-xl shadow-md z-50 max-w-sm">
           ⚠ El informe se guardó localmente pero no pudo escribirse en Sheets: {errorEnvio}
@@ -528,6 +569,8 @@ export default function App() {
       {vistaActual === 'analisis-responsables'    && <AnalisisResponsables />}
       {vistaActual === 'analisis-materiales'      && <AnalisisMateriales />}
       {vistaActual === 'configuracion'            && <ConfiguracionMetas />}
+      {vistaActual === 'usuarios'                 && <Usuarios />}
     </Layout>
+    </AuthContext.Provider>
   );
 }

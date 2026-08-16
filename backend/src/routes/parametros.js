@@ -2,6 +2,7 @@
 const { Router }    = require('express');
 const { query }     = require('../dbClient');
 const asyncHandler  = require('../asyncHandler');
+const { requireRole } = require('../middleware/auth');
 const logger        = require('../logger');
 
 const router = Router();
@@ -63,11 +64,12 @@ router.get('/historico', asyncHandler(ENDPOINT + '/historico', async (req, res) 
 
 // POST /api/parametros
 // Update a parameter by closing the current one and inserting a new one
-router.post('/', asyncHandler(ENDPOINT, async (req, res) => {
-  const { clave, valor, modificado_por } = req.body;
+router.post('/', requireRole('admin'), asyncHandler(ENDPOINT, async (req, res) => {
+  const { clave, valor } = req.body;
+  const modificado_por = req.user.email;
   
-  if (!clave || valor === undefined || valor === null || !modificado_por) {
-    return res.status(400).json({ ok: false, error: 'Faltan campos requeridos (clave, valor, modificado_por)' });
+  if (!clave || valor === undefined || valor === null) {
+    return res.status(400).json({ ok: false, error: 'Faltan campos requeridos (clave, valor)' });
   }
   
   // 1. Get the current active record

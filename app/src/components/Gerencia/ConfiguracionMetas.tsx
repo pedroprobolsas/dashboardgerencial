@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { fetchParametros, fetchHistorialParametros, updateParametro, type Parametro } from '../../services/api';
 
+import { useAuth } from '../Auth/AuthContext';
+
 export default function ConfiguracionMetas() {
+  const { user } = useAuth();
+  const isAdmin = user?.rol === 'admin';
+
   const [parametros, setParametros] = useState<Record<string, Parametro>>({});
   const [historico, setHistorico] = useState<Parametro[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +43,7 @@ export default function ConfiguracionMetas() {
     if (!editValor || isNaN(Number(editValor))) return;
     setGuardando(true);
     try {
-      await updateParametro(clave, Number(editValor), 'Pedro Sandoval'); // TODO: Usuario autenticado
+      await updateParametro(clave, Number(editValor));
       await cargarDatos();
       setEditando(null);
     } catch (err: any) {
@@ -142,15 +147,18 @@ export default function ConfiguracionMetas() {
                             <span className="text-sm font-medium text-slate-500">{param.unidad}</span>
                           </div>
                           <div className="flex flex-col gap-1">
-                            <button
-                              onClick={() => {
-                                setEditValor(String(param.valor));
-                                setEditando(param.clave!);
-                              }}
-                              className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-md font-semibold transition-colors"
-                            >
-                              Editar
-                            </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => {
+                                  setEditValor(String(param.valor));
+                                  setEditando(param.clave!);
+                                }}
+                                className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-md font-semibold transition-colors"
+                              >
+                                Editar
+                              </button>
+                            )}
+
                             <button
                               onClick={() => setClaveHistorial(claveHistorial === param.clave ? null : param.clave!)}
                               className={`text-xs px-3 py-1.5 rounded-md font-semibold transition-colors ${claveHistorial === param.clave ? 'bg-probolsas-navy text-white' : 'text-probolsas-cyan hover:bg-sky-50'}`}

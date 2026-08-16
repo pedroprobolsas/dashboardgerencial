@@ -2,6 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
+const cookieParser = require('cookie-parser');
 
 const logger = require('./logger');
 const cache  = require('./cache');
@@ -9,6 +10,10 @@ const { testConnection } = require('./dbClient');
 
 // ── Routers ───────────────────────────────────────────────────────────────────
 
+// ── Routers ───────────────────────────────────────────────────────────────────
+
+const authRouter           = require('./routes/auth');
+const usuariosRouter       = require('./routes/usuarios');
 const kpisRouter           = require('./routes/kpis');
 const cierresRouter        = require('./routes/cierres');
 const setupRouter          = require('./routes/setup');
@@ -34,8 +39,10 @@ const allowedOrigins = process.env.CORS_ORIGINS
 app.use(cors({
   origin: allowedOrigins,
   methods: ['GET', 'POST', 'PATCH'],
+  credentials: true, // Importante para enviar cookies
 }));
 app.use(express.json());
+app.use(cookieParser());
 
 // ── Healthcheck mejorado ──────────────────────────────────────────────────────
 
@@ -56,6 +63,10 @@ const ENDPOINTS_REGISTRADOS = [
   'POST /api/cierres/:area',
   'GET  /api/cierres/prefill/:area',
   'GET  /api/parametros',
+  'POST /api/auth/login',
+  'POST /api/auth/logout',
+  'GET  /api/auth/me',
+  'GET  /api/usuarios',
 ];
 
 app.get('/api/health', async (_req, res) => {
@@ -109,8 +120,17 @@ app.get('/api/health', async (_req, res) => {
 
 // ── Rutas ─────────────────────────────────────────────────────────────────────
 
-// Endpoints existentes (compatibilidad)
+// ── Rutas ─────────────────────────────────────────────────────────────────────
+
+// Rutas públicas
+app.use('/api/auth',              authRouter);
 app.use('/api/setup',             setupRouter);
+
+// Proteger el resto de las rutas
+const { requireAuth } = require('./middleware/auth');
+app.use('/api', requireAuth);
+
+// Endpoints existentes (compatibilidad)
 app.use('/api/kpis',              kpisRouter);
 app.use('/api/cierres',           cierresRouter);
 
@@ -123,6 +143,7 @@ app.use('/api/analisis_responsables', analisisResponsablesRouter);
 app.use('/api/analisis_materiales', analisisMaterialesRouter);
 app.use('/api/informes',          informesRouter);
 app.use('/api/parametros',        parametrosRouter);
+app.use('/api/usuarios',          usuariosRouter);
 
 // ── Error handler global ──────────────────────────────────────────────────────
 

@@ -10,7 +10,10 @@ export type Vista =
   | 'costo-produccion-detalle'
   | 'analisis-responsables'
   | 'analisis-materiales'
-  | 'configuracion';
+  | 'configuracion'
+  | 'usuarios';
+
+import { useAuth } from '../Auth/AuthContext';
 
 interface Props {
   vistaActual: Vista;
@@ -41,6 +44,8 @@ const itemsCierre: NavItem[] = [
 ];
 
 export default function Sidebar({ vistaActual, onNavegar, pendientesAprobacion }: Props) {
+  const { user, logout } = useAuth();
+  
   function Item({ item }: { item: NavItem }) {
     const activo = vistaActual === item.id;
     return (
@@ -105,6 +110,16 @@ export default function Sidebar({ vistaActual, onNavegar, pendientesAprobacion }
             <span className="text-base leading-none">⚙️</span>
             <span>Configuración</span>
           </button>
+          {user?.rol === 'admin' && (
+            <button
+              onClick={() => onNavegar('usuarios')}
+              className={`w-full text-left flex items-center gap-2.5 p-3 rounded-xl text-sm transition-colors duration-200
+                ${vistaActual === 'usuarios' ? 'bg-slate-700 text-white font-medium' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            >
+              <span className="text-base leading-none">🔐</span>
+              <span>Usuarios</span>
+            </button>
+          )}
         </div>
 
       </nav>
@@ -113,10 +128,15 @@ export default function Sidebar({ vistaActual, onNavegar, pendientesAprobacion }
       <div className="mt-auto border-t border-slate-800 pt-4">
         <div className="flex items-center justify-between text-sm text-slate-400 px-1">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-probolsas-navy flex items-center justify-center text-white text-xs font-bold">PS</div>
-            <span>Pedro Sandoval</span>
+            <div className="w-7 h-7 rounded-full bg-probolsas-navy flex items-center justify-center text-white text-xs font-bold uppercase">
+              {user?.nombre?.slice(0, 2) || '??'}
+            </div>
+            <div className="flex flex-col">
+              <span className="font-medium text-white text-xs truncate max-w-[100px]">{user?.nombre}</span>
+              <span className="text-[10px] text-slate-500 capitalize">{user?.rol}</span>
+            </div>
           </div>
-          <button className="text-xs text-probolsas-cyan hover:text-white transition-colors duration-200">Salir</button>
+          <button onClick={logout} className="text-xs text-probolsas-cyan hover:text-white transition-colors duration-200 p-2">Salir</button>
         </div>
       </div>
 

@@ -33,7 +33,7 @@ router.post('/consecutivo', asyncHandler(ENDPOINT, async (req, res) => {
   
   const { rows } = await query(insertSql, [
     numero, 
-    responsable || 'Sistema', 
+    req.user.nombre || req.user.email, 
     (tipo_informe ? `[${tipo_informe}] ` : '') + (tipo_efecto || 'ambos'), 
     periodo_inicio || null, 
     periodo_fin || null
