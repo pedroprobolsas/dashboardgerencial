@@ -6,7 +6,7 @@ const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'CO
 const fmtNum4 = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 4 });
 
 interface Props {
-  detalle: LineaMaterial[];
+  detalle: (LineaMaterial & { tipo_especial?: 'alias' | 'cotizado_sin_usar' | 'sustitucion' | 'consumo_extra' | 'normal' | null })[];
   fechaInicio: string;
   fechaFin: string;
   onClose: () => void;
@@ -15,14 +15,14 @@ interface Props {
 export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, onClose }: Props) {
   
   const actividades = detalle.map(d => {
-    // Para el informe nos centramos en el efecto cantidad
+    // Para el informe nos centramos en el efecto cantidad (o impacto_final si no está)
     const cant = d.efecto_cantidad || 0;
     return { ...d, impacto: cant };
   });
 
-  const sobrecostos = actividades.filter(a => a.calculable && a.impacto < 0).sort((a, b) => a.impacto - b.impacto);
-  const ahorros = actividades.filter(a => a.calculable && a.impacto > 0).sort((a, b) => b.impacto - a.impacto);
-  const especiales = actividades.filter(a => !a.calculable || a.cant_cotizada === 0 || a.cant_ejecutada === 0);
+  const sobrecostos = actividades.filter(a => a.tipo_especial === 'normal' && a.calculable && a.impacto < 0).sort((a, b) => a.impacto - b.impacto);
+  const ahorros = actividades.filter(a => a.tipo_especial === 'normal' && a.calculable && a.impacto > 0).sort((a, b) => b.impacto - a.impacto);
+  const especiales = actividades.filter(a => a.tipo_especial && a.tipo_especial !== 'normal');
 
   const totalSobrecosto = sobrecostos.reduce((acc, curr) => acc + curr.impacto, 0);
   const totalAhorro = ahorros.reduce((acc, curr) => acc + curr.impacto, 0);
@@ -67,7 +67,7 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
         <div className="border-2 border-amber-100 rounded-xl p-6 bg-amber-50/50 print:bg-transparent print:border-amber-600">
           <span className="text-sm font-bold text-amber-600 uppercase tracking-wider block mb-2">Casos Especiales</span>
           <span className="text-3xl font-black text-amber-600 tracking-tight">{especiales.length}</span>
-          <span className="text-sm font-medium text-slate-600 block mt-2">Sustituidos / No cotizados</span>
+          <span className="text-sm font-medium text-slate-600 block mt-2">Alias / Sust. / No cot. / Consumo extra</span>
         </div>
       </div>
 
@@ -136,7 +136,7 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
       {/* Table - Especiales */}
       {especiales.length > 0 && (
         <div className="mb-12 print:break-before-auto">
-          <h3 className="text-lg font-bold text-amber-700 border-b border-amber-200 pb-2 mb-4">Casos Especiales (Sustituciones, No cotizados, No ejecutados)</h3>
+          <h3 className="text-lg font-bold text-amber-700 border-b border-amber-200 pb-2 mb-4">Calidad de Registro (Casos Especiales)</h3>
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="text-slate-500 uppercase tracking-wider text-xs border-b-2 border-slate-200">
@@ -149,11 +149,12 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
             </thead>
             <tbody className="divide-y divide-slate-100">
               {especiales.map((a, i) => {
-                const esNoCotizado = a.cant_cotizada === 0;
-                const esNoEjecutado = a.cant_ejecutada === 0;
-                let tipo = 'Sustitución';
-                if (esNoCotizado) tipo = 'No Cotizado';
-                else if (esNoEjecutado) tipo = 'No Ejecutado';
+                let tipo = 'Desconocido';
+                if (a.tipo_especial === 'alias') tipo = 'Alias de catálogo';
+                else if (a.tipo_especial === 'cotizado_sin_usar') tipo = 'Cotizado sin usar';
+                else if (a.tipo_especial === 'sustitucion') tipo = 'Sustitución real';
+                else if (a.tipo_especial === 'consumo_extra') tipo = 'Consumo extra';
+                else if (!a.calculable) tipo = 'No calculable';
 
                 return (
                   <tr key={i} className="print:break-inside-avoid">

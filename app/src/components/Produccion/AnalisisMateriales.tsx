@@ -23,6 +23,7 @@ export default function AnalisisMateriales() {
 
   const [opSeleccionada, setOpSeleccionada] = useState<string | null>(null);
   const [opFilaDesplegada, setOpFilaDesplegada] = useState<string | null>(null);
+  const [filtroEspecial, setFiltroEspecial] = useState<'alias' | 'cotizado_sin_usar' | 'sustitucion' | 'consumo_extra' | null>(null);
   
   const [informeAbierto, setInformeAbierto] = useState(false);
 
@@ -45,7 +46,17 @@ export default function AnalisisMateriales() {
   }, [fechaInicio, fechaFin]);
 
   const dataProcesada = useMemo(() => {
-    return detalle.map(d => {
+    const getWords = (name: string) => {
+      return name.toLowerCase().split(/[^a-z0-9ñáéíóúü]+/i).filter(w => w.length > 3);
+    };
+
+    const hasSharedWord = (name1: string, name2: string) => {
+      const words1 = getWords(name1);
+      const words2 = getWords(name2);
+      return words1.some(w => words2.includes(w));
+    };
+
+    const basicData = detalle.map(d => {
       let isAjustado = false;
       let costo_unit_cotizado: number | null = null;
       let costo_unit_ejecutado: number | null = null;
@@ -60,12 +71,87 @@ export default function AnalisisMateriales() {
 
       return {
         ...d,
+        cant_cotizada: Number(d.cant_cotizada),
+        cant_ejecutada: Number(d.cant_ejecutada),
         isAjustado,
         costo_unit_cotizado,
         costo_unit_ejecutado,
-        impacto_final
+        impacto_final,
+        tipo_especial: 'normal' as 'normal' | 'alias' | 'cotizado_sin_usar' | 'sustitucion' | 'consumo_extra' | null,
+        par_id: undefined as string | undefined
       };
     });
+
+    const byOp: Record<string, typeof basicData> = {};
+    basicData.forEach(d => {
+      const opKey = String(d.nro_op);
+      if (!byOp[opKey]) byOp[opKey] = [];
+      byOp[opKey].push(d);
+    });
+
+    const result: typeof basicData = [];
+
+    for (const op in byOp) {
+      const items = byOp[op];
+      const soloCot = items.filter(d => d.cant_cotizada > 0 && d.cant_ejecutada === 0);
+      const soloEjec = items.filter(d => d.cant_cotizada === 0 && d.cant_ejecutada > 0);
+      
+      const matchedCot = new Set();
+      const matchedEjec = new Set();
+
+      // 1. Encontrar Alias (Palabra compartida y ±5%)
+      for (const c of soloCot) {
+        if (matchedCot.has(c)) continue;
+        for (const e of soloEjec) {
+          if (matchedEjec.has(e)) continue;
+          if (hasSharedWord(c.material, e.material)) {
+            const diff = Math.abs(e.cant_ejecutada - c.cant_cotizada) / c.cant_cotizada;
+            if (diff < 0.05) {
+              c.tipo_especial = 'alias';
+              e.tipo_especial = 'alias';
+              c.par_id = e.material;
+              e.par_id = c.material;
+              matchedCot.add(c);
+              matchedEjec.add(e);
+              break;
+            }
+          }
+        }
+      }
+
+      // 2. Encontrar Sustitución Real (Palabra compartida pero fuera de ±5%)
+      for (const c of soloCot) {
+        if (matchedCot.has(c)) continue;
+        for (const e of soloEjec) {
+          if (matchedEjec.has(e)) continue;
+          if (hasSharedWord(c.material, e.material)) {
+            c.tipo_especial = 'sustitucion';
+            e.tipo_especial = 'sustitucion';
+            c.par_id = e.material;
+            e.par_id = c.material;
+            matchedCot.add(c);
+            matchedEjec.add(e);
+            break;
+          }
+        }
+      }
+
+      // 3. Marcar los restantes
+      for (const c of soloCot) {
+        if (!matchedCot.has(c)) {
+          c.tipo_especial = 'cotizado_sin_usar';
+        }
+      }
+      for (const e of soloEjec) {
+        if (!matchedEjec.has(e)) {
+          e.tipo_especial = 'consumo_extra';
+        }
+      }
+
+      result.push(...items);
+    }
+
+    return result;
   }, [detalle]);
 
   const groupedData = useMemo(() => {
@@ -77,7 +163,17 @@ export default function AnalisisMateriales() {
     let cantidadAhorro = 0;
     let countAhorro = 0;
     
-    let casosEspeciales = 0;
+    let cantidadAlias = 0;
+    let countAliasPares = 0;
+    
+    let cantidadCotizadoSinUsar = 0;
+    let countCotizadoSinUsar = 0;
+    
+    let cantidadSustitucion = 0;
+    let countSustitucion = 0;
+
+    let cantidadConsumoExtra = 0;
+    let countConsumoExtra = 0;
 
     let efectoPrecioTotal = 0;
 
@@ -104,8 +200,20 @@ export default function AnalisisMateriales() {
 
       efectoPrecioTotal += pre;
 
-      if (!d.calculable || d.cant_cotizada === 0 || d.cant_ejecutada === 0) {
-        casosEspeciales++;
+      if (d.tipo_especial === 'alias') {
+        cantidadAlias += imp;
+        if (d.cant_ejecutada > 0) countAliasPares++;
+      } else if (d.tipo_especial === 'cotizado_sin_usar') {
+        cantidadCotizadoSinUsar += d.valor_cotizado;
+        countCotizadoSinUsar++;
+      } else if (d.tipo_especial === 'sustitucion') {
+        cantidadSustitucion += imp;
+        if (d.cant_ejecutada > 0) countSustitucion++;
+      } else if (d.tipo_especial === 'consumo_extra') {
+        cantidadConsumoExtra += imp;
+        countConsumoExtra++;
+      } else if (!d.calculable) {
+        // Fallback si no es calculable pero no encajó en los anteriores
       } else {
         if (imp < 0) {
           cantidadSobrecosto += imp;
@@ -130,7 +238,10 @@ export default function AnalisisMateriales() {
       metricas: {
         cantidadSobrecosto, countSobrecosto,
         cantidadAhorro, countAhorro,
-        casosEspeciales,
+        cantidadAlias, countAliasPares,
+        cantidadCotizadoSinUsar, countCotizadoSinUsar,
+        cantidadSustitucion, countSustitucion,
+        cantidadConsumoExtra, countConsumoExtra,
         efectoPrecioTotal
       },
       showBanner,
@@ -222,7 +333,18 @@ export default function AnalisisMateriales() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {groupedData.metricas.countAliasPares > 0 && (
+            <div className="bg-indigo-50/80 border border-indigo-200 text-indigo-800 p-4 rounded-xl flex gap-3 text-sm mb-6 items-start">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              <div>
+                <p className="font-medium">
+                  Se detectaron {groupedData.metricas.countAliasPares} pares de materiales con nombre distinto entre cotización y ejecución. Esto distorsiona el análisis — conviene unificar el catálogo en Crisolweb.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             
             <div className="bg-red-50/50 p-6 rounded-2xl border border-red-100 shadow-sm flex flex-col items-center text-center relative overflow-hidden group hover:border-red-200 transition-colors">
               <div className="absolute -right-4 -top-4 w-24 h-24 bg-red-500/5 rounded-full blur-xl group-hover:bg-red-500/10 transition-colors"></div>
@@ -230,7 +352,7 @@ export default function AnalisisMateriales() {
               <span className="text-3xl font-black text-red-600 relative z-10">
                 {fmtCOP.format(groupedData.metricas.cantidadSobrecosto)}
               </span>
-              <span className="text-xs text-slate-500 mt-2 font-medium relative z-10">En {groupedData.metricas.countSobrecosto} actividades de producción</span>
+              <span className="text-xs text-slate-500 mt-2 font-medium relative z-10">En {groupedData.metricas.countSobrecosto} materiales</span>
             </div>
 
             <div className="bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100 shadow-sm flex flex-col items-center text-center relative overflow-hidden group hover:border-emerald-200 transition-colors">
@@ -239,18 +361,55 @@ export default function AnalisisMateriales() {
               <span className="text-3xl font-black text-emerald-600 relative z-10">
                 +{fmtCOP.format(groupedData.metricas.cantidadAhorro)}
               </span>
-              <span className="text-xs text-slate-500 mt-2 font-medium relative z-10">En {groupedData.metricas.countAhorro} actividades de producción</span>
+              <span className="text-xs text-slate-500 mt-2 font-medium relative z-10">En {groupedData.metricas.countAhorro} materiales</span>
             </div>
 
-            <div className="bg-amber-50/50 p-6 rounded-2xl border border-amber-100 shadow-sm flex flex-col items-center text-center relative overflow-hidden group hover:border-amber-200 transition-colors">
-              <div className="absolute -right-4 -top-4 w-24 h-24 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-colors"></div>
-              <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-2 bg-amber-100 px-3 py-1 rounded-full relative z-10">Casos Especiales</span>
-              <span className="text-3xl font-black text-amber-600 relative z-10">
-                {groupedData.metricas.casosEspeciales}
-              </span>
-              <span className="text-xs text-slate-500 mt-2 font-medium relative z-10">Sustituciones / No Cotizados / No Ejecutados</span>
-            </div>
+          </div>
 
+          <div className="mb-8 bg-slate-50 p-5 rounded-2xl border border-slate-200/60">
+            <h3 className="text-sm font-bold text-slate-700 mb-4 tracking-tight flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+              Calidad del registro (Casos Especiales)
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              
+              <button 
+                onClick={() => setFiltroEspecial(filtroEspecial === 'alias' ? null : 'alias')}
+                className={`bg-white p-4 rounded-xl border text-left flex flex-col items-start transition-all ${filtroEspecial === 'alias' ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-sm' : 'border-slate-200 hover:border-indigo-200 hover:bg-indigo-50/30'}`}
+              >
+                <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${filtroEspecial === 'alias' ? 'text-indigo-700' : 'text-slate-500'}`}>Alias de Catálogo</span>
+                <span className="text-xl font-black text-slate-800">{fmtCOP.format(groupedData.metricas.cantidadAlias)}</span>
+                <span className="text-xs text-slate-400 font-medium mt-1">{groupedData.metricas.countAliasPares} pares detectados</span>
+              </button>
+
+              <button 
+                onClick={() => setFiltroEspecial(filtroEspecial === 'cotizado_sin_usar' ? null : 'cotizado_sin_usar')}
+                className={`bg-white p-4 rounded-xl border text-left flex flex-col items-start transition-all ${filtroEspecial === 'cotizado_sin_usar' ? 'border-sky-400 ring-2 ring-sky-100 shadow-sm' : 'border-slate-200 hover:border-sky-200 hover:bg-sky-50/30'}`}
+              >
+                <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${filtroEspecial === 'cotizado_sin_usar' ? 'text-sky-700' : 'text-slate-500'}`}>Cotizado sin usar</span>
+                <span className="text-xl font-black text-slate-800">{fmtCOP.format(groupedData.metricas.cantidadCotizadoSinUsar)}</span>
+                <span className="text-xs text-slate-400 font-medium mt-1">En {groupedData.metricas.countCotizadoSinUsar} materiales</span>
+              </button>
+
+              <button 
+                onClick={() => setFiltroEspecial(filtroEspecial === 'sustitucion' ? null : 'sustitucion')}
+                className={`bg-white p-4 rounded-xl border text-left flex flex-col items-start transition-all ${filtroEspecial === 'sustitucion' ? 'border-amber-400 ring-2 ring-amber-100 shadow-sm' : 'border-slate-200 hover:border-amber-200 hover:bg-amber-50/30'}`}
+              >
+                <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${filtroEspecial === 'sustitucion' ? 'text-amber-700' : 'text-slate-500'}`}>Sustitución Real</span>
+                <span className="text-xl font-black text-slate-800">{fmtCOP.format(groupedData.metricas.cantidadSustitucion)}</span>
+                <span className="text-xs text-slate-400 font-medium mt-1">En {groupedData.metricas.countSustitucion} materiales/pares</span>
+              </button>
+
+              <button 
+                onClick={() => setFiltroEspecial(filtroEspecial === 'consumo_extra' ? null : 'consumo_extra')}
+                className={`bg-white p-4 rounded-xl border text-left flex flex-col items-start transition-all ${filtroEspecial === 'consumo_extra' ? 'border-rose-400 ring-2 ring-rose-100 shadow-sm' : 'border-slate-200 hover:border-rose-200 hover:bg-rose-50/30'}`}
+              >
+                <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${filtroEspecial === 'consumo_extra' ? 'text-rose-700' : 'text-slate-500'}`}>Consumo no presup.</span>
+                <span className="text-xl font-black text-slate-800">{fmtCOP.format(groupedData.metricas.cantidadConsumoExtra)}</span>
+                <span className="text-xs text-slate-400 font-medium mt-1">En {groupedData.metricas.countConsumoExtra} materiales</span>
+              </button>
+
+            </div>
           </div>
 
           <div className="text-center text-sm font-medium text-slate-500 bg-slate-100/50 py-3 rounded-xl border border-slate-200/50">
@@ -285,6 +444,12 @@ export default function AnalisisMateriales() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {groupedData.grupos.map((grupo, gIndex) => {
+                      const actividadesFiltradas = filtroEspecial 
+                        ? grupo.actividades.filter(a => a.tipo_especial === filtroEspecial)
+                        : grupo.actividades;
+
+                      if (actividadesFiltradas.length === 0) return null;
+
                       const firstAjustado = grupo.actividades.find(a => a.isAjustado);
                       let txtVolumen = null;
                       if (firstAjustado && Math.abs(grupo.subtotalImpacto - grupo.subtotalCumplimiento) > 0.01) {
@@ -314,7 +479,7 @@ export default function AnalisisMateriales() {
                                 <span className="text-slate-300">|</span>
                                 <span className="font-medium text-slate-700 truncate max-w-xs">{grupo.referencia}</span>
                                 <span className="text-xs bg-slate-200/70 text-slate-600 px-2 py-0.5 rounded-full font-medium ml-2">
-                                  {grupo.actividades.length} mat.
+                                  {actividadesFiltradas.length} mat.
                                 </span>
                               </div>
                               <div className="flex flex-col items-end">
@@ -334,12 +499,16 @@ export default function AnalisisMateriales() {
                           </td>
                         </tr>
 
-                        {grupo.actividades.map((d, i) => {
+                        {actividadesFiltradas.map((d, i) => {
                           const id = `${grupo.op}-${i}`;
                           const isExpanded = opFilaDesplegada === id;
                           const hasDescuadre = Math.abs((d.efecto_cantidad || 0) + (d.efecto_precio || 0) - parseFloat(d.cumplimiento as any)) > 500 && d.calculable;
-                          const esNoCotizado = d.cant_cotizada === 0;
-                          const esNoEjecutado = d.cant_ejecutada === 0;
+                          
+                          let tag = null;
+                          if (d.tipo_especial === 'alias') tag = <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">Alias</span>;
+                          else if (d.tipo_especial === 'cotizado_sin_usar') tag = <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">Cotizado sin usar</span>;
+                          else if (d.tipo_especial === 'sustitucion') tag = <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Sustitución</span>;
+                          else if (d.tipo_especial === 'consumo_extra') tag = <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">Consumo extra</span>;
 
                           return (
                             <Fragment key={id}>
@@ -355,8 +524,7 @@ export default function AnalisisMateriales() {
                                 <td className="px-2 py-3 text-slate-500 opacity-50">{d.nro_op}</td>
                                 <td className="px-2 py-3 text-slate-800 font-medium truncate max-w-[200px]" title={d.material}>
                                   {d.material}
-                                  {esNoCotizado && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">No cotizado</span>}
-                                  {esNoEjecutado && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600">No ejecutado</span>}
+                                  {tag}
                                 </td>
                                 <td className="px-2 py-3 text-right tabular-nums text-slate-500">{fmtNum4.format(d.cant_cotizada)}</td>
                                 <td className="px-2 py-3 text-right tabular-nums font-medium text-slate-800">{fmtNum4.format(d.cant_ejecutada)}</td>

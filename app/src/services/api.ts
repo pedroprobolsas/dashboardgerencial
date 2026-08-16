@@ -126,6 +126,8 @@ export interface LineaMaterial {
   op_cantidad_cotizada: number | null;
   op_cantidad_ejecutada: number | null;
   calculable: boolean;
+  tipo_especial?: 'alias' | 'cotizado_sin_usar' | 'sustitucion' | 'consumo_extra' | 'normal' | null;
+  par_id?: string;
 }
 
 export async function fetchAnalisisMateriales(fechaInicio: string, fechaFin: string): Promise<{ detalle: LineaMaterial[], total: number }> {
