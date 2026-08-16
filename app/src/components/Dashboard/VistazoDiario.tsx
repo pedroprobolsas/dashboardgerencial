@@ -10,6 +10,7 @@ const coloresAlerta: Record<AlertaColor, { fondo: string; punto: string; texto: 
   verde:    { fondo: 'bg-emerald-50',  punto: 'bg-emerald-500', texto: 'text-emerald-700',  borde: 'border-emerald-200' },
   amarillo: { fondo: 'bg-amber-50',    punto: 'bg-amber-400',   texto: 'text-amber-700',    borde: 'border-amber-200' },
   rojo:     { fondo: 'bg-red-50',      punto: 'bg-red-500',     texto: 'text-red-700',      borde: 'border-red-200' },
+  gris:     { fondo: 'bg-slate-50',    punto: 'bg-slate-400',   texto: 'text-slate-600',    borde: 'border-slate-200' },
 };
 
 export default function VistazoDiario({ data, fechaSeleccionada, onCambiarFecha }: Props) {

@@ -105,9 +105,11 @@ export interface KPIReal {
   valorFormateado?: string;
   valorAbsoluto?: string;
   meta?: string;
-  alerta?: 'verde' | 'amarillo' | 'rojo';
+  alerta?: 'verde' | 'amarillo' | 'rojo' | 'gris';
   detalle?: string;
   nota?: string;
+  fechaActualizacion?: string;
+  desactualizado?: boolean;
   desglose?: { d30?: string; d60?: string; d90?: string; d100plus?: string };
   ordenes?: number;
   opsCriticas?: number;
