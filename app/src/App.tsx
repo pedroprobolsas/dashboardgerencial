@@ -125,7 +125,7 @@ function adaptarKPI(raw: KPIReal): KPI {
 
   // ── Costo de Producción: margen promedio + desglose facturado/costo ─────────
   if (raw.id === 'costo-produccion' && raw.fuente === 'real') {
-    const descCosto = raw.sinDatos ? 'Sin datos' : alerta === 'verde' ? 'Margen positivo' : alerta === 'amarillo' ? 'Alerta amarilla' : 'Con pérdidas';
+    const descCosto = raw.sinDatos ? 'Sin datos' : alerta === 'verde' ? 'Margen positivo' : alerta === 'amarillo' ? 'Alerta amarilla' : 'Margen bajo';
     const filas: FilaGrid[] = [];
     if (raw.valorProducido && raw.costoEjecutado) {
       filas.push({
@@ -135,7 +135,7 @@ function adaptarKPI(raw: KPIReal): KPI {
     }
     const subtexto = [
       raw.ordenes       != null ? `OPs: ${raw.ordenes}`                        : null,
-      raw.opsConPerdida != null ? `Con pérdida: ${raw.opsConPerdida} OPs`      : null,
+      raw.opsConPerdida != null ? `Bajo meta: ${raw.opsConPerdida} OPs`      : null,
     ].filter(Boolean).join(' | ');
     return { ...base, descripcionAlerta: descCosto, filas: filas.length > 0 ? filas : undefined, subtexto: subtexto || undefined };
   }
