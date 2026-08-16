@@ -74,21 +74,36 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
   const ventas  = parseFloat(ventasResult.rows[0]?.total_ventas  || 0);
   const egresos = parseFloat(egresosResult.rows[0]?.total_egresos || 0);
 
-  const margenAbsoluto = ventas - egresos;
-  const margenPct      = ventas !== 0
-    ? parseFloat((margenAbsoluto / ventas * 100).toFixed(2))
-    : null;
-
-  // Semáforo: ≥35% verde, ≥25% amarillo, <25% rojo
-  let alerta = 'rojo';
-  if (margenPct !== null) {
-    if (margenPct >= 35) alerta = 'verde';
-    else if (margenPct >= 25) alerta = 'amarillo';
-  }
-
   const fmt = new Intl.NumberFormat('es-CO', {
     style: 'currency', currency: 'COP', maximumFractionDigits: 0,
   });
+
+  if (egresos === 0 || ventas === 0) {
+    const resultado = {
+      ok: true,
+      filtros: { fecha_inicio, fecha_fin },
+      ventas,
+      ventas_fmt: fmt.format(ventas),
+      egresos,
+      egresos_fmt: fmt.format(egresos),
+      margen_absoluto: ventas - egresos,
+      margen_absoluto_fmt: fmt.format(ventas - egresos),
+      margen_pct: null,
+      alerta: 'amarillo',
+      sinDatos: true,
+      detalle: egresos === 0 ? 'Sin datos de egresos' : 'Sin datos de ventas'
+    };
+    cache.set(cacheKey, resultado);
+    return res.json(resultado);
+  }
+
+  const margenAbsoluto = ventas - egresos;
+  const margenPct      = parseFloat((margenAbsoluto / ventas * 100).toFixed(2));
+
+  // Semáforo: ≥35% verde, ≥25% amarillo, <25% rojo
+  let alerta = 'rojo';
+  if (margenPct >= 35) alerta = 'verde';
+  else if (margenPct >= 25) alerta = 'amarillo';
 
   const resultado = {
     ok:      true,

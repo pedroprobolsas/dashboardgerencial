@@ -1,6 +1,6 @@
 // Datos mock de KPIs — serán reemplazados por datos reales de Google Sheets en fases siguientes
 
-export type AlertaColor = 'verde' | 'amarillo' | 'rojo';
+export type AlertaColor = 'verde' | 'amarillo' | 'rojo' | 'gris';
 
 export interface FilaGrid {
   izq: { label: string; valor: string };
@@ -19,6 +19,8 @@ export interface KPI {
   filas?: FilaGrid[];
   alerta: AlertaColor;
   descripcionAlerta: string;
+  fechaActualizacion?: string;
+  desactualizado?: boolean;
 }
 
 // Umbrales definidos según documento_maestro.md

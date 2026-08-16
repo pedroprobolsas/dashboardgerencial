@@ -36,48 +36,46 @@ const ENV_METAS = {
 };
 
 /**
- * Lee la hoja Metas_Gerencia desde SP1, filtra Activo="SI",
- * y devuelve un mapa { [KPI]: valor_numerico }.
+ * Lee la configuración de la base de datos app_ops.parametros
+ * a una fecha específica, para que el reporte sea coherente con 
+ * lo que estaba vigente en ese momento.
  */
-async function loadMetasFromSheets() {
+async function loadParametrosFromDB(fecha = null) {
   try {
-    const filas = await readRange(SP1, 'Metas_Gerencia!A:G');
-    if (filas.length <= 1) return {};
-
-    const headers = filas[0];
-    const iKPI    = headers.indexOf('KPI');
-    const iMeta   = headers.indexOf('Meta');
-    const iActivo = headers.indexOf('Activo');
-
-    if (iKPI === -1 || iMeta === -1 || iActivo === -1) {
-      console.warn('loadMetasFromSheets: columnas KPI/Meta/Activo no encontradas en Metas_Gerencia');
-      return {};
+    let sql;
+    let params = [];
+    
+    if (fecha) {
+      sql = `
+        SELECT clave, valor
+        FROM app_ops.parametros
+        WHERE vigente_desde <= $1::date 
+          AND (vigente_hasta IS NULL OR vigente_hasta > $1::date)
+      `;
+      params.push(fecha);
+    } else {
+      sql = `
+        SELECT clave, valor
+        FROM app_ops.parametros
+        WHERE vigente_hasta IS NULL
+      `;
     }
-
+    
+    const { rows } = await query(sql, params);
     const mapa = {};
-    filas.slice(1).forEach(fila => {
-      if ((fila[iActivo] || '').toString().trim().toUpperCase() !== 'SI') return;
-      const kpi  = (fila[iKPI] || '').toString().trim();
-      const raw  = fila[iMeta];
-      if (!kpi || raw === undefined || raw === '') return;
-      // Soporta formato colombiano: "1.234.567,89" o formato simple "200000000"
-      const valor = parseFloat(
-        String(raw).replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, '')
-      );
-      if (!isNaN(valor)) mapa[kpi] = valor;
+    rows.forEach(r => {
+      mapa[r.clave] = parseFloat(r.valor);
     });
-
-    console.log('Metas cargadas desde Sheets:', mapa);
     return mapa;
   } catch (err) {
-    console.error('loadMetasFromSheets error (usando .env como respaldo):', err.message);
+    console.error('loadParametrosFromDB error (usando .env como respaldo):', err.message);
     return {};
   }
 }
 
-/** Devuelve el valor de la meta: primero busca en Sheets, luego usa .env/default. */
-function getMeta(metasSheets, key) {
-  return metasSheets[key] !== undefined ? metasSheets[key] : ENV_METAS[key];
+/** Devuelve el valor de la meta: primero busca en DB, luego usa .env/default. */
+function getMeta(metasDB, key) {
+  return metasDB[key] !== undefined ? metasDB[key] : ENV_METAS[key];
 }
 
 // ── Utilidades ────────────────────────────────────────────────────────────────
@@ -190,8 +188,15 @@ async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
     );
 
     const facturas   = parseInt(rows[0]?.facturas    || 0, 10);
+    
+    // Obtener fecha máxima para frescura de datos
+    const { rows: rowsMax } = await query('SELECT MAX(fecha_creacion)::date as max_date FROM crisolweb.facturas');
+    const maxDate = rowsMax[0]?.max_date;
+    const diffDias = maxDate ? Math.floor((new Date() - new Date(maxDate)) / (1000 * 60 * 60 * 24)) : 0;
+    const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
+
     if (facturas === 0) {
-      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin facturas este período', alerta: 'amarillo' };
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin facturas este período', alerta: 'amarillo', fechaActualizacion: maxDate, desactualizado: diffDias > limiteDias };
     }
 
     const bruto      = parseFloat(rows[0]?.total_bruto || 0);
@@ -210,6 +215,8 @@ async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
       valorIva:      fmt.format(iva),
       valorNetoTotal: fmt.format(neto),
       meta: `Meta: ${fmt.format(metaVentas)}`,
+      fechaActualizacion: maxDate,
+      desactualizado: diffDias > limiteDias,
       alerta: alertaColor(pct, {
         verde:    v => v >= getMeta(metas, 'ventas_pct_verde'),
         amarillo: v => v >= getMeta(metas, 'ventas_pct_amarillo'),
@@ -447,7 +454,7 @@ async function kpiOrdenesCumplidas({ mesNum, anio }) {
 
 // ── KPI: Costo de Producción (margen_pct desde crisolweb.costo_por_orden) ────
 
-async function kpiCostoProduccion({ mesNum, anio }) {
+async function kpiCostoProduccion({ mesNum, anio }, metas = {}) {
   try {
     const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
     const { rows } = await query(
@@ -464,6 +471,11 @@ async function kpiCostoProduccion({ mesNum, anio }) {
       [primerDiaMes]
     );
 
+    const { rows: rowsMax } = await query('SELECT MAX(fecha)::date as max_date FROM crisolweb.costo_por_orden');
+    const maxDate = rowsMax[0]?.max_date;
+    const diffDias = maxDate ? Math.floor((new Date() - new Date(maxDate)) / (1000 * 60 * 60 * 24)) : 0;
+    const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
+
     const opsMes        = parseInt(rows[0]?.ops_mes              || 0, 10);
     const margenProm    = rows[0]?.margen_promedio_pct !== null
                           ? parseFloat(rows[0].margen_promedio_pct)
@@ -473,10 +485,14 @@ async function kpiCostoProduccion({ mesNum, anio }) {
     const opsConPerdida = parseInt(rows[0]?.ops_con_perdida          || 0, 10);
 
     if (opsMes === 0 || margenProm === null) {
-      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo' };
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo', fechaActualizacion: maxDate, desactualizado: diffDias > limiteDias };
     }
 
     const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+    const pctPerdida = (opsConPerdida / opsMes) * 100;
+    
+    const umbralAmarillo = getMeta(metas, 'ops_perdida_alerta_amarilla') || 10;
+    const umbralRojo     = getMeta(metas, 'ops_perdida_alerta_roja')     || 20;
 
     return {
       fuente:          'real',
@@ -484,18 +500,73 @@ async function kpiCostoProduccion({ mesNum, anio }) {
       valorFormateado: `${margenProm}%`,
       ordenes:         opsMes,
       opsConPerdida,
+      pctPerdida,
       costoEjecutado:  fmt.format(totalCosto),
       valorProducido:  fmt.format(totalFact),
-      meta:            `Meta: ≥ 18% | Bajo meta: ${opsConPerdida} OPs`,
+      meta:            `Meta pérdida: < ${umbralAmarillo}% | OPs en pérdida: ${opsConPerdida} (${pctPerdida.toFixed(1)}%)`,
       detalle:         `OPs: ${opsMes} | Bajo meta (<18%): ${opsConPerdida}`,
-      alerta: alertaColor(margenProm, {
-        verde:    v => v >= 18,
-        amarillo: v => v >= 10,
+      fechaActualizacion: maxDate,
+      desactualizado: diffDias > limiteDias,
+      alerta: alertaColor(pctPerdida, {
+        verde:    v => v < umbralAmarillo,
+        amarillo: v => v < umbralRojo,
       }),
     };
   } catch (err) {
     console.error('kpiCostoProduccion:', err.message);
     return { fuente: 'error', detalle: err.message };
+  }
+}
+
+// ── KPI: Calidad de Registro (% OPs limpias) ──────────────────────────────────
+async function kpiCalidadRegistro({ mesNum, anio }, metas = {}) {
+  try {
+    const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
+    // An OP is "limpia" if it has NO special cases (items executed but not quoted or vice versa)
+    const sqlTotal = `SELECT COUNT(DISTINCT nro_op) as total_ops FROM crisolweb.costo_por_orden WHERE fecha >= $1::date AND fecha < ($1::date + INTERVAL '1 month')`;
+    
+    const sqlSucias = `
+      SELECT COUNT(DISTINCT d.nro_op) as ops_sucias
+      FROM crisolweb.costo_por_orden_detalle d
+      JOIN crisolweb.costo_por_orden o ON d.nro_op = o.nro_op AND d.referencia = o.referencia
+      WHERE o.fecha >= $1::date AND o.fecha < ($1::date + INTERVAL '1 month')
+        AND (d.cant_cotizada = 0 OR d.cant_ejecutada = 0)
+    `;
+    
+    const [{rows: tRows}, {rows: sRows}, {rows: maxRows}] = await Promise.all([
+      query(sqlTotal, [primerDiaMes]),
+      query(sqlSucias, [primerDiaMes]),
+      query('SELECT MAX(fecha)::date as max_date FROM crisolweb.costo_por_orden')
+    ]);
+    
+    const maxDate = maxRows[0]?.max_date;
+    const diffDias = maxDate ? Math.floor((new Date() - new Date(maxDate)) / (1000 * 60 * 60 * 24)) : 0;
+    const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
+    
+    const totalOps = parseInt(tRows[0]?.total_ops || 0, 10);
+    const opsSucias = parseInt(sRows[0]?.ops_sucias || 0, 10);
+    
+    if (totalOps === 0) {
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo', fechaActualizacion: maxDate, desactualizado: diffDias > limiteDias };
+    }
+    
+    const opsLimpias = totalOps - opsSucias;
+    const pctLimpias = (opsLimpias / totalOps) * 100;
+    
+    const metaLimpias = getMeta(metas, 'meta_ops_limpias') || 80;
+    
+    return {
+      fuente: 'real',
+      valor: pctLimpias,
+      valorFormateado: `${pctLimpias.toFixed(1)}%`,
+      detalle: `OPs Limpias: ${opsLimpias} | Con casos especiales: ${opsSucias}`,
+      meta: `Meta: ≥ ${metaLimpias}%`,
+      fechaActualizacion: maxDate,
+      desactualizado: diffDias > limiteDias,
+      alerta: pctLimpias >= metaLimpias ? 'verde' : pctLimpias >= (metaLimpias - 10) ? 'amarillo' : 'rojo',
+    };
+  } catch(e) {
+    return { fuente: 'error', detalle: e.message };
   }
 }
 
@@ -653,7 +724,7 @@ async function kpiDiario(targetFecha = null, metas = {}) {
 router.get('/diario', async (req, res) => {
   try {
     const fecha = req.query.fecha || null;
-    const metas = await loadMetasFromSheets();
+    const metas = await loadParametrosFromDB();
     const data = await kpiDiario(fecha, metas);
     res.json(data);
   } catch (err) {
@@ -735,7 +806,7 @@ async function ejecutarSnapshot(fechaParam = null) {
       : Promise.resolve(null),
     usePgVentas  ? Promise.resolve([]) : readRange(SP1, 'Facturacion_OP!A:AZ'),
     usePgEgresos ? Promise.resolve([]) : readRange(SP2, 'Consecutivo_de_egresos!A:AZ'),
-    loadMetasFromSheets(),
+    loadParametrosFromDB(),
   ]);
 
   // Ventas
@@ -811,6 +882,7 @@ async function ejecutarSnapshot(fechaParam = null) {
 
 router.post('/snapshot', async (req, res) => {
   try {
+    const metas = await loadParametrosFromDB();
     const fecha = (req.body && req.body.fecha) || req.query.fecha || null;
     const resultado = await ejecutarSnapshot(fecha);
     res.json(resultado);
@@ -879,33 +951,34 @@ router.get('/', async (req, res) => {
     const { mesLabel, mesNum, anio } = parsePeriodo(periodo);
 
     // Cargar metas desde Sheets (con fallback a .env si falla o no existe la clave)
-    const metas = await loadMetasFromSheets();
+    const metas = await loadParametrosFromDB();
 
-    const [ventas, margen, cartera, flujo, cierre, produccion, costo, rotacion, obligaciones, diario] = await Promise.all([
+    const [ventas, margen, cartera, flujo, cierre, produccion, costo, rotacion, obligaciones, diario, calidad] = await Promise.all([
       kpiVentasMeta({ mesNum, anio }, metas),
       kpiMargenCaja({ mesNum, anio }, metas),
       kpiCarteraPorAsesor(),
       kpiFlujoCaja({ mesNum, anio }, metas),
       kpiCierreMensual(periodo, metas),
       kpiOrdenesCumplidas({ mesNum, anio }),
-      kpiCostoProduccion({ mesNum, anio }),
+      kpiCostoProduccion({ mesNum, anio }, metas),
       kpiRotacionPersonal(periodo, metas),
       kpiObligacionesPorVencer(),
       kpiDiario(req.query.fecha, metas).catch(() => null),
+      kpiCalidadRegistro({ mesNum, anio }, metas),
     ]);
-
 
     res.json({
       periodo,
       kpis: {
-        ventas_meta:             { id: 'ventas-meta',             nombre: 'Ventas del mes vs meta',    area: 'Ventas',          ...ventas        },
+        ventas_meta:             { id: 'ventas-meta',             nombre: 'Ventas Reales (Facturado)',    area: 'Ventas',          ...ventas        },
         margen_caja:             { id: 'margen-caja',             nombre: 'Margen de caja',             area: 'Finanzas',        ...margen        },
         cartera_asesores:        { id: 'cartera-asesores',        nombre: 'CxC por Asesor',               area: 'Cartera',      ...cartera       },
         flujo_caja:              { id: 'flujo-caja',              nombre: 'Flujo de caja disponible',      area: 'Finanzas',     ...flujo         },
         obligaciones_por_vencer: { id: 'obligaciones-por-vencer', nombre: 'Obligaciones por vencer',      area: 'Proveedores',  ...obligaciones  },
         cierre_mensual:          { id: 'cierre-mensual',          nombre: '% Cierre mensual',           area: 'Todas las áreas', ...cierre        },
         ordenes_cumplidas:       { id: 'ordenes-cumplidas',       nombre: 'Órdenes Cumplidas',          area: 'Producción',      ...produccion    },
-        costo_produccion:        { id: 'costo-produccion',        nombre: 'Costo de Producción',        area: 'Producción',      ...costo         },
+        costo_produccion:        { id: 'costo-produccion',        nombre: 'Producción Cumplida (Valorizada)',        area: 'Producción',      ...costo         },
+        calidad_registro:        { id: 'calidad-registro',        nombre: 'Calidad de Registro',        area: 'Producción',      ...calidad       },
         rotacion_personal:       { id: 'rotacion-personal',       nombre: 'Rotación de personal',       area: 'Talento Humano',  ...rotacion      },
       },
       diario,
@@ -1017,10 +1090,10 @@ router.get('/ventas-debug', async (req, res) => {
  * Muestra el contenido crudo de Metas_Gerencia y el mapa resultante.
  * Útil para diagnosticar por qué una meta no se lee correctamente.
  */
-router.get('/metas-debug', async (req, res) => {
+router.get('/metas', async (req, res) => {
   try {
     const filas = await readRange(SP1, 'Metas_Gerencia!A:G');
-    const mapa  = await loadMetasFromSheets();
+    const mapa  = await loadParametrosFromDB();
     res.json({
       headers:        filas[0]  || [],
       filas_raw:      filas.slice(1),

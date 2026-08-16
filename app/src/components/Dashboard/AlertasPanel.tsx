@@ -129,7 +129,11 @@ export default function AlertasPanel({ kpis }: { kpis: Record<string, KPIReal> }
   const [expandido, setExpandido] = useState(true);
   const alertas   = generarAlertas(kpis);
 
-  if (alertas.length === 0) {
+  const rojas     = alertas.filter(a => a.nivel === 'rojo').length;
+  const amarillas = alertas.filter(a => a.nivel === 'amarillo').length;
+  const grises    = Object.values(kpis).filter(k => k.sinDatos).length;
+
+  if (alertas.length === 0 && grises === 0) {
     return (
       <div className="flex items-center gap-2 mb-6 px-1">
         <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -138,8 +142,8 @@ export default function AlertasPanel({ kpis }: { kpis: Record<string, KPIReal> }
     );
   }
 
-  const rojas     = alertas.filter(a => a.nivel === 'rojo').length;
-  const amarillas = alertas.filter(a => a.nivel === 'amarillo').length;
+  // Determine overall worst color for the header bar if we wanted to color it, but currently it's white.
+  // We just add the badges.
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6">
@@ -151,7 +155,7 @@ export default function AlertasPanel({ kpis }: { kpis: Record<string, KPIReal> }
       >
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-dashboard-textMain">⚡ Alertas activas</span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {rojas > 0 && (
               <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
@@ -162,6 +166,12 @@ export default function AlertasPanel({ kpis }: { kpis: Record<string, KPIReal> }
               <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>
                 {amarillas} en precaución
+              </span>
+            )}
+            {grises > 0 && (
+              <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span>
+                {grises} sin datos
               </span>
             )}
           </div>

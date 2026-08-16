@@ -24,10 +24,10 @@ import type { InformeCierre, AreaCierre } from './types/cierres';
 // ── Adaptador: KPIReal (backend) → KPI (componente tarjeta) ──────────────────
 
 function adaptarKPI(raw: KPIReal): KPI {
-  const alerta: AlertaColor = (raw.alerta as AlertaColor) ?? 'amarillo';
+  const alerta: AlertaColor = raw.sinDatos ? 'gris' : ((raw.alerta as AlertaColor) ?? 'amarillo');
 
   const descEstado = raw.fuente === 'real'
-    ? (alerta === 'verde' ? 'Normal' : alerta === 'amarillo' ? 'Precaución' : 'Alerta')
+    ? (raw.sinDatos ? 'Sin datos' : alerta === 'verde' ? 'Normal' : alerta === 'amarillo' ? 'Precaución' : 'Alerta')
     : raw.fuente === 'error' ? 'Error de lectura'
     : 'Pendiente de datos';
 
@@ -40,6 +40,8 @@ function adaptarKPI(raw: KPIReal): KPI {
     meta: raw.meta ?? raw.nota,
     alerta,
     descripcionAlerta: descEstado,
+    fechaActualizacion: raw.fechaActualizacion,
+    desactualizado: raw.desactualizado,
   };
 
   // ── Ventas: valor bruto como principal + desglose IVA/neto ──────────────
@@ -58,7 +60,7 @@ function adaptarKPI(raw: KPIReal): KPI {
 
   // ── Margen de caja: % como principal + monto absoluto y desglose ────────
   if (raw.id === 'margen-caja' && raw.valorAbsoluto) {
-    const descMargen = alerta === 'verde' ? 'Margen saludable' : alerta === 'amarillo' ? 'Margen ajustado' : 'Margen crítico';
+    const descMargen = raw.sinDatos ? 'Sin datos' : alerta === 'verde' ? 'Margen saludable' : alerta === 'amarillo' ? 'Margen ajustado' : 'Margen crítico';
     return {
       ...base,
       descripcionAlerta: descMargen,
@@ -68,7 +70,7 @@ function adaptarKPI(raw: KPIReal): KPI {
 
   // ── Flujo de caja: desglose ingresos/egresos + días de caja disponibles ───
   if (raw.id === 'flujo-caja') {
-    const descFlujo = alerta === 'verde' ? 'Flujo positivo' : alerta === 'amarillo' ? 'Flujo bajo' : 'Flujo negativo';
+    const descFlujo = raw.sinDatos ? 'Sin datos' : alerta === 'verde' ? 'Flujo positivo' : alerta === 'amarillo' ? 'Flujo low' : 'Flujo negativo';
     const diasLabel = raw.diasCajaDisponibles != null
       ? (raw.diasCajaDisponibles < 1
           ? 'Runway: < 1 día'
@@ -103,7 +105,7 @@ function adaptarKPI(raw: KPIReal): KPI {
 
   // ── Órdenes Cumplidas: cumplimiento % + críticas + días atraso ─────────────
   if (raw.id === 'ordenes-cumplidas' && raw.fuente === 'real') {
-    const descProd = alerta === 'verde' ? 'En meta' : alerta === 'amarillo' ? 'Con desviaciones' : 'Crítico';
+    const descProd = raw.sinDatos ? 'Sin datos' : alerta === 'verde' ? 'En meta' : alerta === 'amarillo' ? 'Con desviaciones' : 'Crítico';
 
     const filas: FilaGrid[] = [];
     if (raw.opsCriticas != null && raw.opsAtrasadas != null) {
@@ -123,7 +125,7 @@ function adaptarKPI(raw: KPIReal): KPI {
 
   // ── Costo de Producción: margen promedio + desglose facturado/costo ─────────
   if (raw.id === 'costo-produccion' && raw.fuente === 'real') {
-    const descCosto = alerta === 'verde' ? 'Margen positivo' : alerta === 'amarillo' ? 'Margen bajo' : 'Con pérdidas';
+    const descCosto = raw.sinDatos ? 'Sin datos' : alerta === 'verde' ? 'Margen positivo' : alerta === 'amarillo' ? 'Alerta amarilla' : 'Con pérdidas';
     const filas: FilaGrid[] = [];
     if (raw.valorProducido && raw.costoEjecutado) {
       filas.push({
@@ -140,7 +142,7 @@ function adaptarKPI(raw: KPIReal): KPI {
 
   // ── Obligaciones por vencer: total + desglose por rango de días ─────────────
   if (raw.id === 'obligaciones-por-vencer' && raw.fuente === 'real') {
-    const descOblig = raw.alerta === 'verde' ? 'Al día' : raw.alerta === 'amarillo' ? 'Con vencidos' : 'Vencidos urgentes';
+    const descOblig = raw.sinDatos ? 'Sin datos' : raw.alerta === 'verde' ? 'Al día' : raw.alerta === 'amarillo' ? 'Con vencidos' : 'Vencidos urgentes';
     const dv = raw.desgloseVencimientos;
 
     const filas: FilaGrid[] = [];
@@ -166,7 +168,7 @@ function adaptarKPI(raw: KPIReal): KPI {
 
   // ── Talento Humano: rotación + desglose empleados/retiros/ausentismo ────────
   if (raw.id === 'rotacion-personal' && raw.fuente === 'real') {
-    const descRot = alerta === 'verde' ? 'Normal' : alerta === 'amarillo' ? 'Moderada' : 'Alta';
+    const descRot = raw.sinDatos ? 'Sin datos' : alerta === 'verde' ? 'Normal' : alerta === 'amarillo' ? 'Moderada' : 'Alta';
     const lineas = [
       raw.totalEmpleados != null ? `Empleados: ${raw.totalEmpleados}`         : null,
       raw.retiros        != null ? `Retiros: ${raw.retiros}`                  : null,
@@ -207,19 +209,19 @@ function generarPeriodos(): string[] {
 // ── Vista Dashboard ───────────────────────────────────────────────────────────
 
 // IDs de KPIs que siguen usando el endpoint monolítico /api/kpis
-const KPIS_MONOLITICOS = ['flujo-caja', 'cierre-mensual', 'ordenes-cumplidas', 'costo-produccion', 'rotacion-personal', 'obligaciones-por-vencer'] as const;
+const KPIS_MONOLITICOS = ['flujo-caja', 'cierre-mensual', 'ordenes-cumplidas', 'costo-produccion', 'calidad-registro', 'rotacion-personal', 'obligaciones-por-vencer'] as const;
 // Orden de visualización de todos los KPIs
-const KPI_ORDER = ['ventas-meta', 'margen-caja', 'cartera-asesores', 'flujo-caja', 'cierre-mensual', 'ordenes-cumplidas', 'costo-produccion', 'rotacion-personal', 'obligaciones-por-vencer'];
+const KPI_ORDER = ['ventas-meta', 'margen-caja', 'cartera-asesores', 'flujo-caja', 'cierre-mensual', 'ordenes-cumplidas', 'costo-produccion', 'calidad-registro', 'rotacion-personal', 'obligaciones-por-vencer'];
 
-// Metadata para mostrar skeletons/errores con nombre y área
 const KPI_META: Record<string, { nombre: string; area: string }> = {
-  'ventas-meta':             { nombre: 'Ventas del mes vs meta',  area: 'Ventas' },
+  'ventas-meta':             { nombre: 'Ventas Reales (Facturado)',  area: 'Ventas' },
   'margen-caja':             { nombre: 'Margen de caja',          area: 'Finanzas' },
   'cartera-asesores':        { nombre: 'CxC por Asesor',          area: 'Cartera' },
   'flujo-caja':              { nombre: 'Flujo de caja disponible', area: 'Finanzas' },
   'cierre-mensual':          { nombre: '% Cierre mensual',        area: 'Todas las áreas' },
   'ordenes-cumplidas':       { nombre: 'Órdenes Cumplidas',       area: 'Producción' },
-  'costo-produccion':        { nombre: 'Costo de Producción',     area: 'Producción' },
+  'costo-produccion':        { nombre: 'Producción Cumplida (Valorizada)',     area: 'Producción' },
+  'calidad-registro':        { nombre: 'Calidad de Registro',     area: 'Producción' },
   'rotacion-personal':       { nombre: 'Rotación de personal',    area: 'Talento Humano' },
   'obligaciones-por-vencer': { nombre: 'Obligaciones por vencer', area: 'Proveedores' },
 };

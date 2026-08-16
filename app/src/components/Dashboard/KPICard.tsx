@@ -4,6 +4,7 @@ const coloresAlerta: Record<AlertaColor, { fondo: string; punto: string; texto: 
   verde:    { fondo: 'bg-emerald-50',  punto: 'bg-emerald-500', texto: 'text-emerald-700',  borde: 'border-emerald-200' },
   amarillo: { fondo: 'bg-amber-50',    punto: 'bg-amber-400',   texto: 'text-amber-700',    borde: 'border-amber-200' },
   rojo:     { fondo: 'bg-red-50',      punto: 'bg-red-500',     texto: 'text-red-700',      borde: 'border-red-200' },
+  gris:     { fondo: 'bg-slate-100',   punto: 'bg-slate-400',   texto: 'text-slate-600',    borde: 'border-slate-200' },
 };
 
 const iconosArea: Record<string, string> = {
@@ -109,6 +110,17 @@ export default function KPICard({ kpi }: { kpi: KPI }) {
           {kpi.subtexto.split(' | ').map((linea, i) => (
             <span key={i} className="text-xs text-dashboard-textMuted">{linea}</span>
           ))}
+        </div>
+      )}
+
+      {/* Frescura del dato (fecha de actualización) */}
+      {kpi.fechaActualizacion && (
+        <div className="mt-auto pt-2 flex justify-end">
+          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${kpi.desactualizado ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'text-slate-400'}`}>
+            {kpi.desactualizado ? '⚠ Desactualizado (último dato: ' : 'datos al '}
+            {new Date(kpi.fechaActualizacion).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}
+            {kpi.desactualizado ? ')' : ''}
+          </span>
         </div>
       )}
     </div>
