@@ -47,7 +47,7 @@ export default function AnalisisMateriales() {
 
   const dataProcesada = useMemo(() => {
     const getWords = (name: string) => {
-      return name.toLowerCase().split(/[^a-z0-9ñáéíóúü]+/i).filter(w => w.length > 3);
+      return name.toLowerCase().split(/[^a-z0-9ñáéíóúü]+/i).filter(w => w.length >= 3);
     };
 
     const hasSharedWord = (name1: string, name2: string) => {
@@ -69,10 +69,17 @@ export default function AnalisisMateriales() {
         isAjustado = true;
       }
 
+      // Prevenir NaN por comas en strings
+      const parseNum = (val: any) => {
+        if (typeof val === 'number') return val;
+        if (!val) return 0;
+        return Number(String(val).replace(',', '.'));
+      };
+
       return {
         ...d,
-        cant_cotizada: Number(d.cant_cotizada),
-        cant_ejecutada: Number(d.cant_ejecutada),
+        cant_cotizada: parseNum(d.cant_cotizada),
+        cant_ejecutada: parseNum(d.cant_ejecutada),
         isAjustado,
         costo_unit_cotizado,
         costo_unit_ejecutado,
@@ -84,7 +91,7 @@ export default function AnalisisMateriales() {
 
     const byOp: Record<string, typeof basicData> = {};
     basicData.forEach(d => {
-      const opKey = String(d.nro_op);
+      const opKey = String(d.nro_op).trim();
       if (!byOp[opKey]) byOp[opKey] = [];
       byOp[opKey].push(d);
     });
@@ -93,8 +100,8 @@ export default function AnalisisMateriales() {
 
     for (const op in byOp) {
       const items = byOp[op];
-      const soloCot = items.filter(d => d.cant_cotizada > 0 && d.cant_ejecutada === 0);
-      const soloEjec = items.filter(d => d.cant_cotizada === 0 && d.cant_ejecutada > 0);
+      const soloCot = items.filter(d => d.cant_cotizada > 0 && d.cant_ejecutada <= 0.001);
+      const soloEjec = items.filter(d => d.cant_cotizada <= 0.001 && d.cant_ejecutada > 0);
       
       const matchedCot = new Set();
       const matchedEjec = new Set();
@@ -532,7 +539,7 @@ export default function AnalisisMateriales() {
                                 <td className="px-2 py-3 text-right tabular-nums font-medium text-slate-800">{d.costo_unit_ejecutado !== null ? fmtCOP.format(d.costo_unit_ejecutado) : '-'}</td>
                                 <td className="px-2 py-3 text-right tabular-nums text-slate-500">{fmtCOP.format(d.valor_cotizado)}</td>
                                 <td className="px-2 py-3 text-right tabular-nums text-slate-700">{fmtCOP.format(d.valor_ejecutado)}</td>
-                                <td className={`px-2 py-3 text-right tabular-nums font-black flex items-center justify-end gap-1 ${d.cumplimiento < -100 ? 'text-red-600' : d.cumplimiento > 100 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                                <td className={`px-2 py-3 text-right tabular-nums font-black flex items-center justify-end gap-1 ${d.cumplimiento < -100 ? 'text-red-600' : (d.cumplimiento > 100 && d.tipo_especial === 'normal') ? 'text-emerald-600' : 'text-slate-600'}`}>
                                   {hasDescuadre && (
                                     <div className="relative group/tooltip flex items-center">
                                       <span className="text-amber-500 cursor-help">
