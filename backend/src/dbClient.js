@@ -46,4 +46,4 @@ async function testConnection() {
   }
 }
 
-module.exports = { query, testConnection };
+module.exports = { query, testConnection, pool };

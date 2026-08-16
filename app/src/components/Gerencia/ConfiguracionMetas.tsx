@@ -42,7 +42,8 @@ export default function ConfiguracionMetas() {
       await cargarDatos();
       setEditando(null);
     } catch (err: any) {
-      alert(err.message || 'Error al guardar');
+      const msg = err.message || 'Error al guardar';
+      alert(`No se pudo guardar: ${msg}`);
     } finally {
       setGuardando(false);
     }
