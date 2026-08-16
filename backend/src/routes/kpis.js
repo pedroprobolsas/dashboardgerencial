@@ -12,25 +12,26 @@ const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto'
 // ── Metas desde Google Sheets con fallback a .env ─────────────────────────────
 
 const ENV_METAS = {
-  ventas_mes:             parseFloat(process.env.META_VENTAS                  || '200000000'),
+  meta_ventas_mes:        parseFloat(process.env.META_VENTAS                  || '450000000'),
   ventas_pct_verde:       parseFloat(process.env.META_VENTAS_PCT_VERDE        || '90'),
   ventas_pct_amarillo:    parseFloat(process.env.META_VENTAS_PCT_AMARILLO     || '80'),
-  // Margen: meta objetivo (mínimo aceptable) + umbrales de semáforo
-  margen_bruto:           parseFloat(process.env.META_MARGEN_BRUTO            || '28'),
-  margen_verde:           parseFloat(process.env.META_MARGEN_VERDE            || '35'),
+  // Margen de caja
+  meta_margen_caja:       parseFloat(process.env.META_MARGEN_VERDE            || '35'),
   margen_amarillo:        parseFloat(process.env.META_MARGEN_AMARILLO         || '25'),
   // Cartera / proveedores
+  cartera_vencida_alerta: parseFloat(process.env.META_CARTERA_ALERTA_ROJA     || '40'),
+  cartera_vencida_alerta_amarilla: parseFloat(process.env.META_CARTERA_ALERTA_AMARILLA || '20'),
   cartera_verde:          parseFloat(process.env.META_CARTERA_VERDE           || '30000000'),
   cartera_amarillo:       parseFloat(process.env.META_CARTERA_AMARILLO        || '50000000'),
   cartera_vencida_max:    parseFloat(process.env.META_CARTERA_MAX             || '30000000'),
   // Flujo de caja
   flujo_verde:            parseFloat(process.env.META_FLUJO_VERDE             || '50000000'),
   // Eficiencia producción
-  eficiencia_produccion:  parseFloat(process.env.META_EFICIENCIA              || '85'),
+  meta_margen_produccion: parseFloat(process.env.META_MARGEN_PRODUCCION       || '18'),
   // Rotación personal
   rotacion_personal_max:  parseFloat(process.env.META_ROTACION               || '5'),
   // Cierres
-  cierre_mensual:         parseFloat(process.env.META_CIERRE                  || '100'),
+  meta_aprobaciones_cierre: parseFloat(process.env.META_CIERRE                  || '5'),
   cierre_verde:           parseFloat(process.env.META_CIERRE_VERDE            || '100'),
   cierre_amarillo:        parseFloat(process.env.META_CIERRE_AMARILLO         || '60'),
 };
@@ -151,7 +152,7 @@ async function kpiCierreMensual(periodo, metas = {}) {
 
     const datos = filas.slice(1).filter(f => f[iPeriodo] === periodo);
     const aprobados = datos.filter(f => f[iEstado] === 'APROBADO').length;
-    const total = 5;
+    const total = getMeta(metas, 'meta_aprobaciones_cierre') || 5;
     const pct = Math.round((aprobados / total) * 100);
 
     return {
@@ -202,7 +203,7 @@ async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
     const bruto      = parseFloat(rows[0]?.total_bruto || 0);
     const iva        = parseFloat(rows[0]?.total_iva   || 0);
     const neto       = parseFloat(rows[0]?.total_neto  || 0);
-    const metaVentas = getMeta(metas, 'ventas_mes');
+    const metaVentas = getMeta(metas, 'meta_ventas_mes');
     const pct        = Math.round((bruto / metaVentas) * 100);
     const fmt        = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
@@ -269,7 +270,7 @@ async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
     }
 
     const fmt           = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
-    const umbralVerde   = getMeta(metas, 'margen_verde');
+    const umbralVerde   = getMeta(metas, 'meta_margen_caja');
     const umbralAmari   = getMeta(metas, 'margen_amarillo');
 
     return {
@@ -294,7 +295,7 @@ async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
 // Snapshot de cartera_vendedor (se actualiza completa en cada sync).
 // Muestra total + top asesores por saldo, con desglose vencido/corriente.
 
-async function kpiCarteraPorAsesor() {
+async function kpiCarteraPorAsesor(metas = {}) {
   try {
     const { rows } = await query(
       `SELECT
@@ -340,8 +341,8 @@ async function kpiCarteraPorAsesor() {
       corrienteRaw:   corriente,
       topAsesores,
       alerta: alertaColor(vencidoPct, {
-        verde:    v => v <= 20,
-        amarillo: v => v <= 40,
+        verde:    v => v <= (getMeta(metas, 'cartera_vencida_alerta_amarilla') || 20),
+        amarillo: v => v <= (getMeta(metas, 'cartera_vencida_alerta') || 40),
       }),
     };
   } catch (err) {
@@ -458,18 +459,19 @@ async function kpiOrdenesCumplidas({ mesNum, anio }) {
 async function kpiCostoProduccion({ mesNum, anio }, metas = {}) {
   try {
     const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
+    const margenMinimo = getMeta(metas, 'meta_margen_produccion') || 18;
     const { rows } = await query(
       `SELECT
          COUNT(*)                                AS ops_mes,
          ROUND(AVG(margen_pct), 1)              AS margen_promedio_pct,
          ROUND(SUM(costo_total), 0)             AS total_costo_ejecutado,
          ROUND(SUM(valor_cumplido), 0)          AS total_facturado,
-         COUNT(*) FILTER (WHERE margen_pct < 18) AS ops_con_perdida
+         COUNT(*) FILTER (WHERE margen_pct < $2) AS ops_con_perdida
        FROM crisolweb.costo_por_orden
        WHERE fecha >= $1::date
          AND fecha <  ($1::date + INTERVAL '1 month')
          AND costo_total > 0`,
-      [primerDiaMes]
+      [primerDiaMes, margenMinimo]
     );
 
     const { rows: rowsMax } = await query('SELECT MAX(fecha)::date as max_date FROM crisolweb.costo_por_orden');
@@ -957,7 +959,7 @@ router.get('/', async (req, res) => {
     const [ventas, margen, cartera, flujo, cierre, produccion, costo, rotacion, obligaciones, diario, calidad] = await Promise.all([
       kpiVentasMeta({ mesNum, anio }, metas),
       kpiMargenCaja({ mesNum, anio }, metas),
-      kpiCarteraPorAsesor(),
+      kpiCarteraPorAsesor(metas),
       kpiFlujoCaja({ mesNum, anio }, metas),
       kpiCierreMensual(periodo, metas),
       kpiOrdenesCumplidas({ mesNum, anio }),
