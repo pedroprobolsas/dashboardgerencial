@@ -89,7 +89,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       margen_absoluto: ventas - egresos,
       margen_absoluto_fmt: fmt.format(ventas - egresos),
       margen_pct: null,
-      alerta: 'amarillo',
+      alerta: 'gris',
       sinDatos: true,
       detalle: egresos === 0 ? 'Sin datos de egresos' : 'Sin datos de ventas'
     };

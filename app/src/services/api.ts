@@ -357,9 +357,9 @@ export async function fetchMargenGlobal(periodo: string): Promise<KPIReal> {
   return {
     id: 'margen-caja', nombre: 'Margen de caja', area: 'Finanzas',
     fuente: 'real',
-    sinDatos: data.ventas === 0,
+    sinDatos: data.sinDatos || false,
     valor: data.margen_pct,
-    valorFormateado: `${data.margen_pct}%`,
+    valorFormateado: data.sinDatos ? '—' : `${data.margen_pct}%`,
     valorAbsoluto: data.margen_absoluto_fmt,
     detalle: `Ventas: ${data.ventas_fmt} | Egresos: ${data.egresos_fmt}`,
     meta: 'Meta: ≥ 35%',

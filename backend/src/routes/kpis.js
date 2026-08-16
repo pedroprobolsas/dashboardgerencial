@@ -264,8 +264,8 @@ async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
     const margen  = ventas - egresos;
     const pct     = ventas !== 0 ? parseFloat((margen / ventas * 100).toFixed(1)) : null;
 
-    if (ventas === 0 || pct === null || isNaN(pct)) {
-      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo' };
+    if (ventas === 0 || egresos === 0 || pct === null || isNaN(pct)) {
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'gris', detalle: egresos === 0 ? 'Sin datos de egresos' : 'Sin datos de ventas' };
     }
 
     const fmt           = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
@@ -364,13 +364,14 @@ async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
       [mesStr]
     );
 
-    if (!rows[0]) {
-      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin datos este período', alerta: 'amarillo' };
+    const ingresos = parseFloat(rows[0]?.ingresos_mes_acum || 0);
+    const egresos  = parseFloat(rows[0]?.egresos_mes_acum  || 0);
+    const flujo    = parseFloat(rows[0]?.flujo_mes_acum    || 0);
+
+    if (!rows[0] || (ingresos === 0 && egresos === 0)) {
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin datos este período', alerta: 'gris' };
     }
 
-    const ingresos = parseFloat(rows[0].ingresos_mes_acum || 0);
-    const egresos  = parseFloat(rows[0].egresos_mes_acum  || 0);
-    const flujo    = parseFloat(rows[0].flujo_mes_acum    || 0);
     const fmt      = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
     const diasCajaDisponibles = egresos > 0
