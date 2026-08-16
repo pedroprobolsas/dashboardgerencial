@@ -7,6 +7,7 @@ export type Vista =
   | 'cierre-cartera'
   | 'cierre-talento-humano'
   | 'bandeja-aprobacion'
+  | 'costo-produccion-detalle'
   | 'analisis-responsables'
   | 'analisis-materiales'
   | 'configuracion';
