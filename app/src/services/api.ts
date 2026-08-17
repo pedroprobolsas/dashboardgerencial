@@ -538,7 +538,10 @@ export interface MetaMensual {
 export async function fetchMetasMensualesAnios(): Promise<number[]> {
   const res = await fetch('/api/metas_mensuales/anios');
   checkAuthError(res);
-  if (!res.ok) throw new Error(`Error ${res.status} al obtener años de metas`);
+  if (!res.ok) {
+    const errObj = await res.json().catch(() => ({}));
+    throw new Error(errObj.error || errObj.detalle || `Error ${res.status} al obtener años de metas`);
+  }
   const data = await res.json();
   return data.data || [];
 }
@@ -546,7 +549,10 @@ export async function fetchMetasMensualesAnios(): Promise<number[]> {
 export async function fetchMetasMensuales(anio: number, concepto: string = 'ventas'): Promise<MetaMensual[]> {
   const res = await fetch(`/api/metas_mensuales?anio=${anio}&concepto=${concepto}`);
   checkAuthError(res);
-  if (!res.ok) throw new Error(`Error ${res.status} al obtener metas mensuales`);
+  if (!res.ok) {
+    const errObj = await res.json().catch(() => ({}));
+    throw new Error(errObj.error || errObj.detalle || `Error ${res.status} al obtener metas mensuales`);
+  }
   const data = await res.json();
   return data.data || [];
 }
