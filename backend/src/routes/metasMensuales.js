@@ -1,6 +1,6 @@
 'use strict';
 const { Router } = require('express');
-const { query, getClient } = require('../dbClient');
+const { query, pool } = require('../dbClient');
 const asyncHandler = require('../asyncHandler');
 const logger = require('../logger');
 
@@ -91,7 +91,7 @@ router.post('/bulk', asyncHandler(ENDPOINT, async (req, res) => {
     }
   }
 
-  const client = await getClient();
+  const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
@@ -140,7 +140,7 @@ router.post('/duplicar', asyncHandler(ENDPOINT, async (req, res) => {
     return res.status(403).json({ ok: false, error: 'Solo los administradores pueden forzar la duplicación (sobrescribir)' });
   }
 
-  const client = await getClient();
+  const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
