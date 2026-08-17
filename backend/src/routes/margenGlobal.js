@@ -63,10 +63,10 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       [fecha_inicio, fecha_fin]
     ),
     query(
-      `SELECT COALESCE(SUM(egresos_dia), 0) AS total_egresos
-       FROM analytics.v_vistazo_diario
-       WHERE fecha >= $1::date
-         AND fecha <= $2::date`,
+      `SELECT COALESCE(SUM(total_egresos), 0) AS total_egresos
+       FROM crisolweb.egresos_agrupados_concepto
+       WHERE fecha_contable >= $1::date
+         AND fecha_contable <= $2::date`,
       [fecha_inicio, fecha_fin]
     ),
   ]);
