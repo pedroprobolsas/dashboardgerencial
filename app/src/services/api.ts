@@ -540,7 +540,7 @@ export async function fetchMetasMensualesAnios(): Promise<number[]> {
   checkAuthError(res);
   if (!res.ok) {
     const errObj = await res.json().catch(() => ({}));
-    throw new Error(errObj.error || errObj.detalle || `Error ${res.status} al obtener años de metas`);
+    throw new Error(errObj.detalle || errObj.error || `Error ${res.status} al obtener años de metas`);
   }
   const data = await res.json();
   return data.data || [];
@@ -551,7 +551,7 @@ export async function fetchMetasMensuales(anio: number, concepto: string = 'vent
   checkAuthError(res);
   if (!res.ok) {
     const errObj = await res.json().catch(() => ({}));
-    throw new Error(errObj.error || errObj.detalle || `Error ${res.status} al obtener metas mensuales`);
+    throw new Error(errObj.detalle || errObj.error || `Error ${res.status} al obtener metas mensuales`);
   }
   const data = await res.json();
   return data.data || [];
