@@ -25,6 +25,7 @@ const analisisResponsablesRouter = require('./routes/analisisResponsables');
 const analisisMaterialesRouter   = require('./routes/analisisMateriales');
 const informesRouter       = require('./routes/informes');
 const parametrosRouter     = require('./routes/parametros');
+const metasMensualesRouter = require('./routes/metasMensuales');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -143,6 +144,7 @@ app.use('/api/analisis_responsables', analisisResponsablesRouter);
 app.use('/api/analisis_materiales', analisisMaterialesRouter);
 app.use('/api/informes',          informesRouter);
 app.use('/api/parametros',        parametrosRouter);
+app.use('/api/metas_mensuales',   metasMensualesRouter);
 app.use('/api/usuarios',          usuariosRouter);
 
 // ── Error handler global ──────────────────────────────────────────────────────

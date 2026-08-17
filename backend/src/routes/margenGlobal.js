@@ -59,7 +59,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
        FROM crisolweb.facturas
        WHERE fecha_creacion >= $1::date
          AND fecha_creacion <= $2::date
-         AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))`,
+         AND (estado IS NULL OR UPPER(TRIM(estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))`,
       [fecha_inicio, fecha_fin]
     ),
     query(

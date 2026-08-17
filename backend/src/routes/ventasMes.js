@@ -60,13 +60,13 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     query(
       `SELECT
          COUNT(*)              AS facturas,
-         ROUND(SUM(valor_bruto), 2) AS total_bruto,
-         ROUND(SUM(valor_iva), 2)   AS total_iva,
-         ROUND(SUM(valor_neto), 2)  AS total_neto
+         COALESCE(ROUND(SUM(valor_bruto), 2), 0) AS total_bruto,
+         COALESCE(ROUND(SUM(valor_iva), 2), 0)   AS total_iva,
+         COALESCE(ROUND(SUM(valor_neto), 2), 0)  AS total_neto
        FROM crisolweb.facturas
        WHERE fecha_creacion >= $1::date
          AND fecha_creacion <= $2::date
-         AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))`,
+         AND (estado IS NULL OR UPPER(TRIM(estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))`,
       [fecha_inicio, fecha_fin]
     ),
     query(
@@ -79,7 +79,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
        FROM crisolweb.facturas
        WHERE fecha_creacion >= $1::date
          AND fecha_creacion <= $2::date
-         AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))
+         AND (estado IS NULL OR UPPER(TRIM(estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))
        ORDER BY fecha_creacion DESC
        LIMIT $3`,
       [fecha_inicio, fecha_fin, limit]

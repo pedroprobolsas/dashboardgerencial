@@ -522,3 +522,63 @@ export async function fetchPrefill(area: string, periodo: string): Promise<Respu
   if (!res.ok) throw new Error(`Error ${res.status} al obtener datos del sistema`);
   return res.json();
 }
+
+// ── Metas Mensuales ───────────────────────────────────────────────────────────
+
+export interface MetaMensual {
+  id?: number;
+  anio: number;
+  mes: number;
+  concepto: string;
+  valor: number;
+  modificado_por?: string;
+  modificado_en?: string;
+}
+
+export async function fetchMetasMensualesAnios(): Promise<number[]> {
+  const res = await fetch('/api/metas_mensuales/anios');
+  checkAuthError(res);
+  if (!res.ok) throw new Error(`Error ${res.status} al obtener años de metas`);
+  const data = await res.json();
+  return data.data || [];
+}
+
+export async function fetchMetasMensuales(anio: number, concepto: string = 'ventas'): Promise<MetaMensual[]> {
+  const res = await fetch(`/api/metas_mensuales?anio=${anio}&concepto=${concepto}`);
+  checkAuthError(res);
+  if (!res.ok) throw new Error(`Error ${res.status} al obtener metas mensuales`);
+  const data = await res.json();
+  return data.data || [];
+}
+
+export async function saveMetasMensualesBulk(anio: number, meses: { mes: number, valor: number }[], concepto: string = 'ventas'): Promise<void> {
+  const res = await fetch('/api/metas_mensuales/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ anio, meses, concepto }),
+  });
+  checkAuthError(res);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Error ${res.status} al guardar metas masivamente`);
+  }
+}
+
+export async function duplicateMetasMensuales(anioOrigen: number, anioDestino: number, force: boolean = false, concepto: string = 'ventas'): Promise<void> {
+  const res = await fetch('/api/metas_mensuales/duplicar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ anioOrigen, anioDestino, force, concepto }),
+  });
+  checkAuthError(res);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    // We can throw a specific error structure if we need to detect the "requiresForce" flag in the frontend
+    if (res.status === 409 && err.requiresForce) {
+      const customErr: any = new Error(err.error);
+      customErr.requiresForce = true;
+      throw customErr;
+    }
+    throw new Error(err.error || `Error ${res.status} al duplicar metas`);
+  }
+}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { fetchParametros, fetchHistorialParametros, updateParametro, type Parametro } from '../../services/api';
 
 import { useAuth } from '../Auth/AuthContext';
+import MetasMensualesGrid from './MetasMensualesGrid';
 
 export default function ConfiguracionMetas() {
   const { user } = useAuth();
@@ -200,6 +201,8 @@ export default function ConfiguracionMetas() {
           </section>
         ))}
       </div>
+
+      <MetasMensualesGrid />
     </div>
   );
 }

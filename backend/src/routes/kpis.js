@@ -171,41 +171,125 @@ async function kpiCierreMensual(periodo, metas = {}) {
   }
 }
 
+/**
+ * Calcula días hábiles de un mes (lunes a viernes).
+ * Encapsulado para futura incorporación de festivos de Colombia.
+ */
+function calcularDiasHabiles(anio, mesNum) {
+  const hoy = new Date();
+  const anioActual = hoy.getFullYear();
+  const mesActual = hoy.getMonth() + 1;
+  
+  const esMesActual = anio === anioActual && mesNum === mesActual;
+  const esMesPasado = anio < anioActual || (anio === anioActual && mesNum < mesActual);
+  const esMesFuturo = anio > anioActual || (anio === anioActual && mesNum > mesActual);
+  
+  const fechaFin = new Date(anio, mesNum, 0); // último día del mes
+  const diasTotalesMes = fechaFin.getDate();
+  
+  let habilesTotales = 0;
+  let habilesTranscurridos = 0;
+  
+  const diaTope = esMesActual ? hoy.getDate() : esMesPasado ? diasTotalesMes : 0;
+  
+  for (let d = 1; d <= diasTotalesMes; d++) {
+    const fecha = new Date(anio, mesNum - 1, d);
+    const diaSemana = fecha.getDay(); // 0 = Dom, 6 = Sab
+    const esHabil = diaSemana !== 0 && diaSemana !== 6;
+    
+    if (esHabil) {
+      habilesTotales++;
+      if (d <= diaTope) {
+        habilesTranscurridos++;
+      }
+    }
+  }
+  
+  if (habilesTotales === 0) habilesTotales = 1;
+  if (habilesTranscurridos === 0 && esMesActual) habilesTranscurridos = 1;
+
+  return { transcurridos: habilesTranscurridos, totales: habilesTotales, esMesActual, esMesPasado, esMesFuturo };
+}
+
 // ── KPI: Ventas del mes vs meta ───────────────────────────────────────────────
 
 async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
   try {
     const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
-    const { rows } = await query(
-      `SELECT SUM(valor_bruto) AS total_bruto,
-              SUM(valor_iva)   AS total_iva,
-              SUM(valor_neto)  AS total_neto,
-              COUNT(*)         AS facturas
-       FROM crisolweb.facturas
-       WHERE fecha_creacion >= $1::date
-         AND fecha_creacion <  ($1::date + INTERVAL '1 month')
-         AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))`,
-      [primerDiaMes]
-    );
-
-    const facturas   = parseInt(rows[0]?.facturas    || 0, 10);
     
-    // Obtener fecha máxima para frescura de datos
-    const { rows: rowsMax } = await query('SELECT MAX(fecha_creacion)::date as max_date FROM crisolweb.facturas');
-    const maxDate = rowsMax[0]?.max_date;
+    const [ventasResult, metasResult, maxDateResult] = await Promise.all([
+      query(
+        `SELECT COALESCE(SUM(valor_bruto), 0) AS total_bruto,
+                COALESCE(SUM(valor_iva), 0)   AS total_iva,
+                COALESCE(SUM(valor_neto), 0)  AS total_neto,
+                COUNT(*)         AS facturas
+         FROM crisolweb.facturas
+         WHERE fecha_creacion >= $1::date
+           AND fecha_creacion <  ($1::date + INTERVAL '1 month')
+           AND (estado IS NULL OR UPPER(TRIM(estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))`,
+        [primerDiaMes]
+      ),
+      query(
+        `SELECT valor FROM app_ops.metas_mensuales WHERE anio = $1 AND mes = $2 AND concepto = 'ventas'`,
+        [anio, mesNum]
+      ),
+      query('SELECT MAX(fecha_creacion)::date as max_date FROM crisolweb.facturas')
+    ]);
+
+    const rows = ventasResult.rows;
+    const facturas = parseInt(rows[0]?.facturas || 0, 10);
+    const maxDate = maxDateResult.rows[0]?.max_date;
     const diffDias = maxDate ? Math.floor((new Date() - new Date(maxDate)) / (1000 * 60 * 60 * 24)) : 0;
     const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
 
+    const metaRow = metasResult.rows[0];
+    const tieneMeta = !!metaRow;
+    const metaVentas = tieneMeta ? parseFloat(metaRow.valor) : 0;
+
+    const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+
     if (facturas === 0) {
-      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin facturas este período', alerta: 'amarillo', fechaActualizacion: maxDate, desactualizado: diffDias > limiteDias };
+      return { 
+        fuente: 'real', 
+        sinDatos: true, 
+        valor: 0, 
+        valorFormateado: '—', 
+        meta: tieneMeta ? `Meta: ${fmt.format(metaVentas)}` : 'Meta no configurada', 
+        alerta: tieneMeta ? 'amarillo' : 'gris', 
+        fechaActualizacion: maxDate, 
+        desactualizado: diffDias > limiteDias 
+      };
     }
 
-    const bruto      = parseFloat(rows[0]?.total_bruto || 0);
-    const iva        = parseFloat(rows[0]?.total_iva   || 0);
-    const neto       = parseFloat(rows[0]?.total_neto  || 0);
-    const metaVentas = getMeta(metas, 'meta_ventas_mes');
-    const pct        = Math.round((bruto / metaVentas) * 100);
-    const fmt        = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+    const bruto = parseFloat(rows[0]?.total_bruto || 0);
+    const iva   = parseFloat(rows[0]?.total_iva   || 0);
+    const neto  = parseFloat(rows[0]?.total_neto  || 0);
+
+    if (!tieneMeta || metaVentas === 0) {
+      return {
+        fuente: 'real',
+        valor: null,
+        valorFormateado: '—',
+        valorAbsoluto: fmt.format(bruto),
+        valorBruto:    fmt.format(bruto),
+        valorIva:      fmt.format(iva),
+        valorNetoTotal: fmt.format(neto),
+        meta: 'Meta no configurada',
+        fechaActualizacion: maxDate,
+        desactualizado: diffDias > limiteDias,
+        alerta: 'gris',
+      };
+    }
+
+    const pct = Math.round((bruto / metaVentas) * 100);
+    
+    const { transcurridos, totales, esMesActual } = calcularDiasHabiles(anio, mesNum);
+    let metaTexto = `Meta: ${fmt.format(metaVentas)}`;
+    
+    if (esMesActual) {
+      const proyectado = Math.round((bruto / metaVentas) / (transcurridos / totales) * 100);
+      metaTexto += ` | ${pct}% con ${transcurridos} de ${totales} días hábiles (proyectado ${proyectado}%)`;
+    }
 
     return {
       fuente: 'real',
@@ -215,7 +299,7 @@ async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
       valorBruto:    fmt.format(bruto),
       valorIva:      fmt.format(iva),
       valorNetoTotal: fmt.format(neto),
-      meta: `Meta: ${fmt.format(metaVentas)}`,
+      meta: metaTexto,
       fechaActualizacion: maxDate,
       desactualizado: diffDias > limiteDias,
       alerta: alertaColor(pct, {
@@ -247,7 +331,7 @@ async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
          FROM crisolweb.facturas
          WHERE fecha_creacion >= $1::date
            AND fecha_creacion <  ($1::date + INTERVAL '1 month')
-           AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR'))`,
+           AND (estado IS NULL OR UPPER(TRIM(estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))`,
         [primerDiaMes]
       ),
       query(
@@ -795,10 +879,10 @@ async function ejecutarSnapshot(fechaParam = null) {
     metas,
   ] = await Promise.all([
     usePgVentas
-      ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE fecha_creacion::date = $1 AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR')) AND valor_neto > 0`, [fecha])
+      ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE fecha_creacion::date = $1 AND (estado IS NULL OR UPPER(TRIM(estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA')) AND valor_neto > 0`, [fecha])
       : Promise.resolve(null),
     usePgVentas
-      ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE DATE_TRUNC('month', fecha_creacion) = $1::date AND fecha_creacion::date <= $2 AND (estado IS NULL OR estado NOT IN ('ANULADO', 'SIN CONFIRMAR')) AND valor_neto > 0`, [`${tY}-${String(tM).padStart(2, '0')}-01`, fecha])
+      ? query(`SELECT COALESCE(SUM(valor_neto), 0) AS total FROM crisolweb.facturas WHERE DATE_TRUNC('month', fecha_creacion) = $1::date AND fecha_creacion::date <= $2 AND (estado IS NULL OR UPPER(TRIM(estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA')) AND valor_neto > 0`, [`${tY}-${String(tM).padStart(2, '0')}-01`, fecha])
       : Promise.resolve(null),
     readRange(SP1, 'LISTADO_DE_INGRESOS!A:AZ'),
     usePgEgresos
