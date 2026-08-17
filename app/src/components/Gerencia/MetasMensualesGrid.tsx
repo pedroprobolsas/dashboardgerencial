@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { fetchMetasMensuales, saveMetasMensualesBulk, duplicateMetasMensuales, fetchMetasMensualesAnios, type MetaMensual } from '../../services/api';
+import { useState, useEffect, useMemo } from 'react';
+import { fetchMetasMensuales, saveMetasMensualesBulk, duplicateMetasMensuales, fetchMetasMensualesAnios } from '../../services/api';
 import { useAuth } from '../Auth/AuthContext';
 
 const NOMBRES_MESES = [
