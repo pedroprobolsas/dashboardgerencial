@@ -335,12 +335,11 @@ async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
         [primerDiaMes]
       ),
       query(
-        `SELECT egresos_mes_acum AS total
-         FROM analytics.v_vistazo_diario
-         WHERE mes = $1
-         ORDER BY fecha DESC
-         LIMIT 1`,
-        [mesStr]
+        `SELECT COALESCE(SUM(total_egresos), 0) AS total
+         FROM crisolweb.egresos_agrupados_concepto
+         WHERE fecha_contable >= $1::date
+           AND fecha_contable <  ($1::date + INTERVAL '1 month')`,
+        [primerDiaMes]
       ),
     ]);
 
