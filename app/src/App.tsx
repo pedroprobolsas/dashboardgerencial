@@ -17,7 +17,7 @@ import Usuarios from './components/Gerencia/Usuarios';
 import Login from './components/Auth/Login';
 import { AuthContext } from './components/Auth/AuthContext';
 import { type KPI, type AlertaColor, type FilaGrid } from './data/kpis';
-import { fetchKPIs, fetchVentasMes, fetchCarteraAsesor, fetchMargenGlobal, enviarCierre, actualizarEstadoCierre, fetchBandeja, fetchMe, logout as apiLogout, type KPIReal, type KPIDiario, type Usuario } from './services/api';
+import { fetchKPIs, fetchVentasMes, fetchCarteraAsesor, fetchMargenGlobal, enviarCierre, actualizarEstadoCierre, fetchBandeja, fetchMe, logout as apiLogout, fetchTarjetasDashboard, type KPIReal, type KPIDiario, type Usuario, type TarjetaDashboard } from './services/api';
 import VistazoDiario from './components/Dashboard/VistazoDiario';
 import type { InformeCierre, AreaCierre } from './types/cierres';
 
@@ -248,6 +248,19 @@ function Dashboard() {
   const [rawKpisMap, setRawKpisMap] = useState<Record<string, KPIReal>>({});
   const [fuentesListas, setFuentesListas] = useState(0);
   const [fuentesTotales] = useState(4); // ventas, cartera, margen, monolítico
+  const [tarjetasConfig, setTarjetasConfig] = useState<TarjetaDashboard[] | null>(null);
+
+  // Cargar configuración de tarjetas (una sola vez)
+  useEffect(() => {
+    fetchTarjetasDashboard()
+      .then(setTarjetasConfig)
+      .catch(() => setTarjetasConfig(null)); // fallback a KPI_ORDER
+  }, []);
+
+  // Orden dinámico: usa config de BD si existe, si no el hardcoded
+  const visibleKpiOrder = tarjetasConfig
+    ? tarjetasConfig.filter(t => t.visible).map(t => t.clave)
+    : KPI_ORDER;
 
   // Inicializar estado de todos los widgets como loading
   useEffect(() => {
@@ -361,7 +374,7 @@ function Dashboard() {
       )}
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-        {KPI_ORDER.map(id => {
+        {visibleKpiOrder.map(id => {
           const w = widgets[id];
           if (!w || w.loading) return <KPICardSkeleton key={id} />;
           if (w.error) return <KPICardError key={id} nombre={KPI_META[id]?.nombre ?? id} area={KPI_META[id]?.area ?? ''} />;

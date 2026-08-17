@@ -3,6 +3,7 @@ import { fetchParametros, fetchHistorialParametros, updateParametro, type Parame
 
 import { useAuth } from '../Auth/AuthContext';
 import MetasMensualesGrid from './MetasMensualesGrid';
+import TarjetasDashboardConfig from './TarjetasDashboardConfig';
 
 export default function ConfiguracionMetas() {
   const { user } = useAuth();
@@ -203,6 +204,7 @@ export default function ConfiguracionMetas() {
       </div>
 
       <MetasMensualesGrid />
+      <TarjetasDashboardConfig />
     </div>
   );
 }

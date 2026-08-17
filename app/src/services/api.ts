@@ -597,3 +597,33 @@ export async function duplicateMetasMensuales(anioOrigen: number, anioDestino: n
     throw new Error(err.detalle || err.error || `Error ${res.status} al duplicar metas`);
   }
 }
+
+// ── Tarjetas del Dashboard (visibilidad y orden) ──────────────────────────────
+
+export interface TarjetaDashboard {
+  clave: string;
+  nombre: string;
+  visible: boolean;
+  orden: number;
+}
+
+export async function fetchTarjetasDashboard(): Promise<TarjetaDashboard[]> {
+  const res = await fetch('/api/tarjetas_dashboard');
+  checkAuthError(res);
+  if (!res.ok) throw new Error(`Error ${res.status} al cargar tarjetas`);
+  const data = await res.json();
+  return data.tarjetas || [];
+}
+
+export async function updateTarjetasDashboard(tarjetas: Array<{ clave: string; visible: boolean; orden: number }>): Promise<void> {
+  const res = await fetch('/api/tarjetas_dashboard', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tarjetas }),
+  });
+  checkAuthError(res);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Error ${res.status} al guardar tarjetas`);
+  }
+}
