@@ -308,19 +308,19 @@ export async function fetchVentasMes(periodo: string): Promise<KPIReal> {
   const bruto = data.resumen.total_bruto;
   const iva = data.resumen.total_iva;
   const neto = data.resumen.total_neto;
-  const meta = data.meta_ventas || 200000000;
+  const meta = data.meta_ventas || 0;
   const pct = meta > 0 ? Math.round((bruto / meta) * 100) : 0;
   return {
     id: 'ventas-meta', nombre: 'Ventas del mes vs meta', area: 'Ventas',
     fuente: bruto === 0 && data.resumen.facturas === 0 ? 'real' : 'real',
     sinDatos: data.resumen.facturas === 0,
     valor: pct,
-    valorFormateado: `${pct}%`,
+    valorFormateado: meta > 0 ? `${pct}%` : '—',
     valorBruto: fmtCOP.format(bruto),
     valorIva: fmtCOP.format(iva),
     valorNetoTotal: fmtCOP.format(neto),
-    meta: `Meta: ${fmtCOP.format(meta)}`,
-    alerta: pct >= 90 ? 'verde' : pct >= 80 ? 'amarillo' : 'rojo',
+    meta: meta > 0 ? `Meta: ${fmtCOP.format(meta)}` : 'Meta no configurada',
+    alerta: meta === 0 ? 'gris' : (pct >= 90 ? 'verde' : pct >= 80 ? 'amarillo' : 'rojo'),
   };
 }
 

@@ -55,8 +55,11 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     return res.json(cached);
   }
 
-  // ── Queries en paralelo: resumen + detalle ────────────────────────────
-  const [resumenResult, detalleResult] = await Promise.all([
+  const anio = parseInt(fecha_inicio.substring(0, 4), 10);
+  const mes = parseInt(fecha_inicio.substring(5, 7), 10);
+
+  // ── Queries en paralelo: resumen + detalle + meta ─────────────────────
+  const [resumenResult, detalleResult, metasResult] = await Promise.all([
     query(
       `SELECT
          COUNT(*)              AS facturas,
@@ -84,13 +87,20 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
        LIMIT $3`,
       [fecha_inicio, fecha_fin, limit]
     ),
+    query(
+      `SELECT valor FROM app_ops.metas_mensuales WHERE anio = $1 AND mes = $2 AND concepto = 'ventas'`,
+      [anio, mes]
+    ),
   ]);
 
   const resumen = resumenResult.rows[0] || {};
+  const metaRow = metasResult.rows[0];
+  const metaVentas = metaRow ? parseFloat(metaRow.valor) : 0;
+
   const resultado = {
     ok:      true,
     filtros: { fecha_inicio, fecha_fin, limit },
-    meta_ventas: parseFloat(process.env.META_VENTAS || '200000000'),
+    meta_ventas: metaVentas,
     resumen: {
       facturas:    parseInt(resumen.facturas || 0, 10),
       total_bruto: parseFloat(resumen.total_bruto || 0),
