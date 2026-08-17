@@ -566,7 +566,7 @@ export async function saveMetasMensualesBulk(anio: number, meses: { mes: number,
   checkAuthError(res);
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Error ${res.status} al guardar metas masivamente`);
+    throw new Error(err.detalle || err.error || `Error ${res.status} al guardar metas masivamente`);
   }
 }
 
@@ -585,6 +585,6 @@ export async function duplicateMetasMensuales(anioOrigen: number, anioDestino: n
       customErr.requiresForce = true;
       throw customErr;
     }
-    throw new Error(err.error || `Error ${res.status} al duplicar metas`);
+    throw new Error(err.detalle || err.error || `Error ${res.status} al duplicar metas`);
   }
 }
