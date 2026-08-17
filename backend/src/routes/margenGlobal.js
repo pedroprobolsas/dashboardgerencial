@@ -52,8 +52,13 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     return res.json(cached);
   }
 
-  // ── Queries en paralelo: ventas netas + egresos ───────────────────────
-  const [ventasResult, egresosResult] = await Promise.all([
+  // ── Queries en paralelo: ventas netas + egresos + desglose ────────────
+  const OBLIGACIONES_FINANCIERAS = [
+    'PAGO CREDITOS BANCARIOS', 'PAGO OTROS CREDITOS', 'PAGO MULTIABONOS',
+    'CRUCE CREDITO 4114 MULTIABONOS', 'CAUSACION GASTOS BANCARIOS', 'PAGO IMPUESTOS',
+  ];
+
+  const [ventasResult, egresosResult, desgloseResult] = await Promise.all([
     query(
       `SELECT COALESCE(SUM(valor_neto), 0) AS total_ventas
        FROM crisolweb.facturas
@@ -69,10 +74,31 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
          AND fecha_contable <= $2::date`,
       [fecha_inicio, fecha_fin]
     ),
+    query(
+      `SELECT concepto, COALESCE(SUM(total_egresos), 0) AS total
+       FROM crisolweb.egresos_agrupados_concepto
+       WHERE fecha_contable >= $1::date
+         AND fecha_contable <= $2::date
+       GROUP BY concepto`,
+      [fecha_inicio, fecha_fin]
+    ),
   ]);
 
   const ventas  = parseFloat(ventasResult.rows[0]?.total_ventas  || 0);
   const egresos = parseFloat(egresosResult.rows[0]?.total_egresos || 0);
+
+  // ── Clasificar egresos en 3 rubros ─────────────────────────────────────
+  let materiaPrima = 0, obligaciones = 0, gastos = 0;
+  for (const row of desgloseResult.rows) {
+    const val = parseFloat(row.total || 0);
+    if (row.concepto === 'PAGO PROVEEDORES') {
+      materiaPrima += val;
+    } else if (OBLIGACIONES_FINANCIERAS.includes(row.concepto)) {
+      obligaciones += val;
+    } else {
+      gastos += val;
+    }
+  }
 
   const fmt = new Intl.NumberFormat('es-CO', {
     style: 'currency', currency: 'COP', maximumFractionDigits: 0,
@@ -91,7 +117,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       margen_pct: null,
       alerta: 'gris',
       sinDatos: true,
-      detalle: egresos === 0 ? 'Sin datos de egresos' : 'Sin datos de ventas'
+      detalle: egresos === 0 ? 'Sin datos de egresos' : 'Sin datos de ventas',
+      desglose: { materia_prima: materiaPrima, materia_prima_fmt: fmt.format(materiaPrima), gastos, gastos_fmt: fmt.format(gastos), obligaciones, obligaciones_fmt: fmt.format(obligaciones) },
     };
     cache.set(cacheKey, resultado);
     return res.json(resultado);
@@ -116,6 +143,14 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     margen_absoluto_fmt: fmt.format(margenAbsoluto),
     margen_pct:      margenPct,
     alerta,
+    desglose: {
+      materia_prima: materiaPrima,
+      materia_prima_fmt: fmt.format(materiaPrima),
+      gastos,
+      gastos_fmt: fmt.format(gastos),
+      obligaciones,
+      obligaciones_fmt: fmt.format(obligaciones),
+    },
   };
 
   cache.set(cacheKey, resultado);

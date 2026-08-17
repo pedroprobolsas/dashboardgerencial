@@ -61,10 +61,19 @@ function adaptarKPI(raw: KPIReal): KPI {
   // ── Margen de caja: % como principal + monto absoluto y desglose ────────
   if (raw.id === 'margen-caja' && raw.valorAbsoluto) {
     const descMargen = raw.sinDatos ? 'Sin datos' : alerta === 'verde' ? 'Margen saludable' : alerta === 'amarillo' ? 'Margen ajustado' : 'Margen crítico';
+    const filas: FilaGrid[] = [];
+    if (raw.desgloseEgresos) {
+      const d = raw.desgloseEgresos;
+      filas.push(
+        { izq: { label: 'MATERIA PRIMA', valor: d.materiaPrima }, der: { label: 'GASTOS', valor: d.gastos } },
+        { izq: { label: 'OBLIG. FINANCIERAS', valor: d.obligaciones }, der: { label: 'TOTAL EGRESOS', valor: d.total } },
+      );
+    }
     return {
       ...base,
       descripcionAlerta: descMargen,
       subtexto: raw.detalle || undefined,
+      filas: filas.length > 0 ? filas : undefined,
     };
   }
 

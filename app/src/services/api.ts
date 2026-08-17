@@ -144,6 +144,8 @@ export interface KPIReal {
   topAsesores?: Array<{ nombre: string; saldo: string; vencido: string }>;
   vencidoRaw?: number;
   corrienteRaw?: number;
+  // Desglose de egresos para margen de caja
+  desgloseEgresos?: { materiaPrima: string; gastos: string; obligaciones: string; total: string };
   // Raw numbers para cálculos en AlertasPanel (obligaciones_por_vencer)
   totalVencidoRaw?: number;
   d15Raw?: number;
@@ -354,6 +356,7 @@ export async function fetchMargenGlobal(periodo: string): Promise<KPIReal> {
   checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status}`);
   const data = await res.json();
+  const desglose = data.desglose;
   return {
     id: 'margen-caja', nombre: 'Margen de caja', area: 'Finanzas',
     fuente: 'real',
@@ -361,9 +364,15 @@ export async function fetchMargenGlobal(periodo: string): Promise<KPIReal> {
     valor: data.margen_pct,
     valorFormateado: data.sinDatos ? '—' : `${data.margen_pct}%`,
     valorAbsoluto: data.margen_absoluto_fmt,
-    detalle: `Ventas: ${data.ventas_fmt} | Egresos: ${data.egresos_fmt}`,
+    detalle: `Ventas: ${data.ventas_fmt}`,
     meta: 'Meta: ≥ 35%',
     alerta: data.alerta,
+    desgloseEgresos: desglose ? {
+      materiaPrima: desglose.materia_prima_fmt,
+      gastos: desglose.gastos_fmt,
+      obligaciones: desglose.obligaciones_fmt,
+      total: data.egresos_fmt,
+    } : undefined,
   };
 }
 
