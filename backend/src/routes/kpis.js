@@ -439,7 +439,7 @@ async function kpiCarteraPorAsesor(metas = {}) {
 async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
   try {
     const { rows } = await query(
-      `SELECT flujo_caja_disponible, fecha
+      `SELECT flujo_caja_disponible, fecha, cuentas_incluidas
        FROM app_ops.v_flujo_caja_disponible
        ORDER BY fecha DESC
        LIMIT 1`
@@ -450,22 +450,29 @@ async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
     }
 
     const flujo = parseFloat(rows[0].flujo_caja_disponible);
+    const cuentas = parseInt(rows[0].cuentas_incluidas, 10);
     const fmt   = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
     
     // Obtener la fecha local para mostrarla
     const fechaObj = new Date(rows[0].fecha);
     const fechaStr = fechaObj.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
 
+    let nota = `Actualizado al: ${fechaStr}`;
+    if (cuentas < 9) {
+      nota += ` (⚠️ Solo ${cuentas}/9 cuentas)`;
+    }
+
     return {
       fuente: 'real',
       valor: flujo,
       valorFormateado: fmt.format(flujo),
       meta: 'Alerta si es negativo',
-      detalle: `Actualizado al: ${fechaStr}`,
+      detalle: nota,
       alerta: alertaColor(flujo, {
         verde:    v => v > 0,
         amarillo: v => v === 0,
       }),
+      cuentasIncluidas: cuentas,
     };
   } catch (err) {
     console.error('kpiFlujoCaja:', err.message);
