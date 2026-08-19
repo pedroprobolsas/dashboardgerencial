@@ -77,19 +77,13 @@ function adaptarKPI(raw: KPIReal): KPI {
     };
   }
 
-  // ── Flujo de caja: desglose ingresos/egresos + días de caja disponibles ───
+  // ── Flujo de caja ──────────────────────────────────────────────────────────
   if (raw.id === 'flujo-caja') {
-    const descFlujo = raw.sinDatos ? 'Sin datos' : alerta === 'verde' ? 'Flujo positivo' : alerta === 'amarillo' ? 'Flujo low' : 'Flujo negativo';
-    const diasLabel = raw.diasCajaDisponibles != null
-      ? (raw.diasCajaDisponibles < 1
-          ? 'Runway: < 1 día'
-          : `Runway: ${raw.diasCajaDisponibles.toFixed(1)} días`)
-      : null;
-    const subtexto = [raw.detalle, diasLabel].filter(Boolean).join(' | ');
+    const descFlujo = raw.sinDatos ? 'Sin datos' : alerta === 'verde' ? 'Flujo positivo' : alerta === 'amarillo' ? 'Flujo al límite' : 'Flujo negativo';
     return {
       ...base,
       descripcionAlerta: descFlujo,
-      subtexto: subtexto || undefined,
+      subtexto: raw.detalle || undefined,
     };
   }
 

@@ -438,42 +438,33 @@ async function kpiCarteraPorAsesor(metas = {}) {
 
 async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
   try {
-    const mesStr = `${anio}-${String(mesNum).padStart(2, '0')}`;
     const { rows } = await query(
-      `SELECT ingresos_mes_acum, egresos_mes_acum, flujo_mes_acum
-       FROM analytics.v_vistazo_diario
-       WHERE mes = $1
+      `SELECT flujo_caja_disponible, fecha
+       FROM app_ops.v_flujo_caja_disponible
        ORDER BY fecha DESC
-       LIMIT 1`,
-      [mesStr]
+       LIMIT 1`
     );
 
-    const ingresos = parseFloat(rows[0]?.ingresos_mes_acum || 0);
-    const egresos  = parseFloat(rows[0]?.egresos_mes_acum  || 0);
-    const flujo    = parseFloat(rows[0]?.flujo_mes_acum    || 0);
-
-    if (!rows[0] || (ingresos === 0 && egresos === 0)) {
-      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin datos este período', alerta: 'gris' };
+    if (!rows[0] || rows[0].flujo_caja_disponible == null) {
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin datos', alerta: 'gris' };
     }
 
-    const fmt      = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
-
-    const diasCajaDisponibles = egresos > 0
-      ? parseFloat((flujo / (egresos / 22)).toFixed(1))
-      : null;
+    const flujo = parseFloat(rows[0].flujo_caja_disponible);
+    const fmt   = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+    
+    // Obtener la fecha local para mostrarla
+    const fechaObj = new Date(rows[0].fecha);
+    const fechaStr = fechaObj.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
 
     return {
       fuente: 'real',
       valor: flujo,
       valorFormateado: fmt.format(flujo),
-      meta: 'Alerta si negativo',
-      detalle: `Ingresos: ${fmt.format(ingresos)} | Egresos: ${fmt.format(egresos)}`,
-      egresosRaw: egresos,
-      flujoRaw:   flujo,
-      diasCajaDisponibles,
+      meta: 'Alerta si es negativo',
+      detalle: `Actualizado al: ${fechaStr}`,
       alerta: alertaColor(flujo, {
-        verde:    v => v > getMeta(metas, 'flujo_verde'),
-        amarillo: v => v >= 0,
+        verde:    v => v > 0,
+        amarillo: v => v === 0,
       }),
     };
   } catch (err) {

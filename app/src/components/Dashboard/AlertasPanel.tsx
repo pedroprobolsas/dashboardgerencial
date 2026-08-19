@@ -20,18 +20,16 @@ function generarAlertas(kpis: Record<string, KPIReal>): Alerta[] {
   const margen       = kpis['margen_caja'];
   const cierre       = kpis['cierre_mensual'];
 
-  // ── 1. Días de caja disponibles ────────────────────────────────────────────
-  if (flujo?.diasCajaDisponibles != null && !flujo.sinDatos) {
-    const dias = flujo.diasCajaDisponibles;
-    if (dias < 7) {
-      const diasLabel = dias < 1 ? 'menos de 1 día' : `${dias.toFixed(1)} días`;
+  // ── 1. Flujo de caja disponible ────────────────────────────────────────────
+  if (flujo?.valor != null && !flujo.sinDatos) {
+    if (flujo.alerta === 'rojo' || flujo.valor < 0) {
       alertas.push({
-        id: 'caja-critica',
-        nivel: dias < 3 ? 'rojo' : 'amarillo',
-        titulo: `Caja operativa: ${diasLabel} cubiertos con el flujo actual`,
-        contexto: `El flujo neto del período (${flujo.valorFormateado ?? '—'}) cubre menos de una semana de egresos operativos (${fmtM(flujo.egresosRaw ?? 0)}/mes). Se requieren cobros urgentes o financiación.`,
+        id: 'flujo-rojo',
+        nivel: 'rojo',
+        titulo: `Flujo de caja disponible negativo: ${flujo.valorFormateado}`,
+        contexto: 'El flujo de caja se encuentra en números rojos. Se requiere liquidez inmediata para cubrir la operación.',
         responsable: 'Gerencia + Finanzas',
-        accion: 'Activar cobro urgente',
+        accion: 'Asegurar liquidez',
       });
     }
   }
