@@ -27,6 +27,7 @@ const informesRouter       = require('./routes/informes');
 const parametrosRouter     = require('./routes/parametros');
 const metasMensualesRouter = require('./routes/metasMensuales');
 const tarjetasDashboardRouter = require('./routes/tarjetasDashboard');
+const movimientosMaterialesRouter = require('./routes/movimientosMateriales');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -144,6 +145,7 @@ app.use('/api/cartera_por_asesor', carteraPorAsesorRouter);
 app.use('/api/margen_global',     margenGlobalRouter);
 app.use('/api/analisis_responsables', analisisResponsablesRouter);
 app.use('/api/analisis_materiales', analisisMaterialesRouter);
+app.use('/api/movimientos_materiales', movimientosMaterialesRouter);
 app.use('/api/informes',          informesRouter);
 app.use('/api/parametros',        parametrosRouter);
 app.use('/api/metas_mensuales',   metasMensualesRouter);

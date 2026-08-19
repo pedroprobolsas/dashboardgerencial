@@ -13,6 +13,7 @@ export type Vista =
   | 'costo-produccion-detalle'
   | 'analisis-responsables'
   | 'analisis-materiales'
+  | 'movimiento-materiales'
   | 'configuracion'
   | 'usuarios';
 
@@ -49,6 +50,7 @@ export default function Sidebar({ vistaActual, onNavegar, pendientesAprobacion }
         { id: 'costo-produccion-detalle', etiqueta: 'Margen por OP', icono: '⚙️' },
         { id: 'analisis-responsables', etiqueta: 'Análisis Responsables', icono: '👥' },
         { id: 'analisis-materiales', etiqueta: 'Análisis Materiales', icono: '📦' },
+        { id: 'movimiento-materiales', etiqueta: 'Movimiento de Materiales', icono: '🔄' },
       ]
     },
     {

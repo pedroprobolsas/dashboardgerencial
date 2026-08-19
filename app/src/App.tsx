@@ -12,6 +12,7 @@ import BandejaAprobacion from './components/Aprobaciones/BandejaAprobacion';
 import CostoProduccionDetalle from './components/Produccion/CostoProduccionDetalle';
 import AnalisisResponsables from './components/Produccion/AnalisisResponsables';
 import AnalisisMateriales from './components/Produccion/AnalisisMateriales';
+import MovimientoMateriales from './components/Inventario/MovimientoMateriales';
 import ConfiguracionMetas from './components/Gerencia/ConfiguracionMetas';
 import Usuarios from './components/Gerencia/Usuarios';
 import Login from './components/Auth/Login';
@@ -586,6 +587,7 @@ export default function App() {
       {vistaActual === 'costo-produccion-detalle' && <CostoProduccionDetalle />}
       {vistaActual === 'analisis-responsables'    && <AnalisisResponsables />}
       {vistaActual === 'analisis-materiales'      && <AnalisisMateriales />}
+      {vistaActual === 'movimiento-materiales'    && <MovimientoMateriales />}
       {vistaActual === 'configuracion'            && <ConfiguracionMetas />}
       {vistaActual === 'usuarios'                 && <Usuarios />}
     </Layout>
