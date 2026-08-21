@@ -8,6 +8,7 @@ const mockMonths = [
 ];
 
 const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+const fmtCOPCierre = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtNum = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 4 });
 const fmtDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : '—';
 
@@ -217,8 +218,13 @@ export default function MovimientoMateriales() {
               <p className="text-2xl font-bold text-amber-600">{fmtNum.format(kpis.salidas)}</p>
             </div>
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-2">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Valor Total</span>
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Valor Total Depurado</span>
               <p className="text-2xl font-bold text-indigo-600">{fmtCOP.format(kpis.valor_movimientos)}</p>
+              {kpis.anomalias_excluidas > 0 && (
+                <p className="text-[10px] text-red-500 font-medium">
+                  {kpis.anomalias_excluidas} {kpis.anomalias_excluidas === 1 ? 'movimiento anómalo excluido' : 'movimientos anómalos excluidos'}
+                </p>
+              )}
             </div>
           </>
         )}
@@ -238,17 +244,17 @@ export default function MovimientoMateriales() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
                 <span className="text-sm font-semibold text-slate-600">Consumo de Materia Prima</span>
-                <p className="text-3xl font-bold text-slate-800 my-1">{fmtCOP.format(cierreCostos.consumoMateriaPrima.total)}</p>
+                <p className="text-3xl font-bold text-slate-800 my-1">{fmtCOPCierre.format(cierreCostos.consumoMateriaPrima.total)}</p>
                 <p className="text-[10px] text-slate-400 font-mono">Origen Crisolweb: Cumplido Requisicion / CONSUMO MATERIA PRIMA</p>
               </div>
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
                 <span className="text-sm font-semibold text-slate-600">Producción Terminada</span>
-                <p className="text-3xl font-bold text-emerald-700 my-1">{fmtCOP.format(cierreCostos.produccionTerminada.total)}</p>
+                <p className="text-3xl font-bold text-emerald-700 my-1">{fmtCOPCierre.format(cierreCostos.produccionTerminada.total)}</p>
                 <p className="text-[10px] text-slate-400 font-mono">Origen Crisolweb: Cumplido Produccion</p>
               </div>
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
                 <span className="text-sm font-semibold text-slate-600">Compras de Materia Prima</span>
-                <p className="text-3xl font-bold text-indigo-700 my-1">{fmtCOP.format(cierreCostos.comprasMateriaPrima.total)}</p>
+                <p className="text-3xl font-bold text-indigo-700 my-1">{fmtCOPCierre.format(cierreCostos.comprasMateriaPrima.total)}</p>
                 <p className="text-[10px] text-slate-400 font-mono">Origen Crisolweb: Compra / Bodega 00 Materia Prima</p>
               </div>
             </div>
@@ -266,21 +272,21 @@ export default function MovimientoMateriales() {
                       {cierreCostos.produccionTerminada.porBodega.map((b: any, i: number) => (
                         <tr key={i} className="hover:bg-slate-50">
                           <td className="px-5 py-2.5 font-medium">{b.bodega}</td>
-                          <td className="px-5 py-2.5 text-right text-emerald-700 font-semibold">{fmtCOP.format(b.valor)}</td>
+                          <td className="px-5 py-2.5 text-right text-emerald-700 font-semibold">{fmtCOPCierre.format(b.valor)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
                       <tr>
                         <td className="px-5 py-3 text-xs uppercase tracking-wide">Total Producción Terminada por Bodega</td>
-                        <td className="px-5 py-3 text-right text-emerald-700">{fmtCOP.format(cierreCostos.produccionTerminada.total)}</td>
+                        <td className="px-5 py-3 text-right text-emerald-700">{fmtCOPCierre.format(cierreCostos.produccionTerminada.total)}</td>
                       </tr>
                       {Number(cierreCostos.controles.diferenciaProduccion) !== 0 && (
                         <tr>
                           <td className="px-5 py-2 text-xs uppercase tracking-wide text-red-600 flex items-center gap-1">
                             <span className="w-2 h-2 rounded-full bg-red-500"></span> Diferencia de Cuadre
                           </td>
-                          <td className="px-5 py-2 text-right text-red-600">{fmtCOP.format(cierreCostos.controles.diferenciaProduccion)}</td>
+                          <td className="px-5 py-2 text-right text-red-600">{fmtCOPCierre.format(cierreCostos.controles.diferenciaProduccion)}</td>
                         </tr>
                       )}
                     </tfoot>
@@ -299,21 +305,21 @@ export default function MovimientoMateriales() {
                       {cierreCostos.consumoMateriaPrima.porBodega.map((b: any, i: number) => (
                         <tr key={i} className="hover:bg-slate-50">
                           <td className="px-5 py-2.5 font-medium">{b.bodega}</td>
-                          <td className="px-5 py-2.5 text-right font-semibold">{fmtCOP.format(b.valor)}</td>
+                          <td className="px-5 py-2.5 text-right font-semibold">{fmtCOPCierre.format(b.valor)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
                       <tr>
                         <td className="px-5 py-3 text-xs uppercase tracking-wide">Total Consumo por Bodega</td>
-                        <td className="px-5 py-3 text-right">{fmtCOP.format(cierreCostos.consumoMateriaPrima.total)}</td>
+                        <td className="px-5 py-3 text-right">{fmtCOPCierre.format(cierreCostos.consumoMateriaPrima.total)}</td>
                       </tr>
                       {Number(cierreCostos.controles.diferenciaConsumo) !== 0 && (
                         <tr>
                           <td className="px-5 py-2 text-xs uppercase tracking-wide text-red-600 flex items-center gap-1">
                             <span className="w-2 h-2 rounded-full bg-red-500"></span> Diferencia de Cuadre
                           </td>
-                          <td className="px-5 py-2 text-right text-red-600">{fmtCOP.format(cierreCostos.controles.diferenciaConsumo)}</td>
+                          <td className="px-5 py-2 text-right text-red-600">{fmtCOPCierre.format(cierreCostos.controles.diferenciaConsumo)}</td>
                         </tr>
                       )}
                     </tfoot>
@@ -334,19 +340,19 @@ export default function MovimientoMateriales() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
                 <span className="text-sm font-semibold text-slate-600">Cumplido Requisición Bruto</span>
-                <p className="text-2xl font-bold text-slate-800 my-1">{fmtCOP.format(cierreCostos.controlCierre.bruto)}</p>
+                <p className="text-2xl font-bold text-slate-800 my-1">{fmtCOPCierre.format(cierreCostos.controlCierre.bruto)}</p>
                 <p className="text-[10px] text-slate-400 font-mono">Sin depurar anomalías</p>
               </div>
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
                 <span className="text-sm font-semibold text-slate-600">Movimientos Observados</span>
-                <p className="text-2xl font-bold text-red-600 my-1">{fmtCOP.format(cierreCostos.controlCierre.totalAnomalias)}</p>
+                <p className="text-2xl font-bold text-red-600 my-1">{fmtCOPCierre.format(cierreCostos.controlCierre.totalAnomalias)}</p>
                 <p className="text-[10px] text-slate-400 font-mono">{cierreCostos.controlCierre.listaAnomalias.length} registro(s) detectado(s)</p>
               </div>
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
                 <span className="text-sm font-semibold text-slate-600">Cumplido Requisición Depurado</span>
-                <p className="text-2xl font-bold text-emerald-700 my-1">{fmtCOP.format(cierreCostos.controlCierre.depurado)}</p>
+                <p className="text-2xl font-bold text-emerald-700 my-1">{fmtCOPCierre.format(cierreCostos.controlCierre.depurado)}</p>
                 <p className="text-[10px] text-slate-400 font-mono">
-                  Consumo: {fmtCOP.format(cierreCostos.controlCierre.consumoDepurado)} | Ajustes: {fmtCOP.format(cierreCostos.controlCierre.ajustesDepurado)}
+                  Consumo: {fmtCOPCierre.format(cierreCostos.controlCierre.consumoDepurado)} | Ajustes: {fmtCOPCierre.format(cierreCostos.controlCierre.ajustesDepurado)}
                 </p>
               </div>
             </div>
@@ -378,8 +384,8 @@ export default function MovimientoMateriales() {
                           <td className="px-4 py-2.5 font-medium">{a.consecutivo}</td>
                           <td className="px-4 py-2.5 truncate max-w-[150px]" title={a.material}>{a.material}</td>
                           <td className="px-4 py-2.5 text-xs">{a.concepto}</td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-amber-600">{fmtCOP.format(a.precio)}</td>
-                          <td className="px-4 py-2.5 text-right font-bold text-red-600">{fmtCOP.format(a.valor_total)}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-amber-600">{fmtCOPCierre.format(a.precio)}</td>
+                          <td className="px-4 py-2.5 text-right font-bold text-red-600">{fmtCOPCierre.format(a.valor_total)}</td>
                           <td className="px-4 py-2.5 text-xs">{a.documento}</td>
                           <td className="px-4 py-2.5 text-xs">{a.bodega}</td>
                         </tr>

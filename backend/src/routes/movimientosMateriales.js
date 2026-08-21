@@ -42,13 +42,19 @@ router.get('/', async (req, res) => {
     }
 
     const kpiQuery = `
+      WITH base AS (
+        SELECT entradas, salida, valor_total,
+        (ABS(precio) > 100000000 OR ABS(valor_total) > 100000000000) as es_anomalo
+        FROM crisolweb.movimientos_materiales
+        ${whereSql}
+      )
       SELECT 
         COUNT(*) as total_rows,
         COALESCE(SUM(entradas), 0) as total_entradas,
         COALESCE(SUM(salida), 0) as total_salidas,
-        COALESCE(SUM(valor_total), 0) as total_valor
-      FROM crisolweb.movimientos_materiales
-      ${whereSql}
+        COALESCE(SUM(valor_total) FILTER (WHERE NOT es_anomalo), 0) as total_valor_depurado,
+        COUNT(*) FILTER (WHERE es_anomalo) as total_anomalias
+      FROM base
     `;
 
     const dataQuery = `
@@ -81,7 +87,8 @@ router.get('/', async (req, res) => {
         movimientos: totalRows,
         entradas: parseFloat(kpiRes.rows[0].total_entradas),
         salidas: parseFloat(kpiRes.rows[0].total_salidas),
-        valor_movimientos: parseFloat(kpiRes.rows[0].total_valor)
+        valor_movimientos: kpiRes.rows[0].total_valor_depurado,
+        anomalias_excluidas: parseInt(kpiRes.rows[0].total_anomalias, 10)
       }
     });
 
