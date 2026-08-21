@@ -195,9 +195,9 @@ export default function MovimientoMateriales() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
         {loading && resultados.length === 0 ? (
-          [1,2,3,4].map(i => (
+          [1,2].map(i => (
              <div key={i} className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5 flex flex-col gap-3 animate-pulse">
                 <div className="h-4 w-1/2 bg-slate-200 rounded"></div>
                 <div className="h-8 w-1/3 bg-slate-200 rounded"></div>
@@ -206,16 +206,8 @@ export default function MovimientoMateriales() {
         ) : (
           <>
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-2">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Movimientos</span>
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Movimientos Filtrados</span>
               <p className="text-2xl font-bold text-slate-800">{fmtNum.format(kpis.movimientos)}</p>
-            </div>
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-2">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Entradas</span>
-              <p className="text-2xl font-bold text-emerald-600">{fmtNum.format(kpis.entradas)}</p>
-            </div>
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-2">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Salidas</span>
-              <p className="text-2xl font-bold text-amber-600">{fmtNum.format(kpis.salidas)}</p>
             </div>
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-2">
               <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Valor Total Depurado</span>
@@ -232,7 +224,12 @@ export default function MovimientoMateriales() {
 
       {/* RESUMEN CIERRE DE COSTOS */}
       <div className="mb-6">
-        <h2 className="text-lg font-bold text-dashboard-textMain mb-4">Resumen Cierre de Costos</h2>
+        <div className="mb-4">
+          <h2 className="text-lg font-bold text-dashboard-textMain">Resumen Cierre de Costos</h2>
+          <p className="text-sm text-dashboard-textMuted mt-1">
+            Vista mensual completa · Bodega y Origen no modifican este resumen
+          </p>
+        </div>
         
         {loadingCierre || !cierreCostos ? (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 flex items-center justify-center text-slate-400">
