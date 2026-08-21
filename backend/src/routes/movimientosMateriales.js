@@ -92,6 +92,137 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/movimientos_materiales/cierre-costos
+ */
+router.get('/cierre-costos', async (req, res) => {
+  try {
+    const { anio, mes } = req.query;
+    
+    if (!anio || !mes) {
+      return res.status(400).json({ ok: false, error: 'Faltan parámetros anio y mes' });
+    }
+
+    const primerDia = `${anio}-${String(mes).padStart(2, '0')}-01`;
+    let proximoMes = parseInt(mes, 10) + 1;
+    let proximoAnio = parseInt(anio, 10);
+    if (proximoMes > 12) {
+      proximoMes = 1;
+      proximoAnio += 1;
+    }
+    const primerDiaSiguiente = `${proximoAnio}-${String(proximoMes).padStart(2, '0')}-01`;
+
+    const sqlConsumo = `
+      WITH crudos AS (
+        SELECT valor_total, bodega
+        FROM crisolweb.movimientos_materiales
+        WHERE fecha >= $1 AND fecha < $2
+          AND origen = 'Cumplido Requisicion'
+          AND concepto = 'CONSUMO MATERIA PRIMA'
+      ),
+      agrupados AS (
+        SELECT bodega, SUM(valor_total) as valor_bodega
+        FROM crudos
+        GROUP BY bodega
+      ),
+      totales AS (
+        SELECT 
+          (SELECT SUM(valor_total) FROM crudos) as total_directo,
+          (SELECT SUM(valor_bodega) FROM agrupados) as total_bodegas
+      )
+      SELECT 
+        a.bodega, 
+        a.valor_bodega as valor,
+        t.total_directo as valor_total_global,
+        COALESCE(t.total_directo, 0) - COALESCE(t.total_bodegas, 0) as diferencia_cuadre
+      FROM agrupados a CROSS JOIN totales t
+      ORDER BY a.valor_bodega DESC
+    `;
+
+    const sqlProduccion = `
+      WITH crudos AS (
+        SELECT valor_total, bodega
+        FROM crisolweb.movimientos_materiales
+        WHERE fecha >= $1 AND fecha < $2
+          AND origen = 'Cumplido Produccion'
+      ),
+      agrupados AS (
+        SELECT bodega, SUM(valor_total) as valor_bodega
+        FROM crudos
+        GROUP BY bodega
+      ),
+      totales AS (
+        SELECT 
+          (SELECT SUM(valor_total) FROM crudos) as total_directo,
+          (SELECT SUM(valor_bodega) FROM agrupados) as total_bodegas
+      )
+      SELECT 
+        a.bodega, 
+        a.valor_bodega as valor,
+        t.total_directo as valor_total_global,
+        COALESCE(t.total_directo, 0) - COALESCE(t.total_bodegas, 0) as diferencia_cuadre
+      FROM agrupados a CROSS JOIN totales t
+      ORDER BY a.valor_bodega DESC
+    `;
+
+    const sqlCompras = `
+      SELECT SUM(valor_total) as valor
+      FROM crisolweb.movimientos_materiales
+      WHERE fecha >= $1 AND fecha < $2
+        AND origen = 'Compra'
+        AND bodega = '00 Materia Prima'
+    `;
+
+    const params = [primerDia, primerDiaSiguiente];
+    const [resConsumo, resProduccion, resCompras] = await Promise.all([
+      query(sqlConsumo, params),
+      query(sqlProduccion, params),
+      query(sqlCompras, params)
+    ]);
+
+    // Extraer totales globales nativos de Postgres (vienen como string por ser NUMERIC, se envían así para evitar pérdida en JS)
+    const consumoTotal = resConsumo.rows.length > 0 ? resConsumo.rows[0].valor_total_global : "0";
+    const consumoDif = resConsumo.rows.length > 0 ? resConsumo.rows[0].diferencia_cuadre : "0";
+    const consumoPorBodega = resConsumo.rows.map(r => ({
+      bodega: r.bodega,
+      valor: r.valor // string
+    }));
+
+    const produccionTotal = resProduccion.rows.length > 0 ? resProduccion.rows[0].valor_total_global : "0";
+    const produccionDif = resProduccion.rows.length > 0 ? resProduccion.rows[0].diferencia_cuadre : "0";
+    const produccionPorBodega = resProduccion.rows.map(r => ({
+      bodega: r.bodega,
+      valor: r.valor // string
+    }));
+
+    const comprasTotal = resCompras.rows[0]?.valor || "0";
+    
+    res.json({
+      ok: true,
+      consumoMateriaPrima: {
+        total: consumoTotal,
+        porBodega: consumoPorBodega
+      },
+      produccionTerminada: {
+        total: produccionTotal,
+        porBodega: produccionPorBodega
+      },
+      comprasMateriaPrima: {
+        total: comprasTotal,
+        bodega: '00 Materia Prima'
+      },
+      controles: {
+        diferenciaProduccion: produccionDif,
+        diferenciaConsumo: consumoDif
+      }
+    });
+
+  } catch (err) {
+    console.error('GET /api/movimientos_materiales/cierre-costos error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
  * GET /api/movimientos_materiales/filtros
  */
 router.get('/filtros', async (req, res) => {

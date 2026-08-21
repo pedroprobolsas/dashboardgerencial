@@ -39,6 +39,10 @@ export default function MovimientoMateriales() {
     salidas: 0,
     valor_movimientos: 0
   });
+  
+  // Resumen Cierre Costos
+  const [cierreCostos, setCierreCostos] = useState<any>(null);
+  const [loadingCierre, setLoadingCierre] = useState(false);
 
   const fetchFiltros = async () => {
     try {
@@ -88,9 +92,30 @@ export default function MovimientoMateriales() {
     }
   };
 
+  const fetchCierreCostos = async () => {
+    setLoadingCierre(true);
+    try {
+      const res = await fetch(`/api/movimientos_materiales/cierre-costos?anio=${year}&mes=${month}`);
+      if (!res.ok) throw new Error('Error al consultar cierre de costos');
+      const data = await res.json();
+      if (data.ok) {
+        setCierreCostos(data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingCierre(false);
+    }
+  };
+
   useEffect(() => {
     fetchFiltros();
   }, []);
+
+  useEffect(() => {
+    fetchCierreCostos();
+    // eslint-disable-next-line
+  }, [year, month]);
 
   useEffect(() => {
     fetchDatos(true);
@@ -196,6 +221,107 @@ export default function MovimientoMateriales() {
               <p className="text-2xl font-bold text-indigo-600">{fmtCOP.format(kpis.valor_movimientos)}</p>
             </div>
           </>
+        )}
+      </div>
+
+      {/* RESUMEN CIERRE DE COSTOS */}
+      <div className="mb-6">
+        <h2 className="text-lg font-bold text-dashboard-textMain mb-4">Resumen Cierre de Costos</h2>
+        
+        {loadingCierre || !cierreCostos ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 flex items-center justify-center text-slate-400">
+            Cargando cierre de costos...
+          </div>
+        ) : (
+          <div className="flex flex-col gap-6">
+            {/* Tarjetas Principales */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
+                <span className="text-sm font-semibold text-slate-600">Consumo de Materia Prima</span>
+                <p className="text-3xl font-bold text-slate-800 my-1">{fmtCOP.format(cierreCostos.consumoMateriaPrima.total)}</p>
+                <p className="text-[10px] text-slate-400 font-mono">Origen Crisolweb: Cumplido Requisicion / CONSUMO MATERIA PRIMA</p>
+              </div>
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
+                <span className="text-sm font-semibold text-slate-600">Producción Terminada</span>
+                <p className="text-3xl font-bold text-emerald-700 my-1">{fmtCOP.format(cierreCostos.produccionTerminada.total)}</p>
+                <p className="text-[10px] text-slate-400 font-mono">Origen Crisolweb: Cumplido Produccion</p>
+              </div>
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
+                <span className="text-sm font-semibold text-slate-600">Compras de Materia Prima</span>
+                <p className="text-3xl font-bold text-indigo-700 my-1">{fmtCOP.format(cierreCostos.comprasMateriaPrima.total)}</p>
+                <p className="text-[10px] text-slate-400 font-mono">Origen Crisolweb: Compra / Bodega 00 Materia Prima</p>
+              </div>
+            </div>
+
+            {/* Detalle por bodega */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Produccion Terminada */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
+                  <h3 className="text-sm font-semibold text-slate-700">Producción Terminada por Bodega</h3>
+                </div>
+                <div className="p-0 flex-1">
+                  <table className="w-full text-left text-sm text-slate-600">
+                    <tbody className="divide-y divide-slate-100">
+                      {cierreCostos.produccionTerminada.porBodega.map((b: any, i: number) => (
+                        <tr key={i} className="hover:bg-slate-50">
+                          <td className="px-5 py-2.5 font-medium">{b.bodega}</td>
+                          <td className="px-5 py-2.5 text-right text-emerald-700 font-semibold">{fmtCOP.format(b.valor)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
+                      <tr>
+                        <td className="px-5 py-3 text-xs uppercase tracking-wide">Total Producción Terminada por Bodega</td>
+                        <td className="px-5 py-3 text-right text-emerald-700">{fmtCOP.format(cierreCostos.produccionTerminada.total)}</td>
+                      </tr>
+                      {Number(cierreCostos.controles.diferenciaProduccion) !== 0 && (
+                        <tr>
+                          <td className="px-5 py-2 text-xs uppercase tracking-wide text-red-600 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-red-500"></span> Diferencia de Cuadre
+                          </td>
+                          <td className="px-5 py-2 text-right text-red-600">{fmtCOP.format(cierreCostos.controles.diferenciaProduccion)}</td>
+                        </tr>
+                      )}
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {/* Consumo Materia Prima */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
+                  <h3 className="text-sm font-semibold text-slate-700">Consumo de Materia Prima por Bodega</h3>
+                </div>
+                <div className="p-0 flex-1">
+                  <table className="w-full text-left text-sm text-slate-600">
+                    <tbody className="divide-y divide-slate-100">
+                      {cierreCostos.consumoMateriaPrima.porBodega.map((b: any, i: number) => (
+                        <tr key={i} className="hover:bg-slate-50">
+                          <td className="px-5 py-2.5 font-medium">{b.bodega}</td>
+                          <td className="px-5 py-2.5 text-right font-semibold">{fmtCOP.format(b.valor)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-slate-50 border-t border-slate-200 font-bold text-slate-800">
+                      <tr>
+                        <td className="px-5 py-3 text-xs uppercase tracking-wide">Total Consumo por Bodega</td>
+                        <td className="px-5 py-3 text-right">{fmtCOP.format(cierreCostos.consumoMateriaPrima.total)}</td>
+                      </tr>
+                      {Number(cierreCostos.controles.diferenciaConsumo) !== 0 && (
+                        <tr>
+                          <td className="px-5 py-2 text-xs uppercase tracking-wide text-red-600 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-red-500"></span> Diferencia de Cuadre
+                          </td>
+                          <td className="px-5 py-2 text-right text-red-600">{fmtCOP.format(cierreCostos.controles.diferenciaConsumo)}</td>
+                        </tr>
+                      )}
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
