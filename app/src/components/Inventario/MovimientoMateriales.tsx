@@ -1,39 +1,86 @@
 import { useState, useEffect } from 'react';
 
-// --- MOCK DATA ---
-const mockYears = [2024, 2025, 2026];
 const mockMonths = [
   { val: 1, label: 'Enero' }, { val: 2, label: 'Febrero' }, { val: 3, label: 'Marzo' },
   { val: 4, label: 'Abril' }, { val: 5, label: 'Mayo' }, { val: 6, label: 'Junio' },
   { val: 7, label: 'Julio' }, { val: 8, label: 'Agosto' }, { val: 9, label: 'Septiembre' },
   { val: 10, label: 'Octubre' }, { val: 11, label: 'Noviembre' }, { val: 12, label: 'Diciembre' }
 ];
-const mockBodegas = ['Bodega Principal', 'Bodega Insumos', 'Bodega Cuarentena'];
-const mockOrigenes = ['Ajuste de inventario', 'Recepción', 'Salida a producción', 'Traslado'];
+
+const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+const fmtNum = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 4 });
+const fmtDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : '—';
 
 export default function MovimientoMateriales() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filtros
+  // Filtros Disponibles
+  const [years, setYears] = useState<number[]>([new Date().getFullYear()]);
+  const [bodegas, setBodegas] = useState<string[]>([]);
+  const [origenes, setOrigenes] = useState<string[]>([]);
+
+  // Filtros Seleccionados
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [bodega, setBodega] = useState('Todas');
   const [origen, setOrigen] = useState('Todos');
 
-  // Tabla Mock Data
-  const [resultados, setResultados] = useState<any[]>([]);
+  // Paginación
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 50;
 
-  const fetchDatos = async () => {
+  // Data
+  const [resultados, setResultados] = useState<any[]>([]);
+  const [kpis, setKpis] = useState<any>({
+    movimientos: 0,
+    entradas: 0,
+    salidas: 0,
+    valor_movimientos: 0
+  });
+
+  const fetchFiltros = async () => {
+    try {
+      const res = await fetch('/api/movimientos_materiales/filtros');
+      if (!res.ok) throw new Error('Error cargando filtros');
+      const data = await res.json();
+      if (data.ok) {
+        setYears(data.anios?.length > 0 ? data.anios : [new Date().getFullYear()]);
+        setBodegas(data.bodegas || []);
+        setOrigenes(data.origenes || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchDatos = async (resetPage = false) => {
+    const currentPage = resetPage ? 1 : page;
+    if (resetPage) setPage(1);
+
     setLoading(true);
     setError(null);
     try {
-      // Simulación de carga desde el backend
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setResultados([
-        { id: 1, fecha: '2026-08-15', material: 'MOCK-01', cantidad: 500, origen: 'Recepción', bodega: 'Bodega Principal' },
-        { id: 2, fecha: '2026-08-16', material: 'MOCK-02', cantidad: -20, origen: 'Salida a producción', bodega: 'Bodega Insumos' }
-      ]);
+      const qs = new URLSearchParams({
+        anio: year.toString(),
+        mes: month.toString(),
+        bodega,
+        origen,
+        page: currentPage.toString(),
+        limit: limit.toString()
+      });
+      const res = await fetch(`/api/movimientos_materiales?${qs.toString()}`);
+      if (!res.ok) throw new Error('Error al consultar movimientos');
+      const data = await res.json();
+      
+      if (data.ok) {
+        setResultados(data.data);
+        setTotalPages(data.totalPages || 1);
+        setKpis(data.kpis);
+      } else {
+        throw new Error(data.error);
+      }
     } catch (err: any) {
       setError(err.message || 'Error al cargar los movimientos');
     } finally {
@@ -42,8 +89,18 @@ export default function MovimientoMateriales() {
   };
 
   useEffect(() => {
-    fetchDatos();
+    fetchFiltros();
+  }, []);
+
+  useEffect(() => {
+    fetchDatos(true);
+    // eslint-disable-next-line
   }, [year, month, bodega, origen]);
+
+  useEffect(() => {
+    fetchDatos(false);
+    // eslint-disable-next-line
+  }, [page]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-theme(spacing.20))]">
@@ -51,11 +108,11 @@ export default function MovimientoMateriales() {
         <div>
           <h1 className="text-2xl font-bold text-dashboard-textMain">Movimiento de Materiales</h1>
           <p className="text-sm text-dashboard-textMuted mt-1">
-            Análisis de trazabilidad y movimientos de inventario (Fase A - En construcción)
+            Análisis de trazabilidad y movimientos de inventario
           </p>
         </div>
         <button
-          onClick={() => alert('Exportar no implementado en Fase A')}
+          onClick={() => alert('Exportar próximamente...')}
           className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors shadow-sm"
         >
           Exportar a Excel
@@ -71,7 +128,7 @@ export default function MovimientoMateriales() {
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
           >
-            {mockYears.map(y => <option key={y} value={y}>{y}</option>)}
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         
@@ -94,7 +151,7 @@ export default function MovimientoMateriales() {
             onChange={(e) => setBodega(e.target.value)}
           >
             <option value="Todas">Todas las Bodegas</option>
-            {mockBodegas.map(b => <option key={b} value={b}>{b}</option>)}
+            {bodegas.map(b => <option key={b} value={b}>{b}</option>)}
           </select>
         </div>
 
@@ -106,14 +163,14 @@ export default function MovimientoMateriales() {
             onChange={(e) => setOrigen(e.target.value)}
           >
             <option value="Todos">Todos los orígenes</option>
-            {mockOrigenes.map(o => <option key={o} value={o}>{o}</option>)}
+            {origenes.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         </div>
       </div>
 
-      {/* KPI MOCKS */}
+      {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
-        {loading ? (
+        {loading && resultados.length === 0 ? (
           [1,2,3,4].map(i => (
              <div key={i} className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5 flex flex-col gap-3 animate-pulse">
                 <div className="h-4 w-1/2 bg-slate-200 rounded"></div>
@@ -123,20 +180,20 @@ export default function MovimientoMateriales() {
         ) : (
           <>
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-2">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">MOCK - Movimientos</span>
-              <p className="text-2xl font-bold text-slate-800">1,245</p>
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Movimientos</span>
+              <p className="text-2xl font-bold text-slate-800">{fmtNum.format(kpis.movimientos)}</p>
             </div>
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-2">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">MOCK - Entradas</span>
-              <p className="text-2xl font-bold text-emerald-600">830</p>
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Entradas</span>
+              <p className="text-2xl font-bold text-emerald-600">{fmtNum.format(kpis.entradas)}</p>
             </div>
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-2">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">MOCK - Salidas</span>
-              <p className="text-2xl font-bold text-amber-600">415</p>
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Salidas</span>
+              <p className="text-2xl font-bold text-amber-600">{fmtNum.format(kpis.salidas)}</p>
             </div>
             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-2">
-              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">MOCK - Materiales</span>
-              <p className="text-2xl font-bold text-indigo-600">120</p>
+              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Valor Total</span>
+              <p className="text-2xl font-bold text-indigo-600">{fmtCOP.format(kpis.valor_movimientos)}</p>
             </div>
           </>
         )}
@@ -146,47 +203,86 @@ export default function MovimientoMateriales() {
       <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
           <h2 className="text-sm font-bold text-dashboard-textMain">Detalle de Movimientos</h2>
-          <span className="text-xs font-medium bg-slate-200 text-slate-600 px-2.5 py-1 rounded-full">
-            Estructura Mock - Columnas pendientes de esquema SQL
-          </span>
+          
+          {/* Paginación */}
+          <div className="flex items-center gap-2">
+            <button 
+              disabled={page <= 1 || loading}
+              onClick={() => setPage(p => p - 1)}
+              className="px-3 py-1 bg-white border border-slate-200 rounded text-sm disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <span className="text-sm text-slate-600 font-medium">Página {page} de {totalPages || 1}</span>
+            <button 
+              disabled={page >= totalPages || loading}
+              onClick={() => setPage(p => p + 1)}
+              className="px-3 py-1 bg-white border border-slate-200 rounded text-sm disabled:opacity-50"
+            >
+              Siguiente
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto relative">
           {error ? (
             <div className="p-8 text-center text-red-500 font-medium">{error}</div>
-          ) : loading ? (
-            <div className="p-8 text-center text-slate-400">Cargando movimientos...</div>
-          ) : resultados.length === 0 ? (
+          ) : resultados.length === 0 && !loading ? (
             <div className="p-8 text-center text-slate-400">No se encontraron resultados para los filtros seleccionados.</div>
           ) : (
             <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap">
               <thead className="text-xs text-slate-500 bg-white sticky top-0 border-b border-slate-100 z-10 shadow-sm">
                 <tr>
-                  <th className="px-6 py-3 font-semibold">Fecha (MOCK)</th>
-                  <th className="px-6 py-3 font-semibold">Material (MOCK)</th>
-                  <th className="px-6 py-3 font-semibold">Bodega (MOCK)</th>
-                  <th className="px-6 py-3 font-semibold">Origen (MOCK)</th>
-                  <th className="px-6 py-3 font-semibold text-right">Cantidad (MOCK)</th>
+                  <th className="px-6 py-3 font-semibold">Fecha</th>
+                  <th className="px-4 py-3 font-semibold">Consecutivo</th>
+                  <th className="px-4 py-3 font-semibold">Material</th>
+                  <th className="px-4 py-3 font-semibold">T. Movimiento</th>
+                  <th className="px-4 py-3 font-semibold">Concepto</th>
+                  <th className="px-4 py-3 font-semibold text-right">Entrada</th>
+                  <th className="px-4 py-3 font-semibold text-right">Salida</th>
+                  <th className="px-4 py-3 font-semibold text-right">Precio</th>
+                  <th className="px-4 py-3 font-semibold text-right">Valor Total</th>
+                  <th className="px-4 py-3 font-semibold">Origen</th>
+                  <th className="px-4 py-3 font-semibold">Documento</th>
+                  <th className="px-4 py-3 font-semibold">Tercero</th>
+                  <th className="px-4 py-3 font-semibold">Bodega</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {resultados.map((r, i) => (
-                  <tr key={i} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-3">{r.fecha}</td>
-                    <td className="px-6 py-3 font-medium text-slate-700">{r.material}</td>
-                    <td className="px-6 py-3">{r.bodega}</td>
-                    <td className="px-6 py-3">
-                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs">
-                        {r.origen}
-                      </span>
+                  <tr key={r.id || i} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-2.5 text-slate-500">{fmtDate(r.fecha)}</td>
+                    <td className="px-4 py-2.5">{r.consecutivo || '—'}</td>
+                    <td className="px-4 py-2.5 font-medium text-slate-700">{r.material || '—'}</td>
+                    <td className="px-4 py-2.5">{r.tipo_movimiento || '—'}</td>
+                    <td className="px-4 py-2.5 text-xs text-slate-500 max-w-[200px] truncate" title={r.concepto}>{r.concepto || '—'}</td>
+                    <td className="px-4 py-2.5 text-right font-medium text-emerald-600">
+                      {r.entradas > 0 ? fmtNum.format(r.entradas) : '—'}
                     </td>
-                    <td className={`px-6 py-3 text-right font-medium ${r.cantidad > 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                      {r.cantidad > 0 ? `+${r.cantidad}` : r.cantidad}
+                    <td className="px-4 py-2.5 text-right font-medium text-amber-600">
+                      {r.salida > 0 ? fmtNum.format(r.salida) : '—'}
                     </td>
+                    <td className="px-4 py-2.5 text-right text-slate-500">
+                      {r.precio ? fmtCOP.format(r.precio) : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-slate-500">
+                      {r.valor_total ? fmtCOP.format(r.valor_total) : '—'}
+                    </td>
+                    <td className="px-4 py-2.5"><span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px]">{r.origen || '—'}</span></td>
+                    <td className="px-4 py-2.5">{r.documento || '—'}</td>
+                    <td className="px-4 py-2.5 text-xs truncate max-w-[150px]" title={r.tercero}>{r.tercero || '—'}</td>
+                    <td className="px-4 py-2.5 text-xs">{r.bodega || '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          )}
+          {loading && resultados.length > 0 && (
+            <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-20">
+              <div className="bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-200 text-sm font-medium text-slate-600">
+                Actualizando...
+              </div>
+            </div>
           )}
         </div>
       </div>

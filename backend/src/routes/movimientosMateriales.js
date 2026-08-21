@@ -4,28 +4,84 @@ const router = express.Router();
 
 /**
  * GET /api/movimientos_materiales
- * Endpoint MOCK (Fase A)
  */
 router.get('/', async (req, res) => {
   try {
-    const { anio, mes, bodega, origen } = req.query;
-
-    // TODO: Implementar SQL real cuando se defina la estructura de crisolweb.movimientos_todos_materiales
-    // Se utilizarán parámetros para filtros (anio, mes, bodega, origen)
+    const { anio, mes, bodega, origen, page = '1', limit = '50' } = req.query;
     
-    // Retornamos un MOCK por ahora
-    const mockData = [
-      { id: 1, fecha: '2026-08-15', material: 'MOCK-01', cantidad: 500, origen: 'Recepción', bodega: 'Bodega Principal' },
-      { id: 2, fecha: '2026-08-16', material: 'MOCK-02', cantidad: -20, origen: 'Salida a producción', bodega: 'Bodega Insumos' }
-    ];
+    if (!anio || !mes) {
+      return res.status(400).json({ ok: false, error: 'Faltan parámetros anio y mes' });
+    }
 
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 50;
+    const offsetNum = (pageNum - 1) * limitNum;
+
+    // Calcular rango de fechas
+    const primerDia = `${anio}-${String(mes).padStart(2, '0')}-01`;
+    let proximoMes = parseInt(mes, 10) + 1;
+    let proximoAnio = parseInt(anio, 10);
+    if (proximoMes > 12) {
+      proximoMes = 1;
+      proximoAnio += 1;
+    }
+    const primerDiaSiguiente = `${proximoAnio}-${String(proximoMes).padStart(2, '0')}-01`;
+
+    let whereSql = `WHERE fecha >= $1 AND fecha < $2`;
+    let params = [primerDia, primerDiaSiguiente];
+    let paramIndex = 3;
+
+    if (bodega && bodega !== 'Todas') {
+      whereSql += ` AND bodega = $${paramIndex++}`;
+      params.push(bodega);
+    }
+    
+    if (origen && origen !== 'Todos') {
+      whereSql += ` AND origen = $${paramIndex++}`;
+      params.push(origen);
+    }
+
+    const kpiQuery = `
+      SELECT 
+        COUNT(*) as total_rows,
+        COALESCE(SUM(entradas), 0) as total_entradas,
+        COALESCE(SUM(salida), 0) as total_salidas,
+        COALESCE(SUM(valor_total), 0) as total_valor
+      FROM crisolweb.movimientos_materiales
+      ${whereSql}
+    `;
+
+    const dataQuery = `
+      SELECT 
+        id, consecutivo, fecha, fecha_contable, material, tipo_movimiento, 
+        concepto, entradas, salida, precio, valor_total, lote, origen, 
+        documento, tercero, bodega
+      FROM crisolweb.movimientos_materiales
+      ${whereSql}
+      ORDER BY fecha DESC, id DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+    `;
+    const dataParams = [...params, limitNum, offsetNum];
+
+    const [kpiRes, dataRes] = await Promise.all([
+      query(kpiQuery, params),
+      query(dataQuery, dataParams)
+    ]);
+
+    const totalRows = parseInt(kpiRes.rows[0].total_rows, 10);
+    
     res.json({
       ok: true,
-      data: mockData,
-      total: 2,
-      meta: {
-        filtros_recibidos: { anio, mes, bodega, origen },
-        nota: 'Datos MOCK. Implementación SQL pendiente de estructura de base de datos.'
+      data: dataRes.rows,
+      total: totalRows,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(totalRows / limitNum),
+      kpis: {
+        movimientos: totalRows,
+        entradas: parseFloat(kpiRes.rows[0].total_entradas),
+        salidas: parseFloat(kpiRes.rows[0].total_salidas),
+        valor_movimientos: parseFloat(kpiRes.rows[0].total_valor)
       }
     });
 
@@ -37,17 +93,22 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/movimientos_materiales/filtros
- * Obtiene las opciones disponibles para Bodegas y Orígenes (MOCK Fase A)
  */
 router.get('/filtros', async (req, res) => {
   try {
-    // TODO: Consultar `SELECT DISTINCT bodega FROM ...` 
-    // TODO: Consultar `SELECT DISTINCT origen FROM ...`
-    
+    const [aniosRes, bodegasRes, origenesRes, tiposRes] = await Promise.all([
+      query(`SELECT DISTINCT EXTRACT(YEAR FROM fecha) as anio FROM crisolweb.movimientos_materiales ORDER BY anio DESC`),
+      query(`SELECT DISTINCT bodega FROM crisolweb.movimientos_materiales WHERE bodega IS NOT NULL ORDER BY bodega`),
+      query(`SELECT DISTINCT origen FROM crisolweb.movimientos_materiales WHERE origen IS NOT NULL ORDER BY origen`),
+      query(`SELECT DISTINCT tipo_movimiento FROM crisolweb.movimientos_materiales WHERE tipo_movimiento IS NOT NULL ORDER BY tipo_movimiento`)
+    ]);
+
     res.json({
       ok: true,
-      bodegas: ['Bodega Principal', 'Bodega Insumos', 'Bodega Cuarentena'],
-      origenes: ['Ajuste de inventario', 'Recepción', 'Salida a producción', 'Traslado']
+      anios: aniosRes.rows.map(r => parseInt(r.anio, 10)),
+      bodegas: bodegasRes.rows.map(r => r.bodega),
+      origenes: origenesRes.rows.map(r => r.origen),
+      tipos: tiposRes.rows.map(r => r.tipo_movimiento)
     });
   } catch (err) {
     console.error('GET /api/movimientos_materiales/filtros error:', err);
