@@ -325,6 +325,74 @@ export default function MovimientoMateriales() {
         )}
       </div>
 
+      {/* CONTROL DE CIERRE */}
+      {cierreCostos?.controlCierre && (
+        <div className="mb-6">
+          <h2 className="text-lg font-bold text-dashboard-textMain mb-4">Control de Cierre (Movimientos Anómalos)</h2>
+          <div className="flex flex-col gap-6">
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
+                <span className="text-sm font-semibold text-slate-600">Cumplido Requisición Bruto</span>
+                <p className="text-2xl font-bold text-slate-800 my-1">{fmtCOP.format(cierreCostos.controlCierre.bruto)}</p>
+                <p className="text-[10px] text-slate-400 font-mono">Sin depurar anomalías</p>
+              </div>
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
+                <span className="text-sm font-semibold text-slate-600">Movimientos Observados</span>
+                <p className="text-2xl font-bold text-red-600 my-1">{fmtCOP.format(cierreCostos.controlCierre.totalAnomalias)}</p>
+                <p className="text-[10px] text-slate-400 font-mono">{cierreCostos.controlCierre.listaAnomalias.length} registro(s) detectado(s)</p>
+              </div>
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
+                <span className="text-sm font-semibold text-slate-600">Cumplido Requisición Depurado</span>
+                <p className="text-2xl font-bold text-emerald-700 my-1">{fmtCOP.format(cierreCostos.controlCierre.depurado)}</p>
+                <p className="text-[10px] text-slate-400 font-mono">
+                  Consumo: {fmtCOP.format(cierreCostos.controlCierre.consumoDepurado)} | Ajustes: {fmtCOP.format(cierreCostos.controlCierre.ajustesDepurado)}
+                </p>
+              </div>
+            </div>
+
+            {cierreCostos.controlCierre.listaAnomalias.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-red-200 overflow-hidden flex flex-col">
+                <div className="px-5 py-3 border-b border-red-100 bg-red-50 flex items-center gap-2">
+                  <span className="text-lg">⚠️</span>
+                  <h3 className="text-sm font-bold text-red-700">Existen movimientos con valores anómalos que requieren revisión en Crisolweb</h3>
+                </div>
+                <div className="p-0 overflow-auto">
+                  <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap">
+                    <thead className="text-xs text-slate-500 bg-white border-b border-slate-100">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Fecha</th>
+                        <th className="px-4 py-3 font-semibold">Consecutivo</th>
+                        <th className="px-4 py-3 font-semibold">Material</th>
+                        <th className="px-4 py-3 font-semibold">Concepto</th>
+                        <th className="px-4 py-3 font-semibold text-right">Precio</th>
+                        <th className="px-4 py-3 font-semibold text-right">Valor Total</th>
+                        <th className="px-4 py-3 font-semibold">Documento</th>
+                        <th className="px-4 py-3 font-semibold">Bodega</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {cierreCostos.controlCierre.listaAnomalias.map((a: any, i: number) => (
+                        <tr key={i} className="hover:bg-red-50/50">
+                          <td className="px-4 py-2.5">{fmtDate(a.fecha)}</td>
+                          <td className="px-4 py-2.5 font-medium">{a.consecutivo}</td>
+                          <td className="px-4 py-2.5 truncate max-w-[150px]" title={a.material}>{a.material}</td>
+                          <td className="px-4 py-2.5 text-xs">{a.concepto}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-amber-600">{fmtCOP.format(a.precio)}</td>
+                          <td className="px-4 py-2.5 text-right font-bold text-red-600">{fmtCOP.format(a.valor_total)}</td>
+                          <td className="px-4 py-2.5 text-xs">{a.documento}</td>
+                          <td className="px-4 py-2.5 text-xs">{a.bodega}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ÁREA DE RESULTADOS */}
       <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">

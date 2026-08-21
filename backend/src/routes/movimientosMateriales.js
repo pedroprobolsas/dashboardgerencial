@@ -118,6 +118,7 @@ router.get('/cierre-costos', async (req, res) => {
         WHERE fecha >= $1 AND fecha < $2
           AND origen = 'Cumplido Requisicion'
           AND concepto = 'CONSUMO MATERIA PRIMA'
+          AND NOT (ABS(precio) > 100000000 OR ABS(valor_total) > 100000000000)
       ),
       agrupados AS (
         SELECT bodega, SUM(valor_total) as valor_bodega
@@ -172,11 +173,39 @@ router.get('/cierre-costos', async (req, res) => {
         AND bodega = '00 Materia Prima'
     `;
 
+    const sqlControlCierre = `
+      WITH base_req AS (
+        SELECT 
+          id, fecha, consecutivo, material, concepto, precio, valor_total, documento, bodega,
+          (ABS(precio) > 100000000 OR ABS(valor_total) > 100000000000) as es_anomalo
+        FROM crisolweb.movimientos_materiales
+        WHERE fecha >= $1 AND fecha < $2
+          AND origen = 'Cumplido Requisicion'
+      )
+      SELECT 
+        SUM(valor_total) as bruto,
+        SUM(valor_total) FILTER (WHERE es_anomalo) as total_anomalias,
+        SUM(valor_total) FILTER (WHERE NOT es_anomalo) as depurado,
+        SUM(valor_total) FILTER (WHERE NOT es_anomalo AND concepto = 'CONSUMO MATERIA PRIMA') as consumo_depurado,
+        SUM(valor_total) FILTER (WHERE NOT es_anomalo AND concepto = 'AJUSTE SALDOS INICIALES') as ajustes_depurado,
+        (
+          SELECT json_agg(row_to_json(t))
+          FROM (
+            SELECT fecha, consecutivo, material, concepto, precio, valor_total, documento, bodega
+            FROM base_req
+            WHERE es_anomalo
+            ORDER BY fecha DESC
+          ) t
+        ) as lista_anomalias
+      FROM base_req
+    `;
+
     const params = [primerDia, primerDiaSiguiente];
-    const [resConsumo, resProduccion, resCompras] = await Promise.all([
+    const [resConsumo, resProduccion, resCompras, resControl] = await Promise.all([
       query(sqlConsumo, params),
       query(sqlProduccion, params),
-      query(sqlCompras, params)
+      query(sqlCompras, params),
+      query(sqlControlCierre, params)
     ]);
 
     // Extraer totales globales nativos de Postgres (vienen como string por ser NUMERIC, se envían así para evitar pérdida en JS)
@@ -213,6 +242,14 @@ router.get('/cierre-costos', async (req, res) => {
       controles: {
         diferenciaProduccion: produccionDif,
         diferenciaConsumo: consumoDif
+      },
+      controlCierre: {
+        bruto: resControl.rows[0]?.bruto || "0",
+        totalAnomalias: resControl.rows[0]?.total_anomalias || "0",
+        depurado: resControl.rows[0]?.depurado || "0",
+        consumoDepurado: resControl.rows[0]?.consumo_depurado || "0",
+        ajustesDepurado: resControl.rows[0]?.ajustes_depurado || "0",
+        listaAnomalias: resControl.rows[0]?.lista_anomalias || []
       }
     });
 
