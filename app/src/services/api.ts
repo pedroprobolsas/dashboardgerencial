@@ -146,6 +146,8 @@ export interface KPIReal {
   corrienteRaw?: number;
   // Desglose de egresos para margen de caja
   desgloseEgresos?: { materiaPrima: string; gastos: string; obligaciones: string; total: string };
+  // Desglose de cuentas para flujo de caja
+  cuentasDesglose?: Array<{ nombre: string; saldo: string }>;
   // Raw numbers para cálculos en AlertasPanel (obligaciones_por_vencer)
   totalVencidoRaw?: number;
   d15Raw?: number;

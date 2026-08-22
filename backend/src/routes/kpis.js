@@ -449,18 +449,30 @@ async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
       return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', meta: 'Sin datos', alerta: 'gris' };
     }
 
+    const { rows: rowsCuentas } = await query(
+      `SELECT codigo_cuenta, nombre_cuenta, saldo
+       FROM app_ops.saldos_cuentas_diarios
+       WHERE fecha = (SELECT MAX(fecha) FROM app_ops.saldos_cuentas_diarios)
+       ORDER BY saldo DESC`
+    );
+
     const flujo = parseFloat(rows[0].flujo_caja_disponible);
     const cuentas = parseInt(rows[0].cuentas_incluidas, 10);
     const fmt   = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
     
-    // Obtener la fecha local para mostrarla
+    // Convertir fecha de UTC a YYYY-MM-DD para el frontend (evitar problemas de timezone)
     const fechaObj = new Date(rows[0].fecha);
-    const fechaStr = fechaObj.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+    const fechaActualizacion = fechaObj.toISOString().split('T')[0];
 
-    let nota = `Actualizado al: ${fechaStr}`;
+    let nota = '';
     if (cuentas < 9) {
-      nota += ` (⚠️ Solo ${cuentas}/9 cuentas)`;
+      nota = `(⚠️ Solo ${cuentas}/9 cuentas)`;
     }
+
+    const cuentasDesglose = rowsCuentas.map(r => ({
+      nombre: r.nombre_cuenta,
+      saldo: fmt.format(parseFloat(r.saldo || 0))
+    }));
 
     return {
       fuente: 'real',
@@ -473,6 +485,8 @@ async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
         amarillo: v => v === 0,
       }),
       cuentasIncluidas: cuentas,
+      cuentasDesglose,
+      fechaActualizacion // Para que el frontend lo use y formatee con su timezone correcta
     };
   } catch (err) {
     console.error('kpiFlujoCaja:', err.message);

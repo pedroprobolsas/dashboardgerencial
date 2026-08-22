@@ -21,6 +21,7 @@ export interface KPI {
   descripcionAlerta: string;
   fechaActualizacion?: string;
   desactualizado?: boolean;
+  cuentasDesglose?: Array<{ nombre: string; saldo: string }>;
 }
 
 // Umbrales definidos según documento_maestro.md

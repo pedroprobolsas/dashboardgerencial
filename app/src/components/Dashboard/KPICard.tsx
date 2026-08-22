@@ -104,13 +104,33 @@ export default function KPICard({ kpi }: { kpi: KPI }) {
         </div>
       )}
 
+      {/* Desglose de cuentas (para Flujo de Caja) */}
+      {kpi.cuentasDesglose && kpi.cuentasDesglose.length > 0 && (
+        <div className="border-t border-slate-100 pt-2 flex flex-col gap-1.5 mt-1">
+          <p className="text-[10px] text-dashboard-textMuted uppercase tracking-wide font-bold">Saldo por cuenta</p>
+          <div className="flex flex-col gap-1">
+            {kpi.cuentasDesglose.map((cuenta, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <span className="text-[11px] font-medium text-slate-600 truncate mr-2" title={cuenta.nombre}>{cuenta.nombre}</span>
+                <span className="text-[11px] font-semibold text-slate-800 shrink-0">{cuenta.saldo}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Subtexto: desglose de ingresos/egresos, aging de cartera u órdenes/margen */}
       {kpi.subtexto && (
-        <div className="border-t border-slate-100 pt-2 flex flex-col gap-1">
+        <div className="border-t border-slate-100 pt-2 flex flex-col gap-1 mt-1">
           {kpi.subtexto.split(' | ').map((linea, i) => (
             <span key={i} className="text-xs text-dashboard-textMuted">{linea}</span>
           ))}
         </div>
+      )}
+
+      {/* Detalle (notas, advertencias) */}
+      {kpi.detalle && (
+        <p className="text-xs text-dashboard-textMuted mt-1">{kpi.detalle}</p>
       )}
 
       {/* Frescura del dato (fecha de actualización) */}
@@ -118,7 +138,7 @@ export default function KPICard({ kpi }: { kpi: KPI }) {
         <div className="mt-auto pt-2 flex justify-end">
           <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${kpi.desactualizado ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'text-slate-400'}`}>
             {kpi.desactualizado ? '⚠ Desactualizado (último dato: ' : 'datos al '}
-            {new Date(kpi.fechaActualizacion).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}
+            {new Date(kpi.fechaActualizacion).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', timeZone: 'UTC' })}
             {kpi.desactualizado ? ')' : ''}
           </span>
         </div>

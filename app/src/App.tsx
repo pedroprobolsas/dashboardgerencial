@@ -85,6 +85,7 @@ function adaptarKPI(raw: KPIReal): KPI {
       ...base,
       descripcionAlerta: descFlujo,
       subtexto: raw.detalle || undefined,
+      cuentasDesglose: raw.cuentasDesglose,
     };
   }
 
