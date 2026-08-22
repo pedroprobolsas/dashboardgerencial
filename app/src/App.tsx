@@ -43,6 +43,7 @@ function adaptarKPI(raw: KPIReal): KPI {
     descripcionAlerta: descEstado,
     fechaActualizacion: raw.fechaActualizacion,
     desactualizado: raw.desactualizado,
+    detalle: raw.detalle,
   };
 
   // ── Ventas: valor bruto como principal + desglose IVA/neto ──────────────
