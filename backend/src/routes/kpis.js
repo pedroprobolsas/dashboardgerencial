@@ -557,10 +557,12 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
 
     const pctCriticas = totalOps > 0 ? (opsCriticas / totalOps * 100) : 0;
     
-    let colorAlerta = alertaColor(pctCriticas, {
-      verde:    v => v === 0,
-      amarillo: v => v <= 15,
-    });
+    let colorAlerta = 'verde';
+    
+    // Forzar amarillo si hay OPs atrasadas pero no críticas
+    if (opsAtrasadas > 0) {
+      colorAlerta = 'amarillo';
+    }
     
     // Forzar rojo si hay 1 o más OPs críticas
     if (opsCriticas > 0) {
