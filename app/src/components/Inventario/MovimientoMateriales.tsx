@@ -111,6 +111,12 @@ function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYe
             <span>${fmtCOPCierre.format(total)}</span>
           </div>
         </div>
+
+        <div style="margin-top: 30px; background: #eef2ff; border: 1px solid #c7d2fe; padding: 15px; border-radius: 8px;">
+          <p style="margin: 0 0 10px 0;"><strong>Nota para Contabilidad:</strong> Para realizar el cierre de costos del período, los valores de las cuentas 72 – Mano de obra y 73 – Otros costos de fabricación deben cruzarse contra la cuenta 14100501 – Producto en Proceso.</p>
+          <p style="margin: 0; font-size: 16px;"><strong>Valor a cruzar con Producto en Proceso (72 + 73):</strong> ${fmtCOPCierre.format(total)}</p>
+        </div>
+
         <script>
           window.onload = function() { window.print(); }
         </script>
@@ -210,6 +216,17 @@ function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYe
           </>
         )}
       </div>
+
+      {!loading && data.length > 0 && (
+        <div className="mt-4 bg-indigo-50 border border-indigo-100 rounded-xl p-5">
+          <p className="text-sm text-indigo-900 mb-2">
+            <strong className="font-semibold">Nota para Contabilidad:</strong> Para realizar el cierre de costos del período, los valores de las cuentas 72 – Mano de obra y 73 – Otros costos de fabricación deben cruzarse contra la cuenta 14100501 – Producto en Proceso.
+          </p>
+          <p className="text-base text-indigo-950">
+            <strong className="font-bold">Valor a cruzar con Producto en Proceso (72 + 73):</strong> {fmtCOPCierre.format(total)}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
