@@ -74,7 +74,12 @@ export default function KPICard({ kpi }: { kpi: KPI }) {
       <p className="text-sm font-medium text-dashboard-textMain leading-snug">{kpi.nombre}</p>
 
       {/* Valor principal */}
-      <p className="text-2xl font-bold text-dashboard-textMain leading-none">{kpi.valorFormateado}</p>
+      <p 
+        className={`text-2xl font-bold leading-none ${kpi.onClickValor ? 'text-probolsas-cyan cursor-pointer hover:underline' : 'text-dashboard-textMain'}`}
+        onClick={kpi.onClickValor}
+      >
+        {kpi.valorFormateado}
+      </p>
 
       {/* Subtítulo contextual (ej: ahorro de presupuesto) */}
       {kpi.subtitulo && (
@@ -121,9 +126,12 @@ export default function KPICard({ kpi }: { kpi: KPI }) {
 
       {/* Subtexto: desglose de ingresos/egresos, aging de cartera u órdenes/margen */}
       {kpi.subtexto && (
-        <div className="border-t border-slate-100 pt-2 flex flex-col gap-1 mt-1">
+        <div 
+          className={`border-t border-slate-100 pt-2 flex flex-col gap-1 mt-1 ${kpi.onClickSubtexto ? 'cursor-pointer hover:underline text-probolsas-cyan' : ''}`}
+          onClick={kpi.onClickSubtexto}
+        >
           {kpi.subtexto.split(' | ').map((linea, i) => (
-            <span key={i} className="text-xs text-dashboard-textMuted">{linea}</span>
+            <span key={i} className={`text-xs ${kpi.onClickSubtexto ? 'text-inherit' : 'text-dashboard-textMuted'}`}>{linea}</span>
           ))}
         </div>
       )}

@@ -6,29 +6,34 @@ const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'CO
 
 export default function CostoProduccionDetalle() {
   const [fechaInicio, setFechaInicio] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('fecha_inicio')) return params.get('fecha_inicio')!;
     const d = new Date();
-    d.setDate(1); // Primer día del mes
+    d.setDate(1);
     return d.toISOString().split('T')[0];
   });
   
   const [fechaFin, setFechaFin] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('fecha_fin')) return params.get('fecha_fin')!;
     const d = new Date();
-    // Último día del mes actual
     const ultimoDia = new Date(d.getFullYear(), d.getMonth() + 1, 0);
     return ultimoDia.toISOString().split('T')[0];
   });
   
-  const [margenMinimo, setMargenMinimo] = useState(12.5);
+  const [margenMinimo, setMargenMinimo] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('margen')) return parseFloat(params.get('margen')!);
+    return 12.5;
+  });
   
   const [ordenes, setOrdenes] = useState<OrdenProduccion[]>([]);
   const [resumen, setResumen] = useState<CostoPorOrdenResumen | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
   const [opSeleccionada, setOpSeleccionada] = useState<string | null>(null);
 
   useEffect(() => {
-    // Sincronizar modal con la URL al cargar y al retroceder
     const syncFromUrl = () => {
       const params = new URLSearchParams(window.location.search);
       setOpSeleccionada(params.get('op'));
@@ -52,39 +57,41 @@ export default function CostoProduccionDetalle() {
     setOpSeleccionada(null);
   };
 
-  const cargarDatos = async (usarParametro = false) => {
-    setLoading(true);
-    setError(null);
-    try {
-      let margenToUse = margenMinimo;
-      
-      if (usarParametro) {
-        const parametros = await fetchParametros(fechaFin);
-        margenToUse = parametros['margen_umbral_critico']?.valor ?? 12.5;
-        setMargenMinimo(margenToUse);
+  // Initialize from params or fetch default
+  useEffect(() => {
+    const init = async () => {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.get('margen')) {
+        try {
+          const parametros = await fetchParametros(fechaFin);
+          const defaultMargen = parametros['margen_umbral_critico']?.valor ?? 12.5;
+          setMargenMinimo(defaultMargen);
+        } catch (e) {
+          // ignore error and keep 12.5
+        }
       }
-      
-      const data = await fetchCostoPorOrden(fechaInicio, fechaFin, margenToUse);
-      
-      setOrdenes(data.ordenes);
-      setResumen(data.resumen);
-      
-    } catch (err: any) {
-      setError(err.message || 'Error de conexión');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only on mount
 
   useEffect(() => {
-    cargarDatos(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fechaInicio, fechaFin]);
-
-  useEffect(() => {
-    cargarDatos(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [margenMinimo]);
+    const cargarDatos = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchCostoPorOrden(fechaInicio, fechaFin, margenMinimo);
+        setOrdenes(data.ordenes);
+        setResumen(data.resumen);
+      } catch (err: any) {
+        setError(err.message || 'Error de conexión');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    cargarDatos();
+  }, [fechaInicio, fechaFin, margenMinimo]);
 
   // Validar desactualización (> 7 días)
   let esDesactualizado = false;

@@ -255,7 +255,7 @@ interface KPIWidgetState {
   error: string | null;
 }
 
-function Dashboard() {
+function Dashboard({ onNavegar }: { onNavegar: (vista: string) => void }) {
   const [periodo, setPeriodo] = useState<string>(periodoActual);
   const [widgets, setWidgets] = useState<Record<string, KPIWidgetState>>({});
   const [rawKpisMap, setRawKpisMap] = useState<Record<string, KPIReal>>({});
@@ -287,9 +287,31 @@ function Dashboard() {
 
     // Helper para actualizar un widget específico
     const updateWidget = (id: string, raw: KPIReal) => {
+      const data = adaptarKPI(raw);
+      
+      if (id === 'costo-produccion') {
+        const { fecha_inicio, fecha_fin } = periodoToRango(periodo);
+        data.onClickValor = () => {
+          const url = new URL(window.location.href);
+          url.searchParams.set('fecha_inicio', fecha_inicio);
+          url.searchParams.set('fecha_fin', fecha_fin);
+          url.searchParams.set('margen', '0');
+          window.history.pushState({}, '', url);
+          onNavegar('costo-produccion-detalle');
+        };
+        data.onClickSubtexto = () => {
+          const url = new URL(window.location.href);
+          url.searchParams.set('fecha_inicio', fecha_inicio);
+          url.searchParams.set('fecha_fin', fecha_fin);
+          url.searchParams.set('margen', String(raw.metaMargenProduccion || 18));
+          window.history.pushState({}, '', url);
+          onNavegar('costo-produccion-detalle');
+        };
+      }
+
       setWidgets(prev => ({
         ...prev,
-        [id]: { data: adaptarKPI(raw), raw, loading: false, error: null },
+        [id]: { data, raw, loading: false, error: null },
       }));
       setRawKpisMap(prev => ({ ...prev, [id]: raw }));
     };
@@ -594,7 +616,7 @@ export default function App() {
           ⚠ El informe se guardó localmente pero no pudo escribirse en Sheets: {errorEnvio}
         </div>
       )}
-      {vistaActual === 'dashboard'              && <Dashboard />}
+      {vistaActual === 'dashboard'              && <Dashboard onNavegar={setVistaActual} />}
       {vistaActual === 'vista-diaria'           && <DailyDashboard />}
       {vistaActual === 'cierre-ventas'          && <CierreVentasForm         onEnviar={registrarEnvio} />}
       {vistaActual === 'cierre-finanzas'        && <CierreFinanzasForm       onEnviar={registrarEnvio} />}

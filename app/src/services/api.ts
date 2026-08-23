@@ -121,6 +121,7 @@ export interface KPIReal {
   valorPerdidaRealFormateado?: string;
   opsBajoMeta?: number;
   margenProduccion?: number;
+  metaMargenProduccion?: number;
   valorProducido?: string;
   costoEjecutado?: string;
   utilidadProduccion?: string;

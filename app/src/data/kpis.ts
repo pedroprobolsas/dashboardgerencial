@@ -23,6 +23,8 @@ export interface KPI {
   desactualizado?: boolean;
   cuentasDesglose?: Array<{ nombre: string; saldo: string }>;
   detalle?: string;
+  onClickValor?: () => void;
+  onClickSubtexto?: () => void;
 }
 
 // Umbrales definidos según documento_maestro.md
