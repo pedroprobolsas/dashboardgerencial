@@ -443,6 +443,11 @@ function Dashboard({ onNavegar }: { onNavegar: (vista: Vista) => void }) {
             <div className="mt-2 text-sm text-slate-500">
               <p>OPs totales producidas: {reporteOrdenes.ordenes}</p>
               <p>OPs críticas por atraso: {reporteOrdenes.opsCriticas} | OPs atrasadas: {reporteOrdenes.opsAtrasadas}</p>
+              {reporteOrdenes.promedioAtraso != null && (
+                <p className="font-bold text-slate-800 mt-1">
+                  Promedio de atraso: {reporteOrdenes.promedioAtraso}d (Meta: {reporteOrdenes.metaPromedioAtraso}d)
+                </p>
+              )}
               {reporteOrdenes.fechaActualizacion && (
                 <p className="mt-2 text-xs">Datos calculados hasta: {new Date(reporteOrdenes.fechaActualizacion).toLocaleDateString('es-CO')} {reporteOrdenes.desactualizado && '(Con retraso)'}</p>
               )}
