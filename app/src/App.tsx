@@ -434,7 +434,7 @@ function Dashboard({ onNavegar }: { onNavegar: (vista: Vista) => void }) {
           requestData={{ periodo }}
           titulo="Órdenes en Producción Críticas"
           entidadLabel="Período"
-          entidadValue={formatPeriodo(periodo)}
+          entidadValue={periodoLabel(periodo)}
           firmaLabel="Líder de Planta"
           firmaDerechaLabel="Gerencia Operativa"
           onClose={() => setReporteOrdenes(null)}
