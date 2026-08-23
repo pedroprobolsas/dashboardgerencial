@@ -205,6 +205,7 @@ router.get('/cierre-costos', async (req, res) => {
           ) t
         ) as lista_anomalias
       FROM base_req
+    `;
     const sqlSiigo = `
       SELECT anio, mes, costos_mano_obra_72, costos_otros_73, estado_mes
       FROM app_ops.siigo_costos_produccion_resumen
