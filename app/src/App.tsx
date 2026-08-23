@@ -441,7 +441,7 @@ function Dashboard({ onNavegar }: { onNavegar: (vista: Vista) => void }) {
           infoExtra={
             <div className="mt-2 text-sm text-slate-500">
               <p>OPs totales producidas: {reporteOrdenes.ordenes}</p>
-              <p>OPs críticas por atraso: {reporteOrdenes.opsCriticas}</p>
+              <p>OPs críticas por atraso: {reporteOrdenes.opsCriticas} | OPs atrasadas: {reporteOrdenes.opsAtrasadas}</p>
               {reporteOrdenes.fechaActualizacion && (
                 <p className="mt-2 text-xs">Datos calculados hasta: {new Date(reporteOrdenes.fechaActualizacion).toLocaleDateString('es-CO')} {reporteOrdenes.desactualizado && '(Con retraso)'}</p>
               )}
@@ -449,29 +449,38 @@ function Dashboard({ onNavegar }: { onNavegar: (vista: Vista) => void }) {
           }
         >
           <div className="mb-8">
-            <h3 className="text-lg font-bold text-slate-800 border-b-2 border-slate-800 pb-2 mb-4">Detalle de Órdenes Críticas</h3>
-            {reporteOrdenes.listaCriticas && reporteOrdenes.listaCriticas.length > 0 ? (
+            <h3 className="text-lg font-bold text-slate-800 border-b-2 border-slate-800 pb-2 mb-4">Detalle de Órdenes con Atraso</h3>
+            {reporteOrdenes.listaProblema && reporteOrdenes.listaProblema.length > 0 ? (
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
                   <tr className="bg-slate-100 text-slate-600 uppercase tracking-wider text-xs border-b border-slate-200">
                     <th className="px-4 py-3 font-semibold">Nro OP</th>
+                    <th className="px-4 py-3 font-semibold">Cliente</th>
                     <th className="px-4 py-3 font-semibold">Referencia</th>
                     <th className="px-4 py-3 font-semibold text-right">Días Atraso</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {reporteOrdenes.listaCriticas.map((op, idx) => (
-                    <tr key={idx} onClick={() => setOpSeleccionada(op.nro_op)} className="hover:bg-slate-50 cursor-pointer print:hover:bg-transparent">
-                      <td className="px-4 py-3 font-medium text-slate-800">{op.nro_op}</td>
-                      <td className="px-4 py-3 text-slate-600">{op.referencia}</td>
-                      <td className="px-4 py-3 font-bold text-red-600 text-right">{op.dias_atraso}</td>
-                    </tr>
-                  ))}
+                  {reporteOrdenes.listaProblema
+                    .sort((a, b) => b.dias_atraso - a.dias_atraso)
+                    .map((op, idx) => {
+                    const isCritical = op.dias_atraso > (reporteOrdenes.umbralCritico || 10);
+                    return (
+                      <tr key={idx} onClick={() => setOpSeleccionada(op.nro_op)} className="hover:bg-slate-50 cursor-pointer print:hover:bg-transparent">
+                        <td className="px-4 py-3 font-medium text-slate-800">{op.nro_op}</td>
+                        <td className="px-4 py-3 text-slate-600 truncate max-w-[200px]" title={op.cliente}>{op.cliente}</td>
+                        <td className="px-4 py-3 text-slate-600">{op.referencia}</td>
+                        <td className={`px-4 py-3 font-bold text-right ${isCritical ? 'text-red-600' : 'text-amber-600'}`}>
+                          {op.dias_atraso} {isCritical ? '(Crítica)' : ''}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             ) : (
               <div className="p-8 text-center bg-slate-50 rounded-lg">
-                <p className="text-slate-500">No hay órdenes críticas registradas en este período.</p>
+                <p className="text-slate-500">No hay órdenes atrasadas registradas en este período.</p>
               </div>
             )}
           </div>

@@ -39,11 +39,18 @@ router.post('/consecutivo', asyncHandler(ENDPOINT, async (req, res) => {
     periodo_fin || null
   ]);
 
-  logger.info(ENDPOINT, `Generado informe N° ${numero} para ${responsable} (Período: ${periodo_inicio} a ${periodo_fin})`);
+  // Formatear DDMMAAAA-N
+  const dateObj = new Date();
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const y = dateObj.getFullYear();
+  const numeroFormateado = `${d}${m}${y}-${numero}`;
+
+  logger.info(ENDPOINT, `Generado informe N° ${numeroFormateado} para ${responsable} (Período: ${periodo_inicio} a ${periodo_fin})`);
 
   return res.json({
     ok: true,
-    consecutivo: numero,
+    consecutivo: numeroFormateado,
     fecha: rows[0].fecha_informe
   });
 }));

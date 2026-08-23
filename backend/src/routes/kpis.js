@@ -525,10 +525,11 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
          JSON_AGG(
            JSON_BUILD_OBJECT(
              'nro_op', nro_orden,
+             'cliente', cliente,
              'referencia', referencia,
              'dias_atraso', ABS(dias_vencido)
            )
-         ) FILTER (WHERE dias_vencido < 0 AND ABS(dias_vencido) > $3) AS lista_ops_criticas,
+         ) FILTER (WHERE dias_vencido < 0 AND ABS(dias_vencido) > $2) AS lista_ops_problema,
          
          MAX(fecha_cumplimiento)::date as max_date
          
@@ -545,7 +546,7 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
     const opsCriticas   = parseInt(rows[0]?.ops_criticas      || 0, 10);
     const totalAtraso   = parseInt(rows[0]?.total_dias_atraso || 0, 10);
     const opsAtrasadas  = parseInt(rows[0]?.ops_atrasadas     || 0, 10);
-    const listaCriticas = rows[0]?.lista_ops_criticas         || [];
+    const listaProblema = rows[0]?.lista_ops_problema         || [];
     
     const maxDate = rows[0]?.max_date;
     const diffDias = maxDate ? Math.floor((new Date() - new Date(maxDate)) / (1000 * 60 * 60 * 24)) : 0;
@@ -577,7 +578,7 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
       opsCriticas,
       opsAtrasadas,
       totalDiasAtraso: totalAtraso,
-      listaCriticas,
+      listaProblema,
       meta:            `Meta: Atraso tol. ${umbralTolerancia}d | OPs: ${totalOps}`,
       detalle:         `Críticas: ${opsCriticas} OPs | Atrasadas: ${opsAtrasadas} OPs`,
       umbralCritico:   umbralCritico,

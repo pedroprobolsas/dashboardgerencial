@@ -112,7 +112,7 @@ export interface KPIReal {
   desactualizado?: boolean;
   desglose?: { d30?: string; d60?: string; d90?: string; d100plus?: string };
   ordenes?: number;
-  listaCriticas?: Array<{ nro_op: string; referencia: string; dias_atraso: number }>;
+  listaProblema?: Array<{ nro_op: string; cliente: string; referencia: string; dias_atraso: number }>;
   opsCriticas?: number;
   opsAtrasadas?: number;
   umbralCritico?: number;
