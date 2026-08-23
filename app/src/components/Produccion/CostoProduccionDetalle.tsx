@@ -76,21 +76,29 @@ export default function CostoProduccionDetalle() {
   }, []); // Run only on mount
 
   useEffect(() => {
+    let ignore = false;
     const cargarDatos = async () => {
       setLoading(true);
       setError(null);
       try {
         const data = await fetchCostoPorOrden(fechaInicio, fechaFin, margenMinimo);
-        setOrdenes(data.ordenes);
-        setResumen(data.resumen);
+        if (!ignore) {
+          setOrdenes(data.ordenes);
+          setResumen(data.resumen);
+        }
       } catch (err: any) {
-        setError(err.message || 'Error de conexión');
+        if (!ignore) {
+          setError(err.message || 'Error de conexión');
+        }
       } finally {
-        setLoading(false);
+        if (!ignore) {
+          setLoading(false);
+        }
       }
     };
     
     cargarDatos();
+    return () => { ignore = true; };
   }, [fechaInicio, fechaFin, margenMinimo]);
 
   // Validar desactualización (> 7 días)

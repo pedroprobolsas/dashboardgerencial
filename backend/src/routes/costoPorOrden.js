@@ -47,7 +47,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
   }
 
   // Umbral de margen: solo OPs con margen_pct < este valor
-  const umbral = parseFloat(margen_minimo) || 12.5;
+  const parsedMargen = parseFloat(margen_minimo);
+  const umbral = !isNaN(parsedMargen) ? parsedMargen : 12.5;
 
   // ── Cache ─────────────────────────────────────────────────────────────
   const cacheKey = `costo_por_orden:${fecha_inicio}:${fecha_fin}:${umbral}`;
