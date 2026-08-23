@@ -125,7 +125,8 @@ function adaptarKPI(raw: KPIReal): KPI {
 
     const subtexto = [
       raw.ordenes         != null ? `Total: ${raw.ordenes} OPs`                     : null,
-      raw.totalDiasAtraso != null ? `Días atraso acum.: ${raw.totalDiasAtraso}`     : null,
+      raw.promedioAtraso  != null ? `Prom. atraso: ${raw.promedioAtraso}d (Meta: ${raw.metaPromedioAtraso}d)` : null,
+      raw.totalDiasAtraso != null ? `Acumulado: ${raw.totalDiasAtraso}d`     : null,
     ].filter(Boolean).join(' | ');
 
     return { ...base, descripcionAlerta: descProd, filas: filas.length > 0 ? filas : undefined, subtexto: subtexto || undefined };

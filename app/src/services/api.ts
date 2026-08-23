@@ -117,6 +117,8 @@ export interface KPIReal {
   opsAtrasadas?: number;
   umbralCritico?: number;
   totalDiasAtraso?: number;
+  promedioAtraso?: number;
+  metaPromedioAtraso?: number;
   opsConPerdida?: number;
   margenProm?: number;
   opsPerdidaReal?: number;

@@ -13,6 +13,7 @@ async function seed() {
     console.log('Insertando parámetros...');
     await query(`INSERT INTO app_ops.parametros (clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por) SELECT 'atraso_dias_tolerancia', 2, 'días', 'Días de atraso', 'Producción', CURRENT_DATE, 'sistema@probolsas.com' WHERE NOT EXISTS (SELECT 1 FROM app_ops.parametros WHERE clave = 'atraso_dias_tolerancia')`);
     await query(`INSERT INTO app_ops.parametros (clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por) SELECT 'atraso_dias_critico', 10, 'días', 'Días para crítica', 'Producción', CURRENT_DATE, 'sistema@probolsas.com' WHERE NOT EXISTS (SELECT 1 FROM app_ops.parametros WHERE clave = 'atraso_dias_critico')`);
+    await query(`INSERT INTO app_ops.parametros (clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por) SELECT 'meta_promedio_atraso', 5, 'días', 'Meta de promedio máximo de días de atraso por orden caída', 'Producción', CURRENT_DATE, 'sistema@probolsas.com' WHERE NOT EXISTS (SELECT 1 FROM app_ops.parametros WHERE clave = 'meta_promedio_atraso')`);
     console.log('✅ Parámetros insertados.');
   } catch (err) {
     console.error('❌ Error:', err.message);

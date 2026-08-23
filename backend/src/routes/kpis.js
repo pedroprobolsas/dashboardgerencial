@@ -506,6 +506,9 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
     
     const metaCrit = getMeta(metas, 'atraso_dias_critico');
     const umbralCritico = metaCrit !== null && metaCrit !== undefined ? Number(metaCrit) : 10;
+    
+    const metaProm = getMeta(metas, 'meta_promedio_atraso');
+    const metaPromedioAtraso = metaProm !== null && metaProm !== undefined ? Number(metaProm) : 5;
 
     const { rows } = await query(
       `SELECT
@@ -521,6 +524,8 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
          )                                                                               AS ops_criticas,
          
          SUM(CASE WHEN dias_vencido < 0 THEN ABS(dias_vencido) ELSE 0 END)             AS total_dias_atraso,
+         
+         COUNT(*) FILTER (WHERE dias_vencido < 0)                                      AS total_ops_caidas,
          
          JSON_AGG(
            JSON_BUILD_OBJECT(
@@ -546,7 +551,10 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
     const opsCriticas   = parseInt(rows[0]?.ops_criticas      || 0, 10);
     const totalAtraso   = parseInt(rows[0]?.total_dias_atraso || 0, 10);
     const opsAtrasadas  = parseInt(rows[0]?.ops_atrasadas     || 0, 10);
+    const opsCaidas     = parseInt(rows[0]?.total_ops_caidas  || 0, 10);
     const listaProblema = rows[0]?.lista_ops_problema         || [];
+    
+    const promedioAtraso = opsCaidas > 0 ? Number((totalAtraso / opsCaidas).toFixed(1)) : 0;
     
     const maxDate = rows[0]?.max_date;
     const diffDias = maxDate ? Math.floor((new Date() - new Date(maxDate)) / (1000 * 60 * 60 * 24)) : 0;
@@ -569,6 +577,11 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
     if (opsCriticas > 0) {
       colorAlerta = 'rojo';
     }
+    
+    // También alertar si el promedio de atraso supera la meta
+    if (promedioAtraso > metaPromedioAtraso && colorAlerta === 'verde') {
+      colorAlerta = 'amarillo';
+    }
 
     return {
       fuente:          'real',
@@ -578,6 +591,8 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
       opsCriticas,
       opsAtrasadas,
       totalDiasAtraso: totalAtraso,
+      promedioAtraso,
+      metaPromedioAtraso,
       listaProblema,
       meta:            `Meta: Atraso tol. ${umbralTolerancia}d | OPs: ${totalOps}`,
       detalle:         `Críticas: ${opsCriticas} OPs | Atrasadas: ${opsAtrasadas} OPs`,
