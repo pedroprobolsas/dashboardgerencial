@@ -5,17 +5,17 @@ const { query, testConnection } = require('../src/dbClient');
 async function seed() {
   const pg = await testConnection();
   if (!pg.ok) {
-    console.error('? No se pudo conectar a PostgreSQL.');
+    console.error('‚ùå No se pudo conectar a PostgreSQL.');
     process.exit(1);
   }
 
   try {
-    console.log('Insertando par·metros...');
-    await query( + "" + INSERT INTO app_ops.parametros (clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por) SELECT 'atraso_dias_tolerancia', 2, 'dÌas', 'DÌas de atraso', 'ProducciÛn', CURRENT_DATE, 'sistema@probolsas.com' WHERE NOT EXISTS (SELECT 1 FROM app_ops.parametros WHERE clave = 'atraso_dias_tolerancia') + "" + );
-    await query( + "" + INSERT INTO app_ops.parametros (clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por) SELECT 'atraso_dias_critico', 10, 'dÌas', 'DÌas para crÌtica', 'ProducciÛn', CURRENT_DATE, 'sistema@probolsas.com' WHERE NOT EXISTS (SELECT 1 FROM app_ops.parametros WHERE clave = 'atraso_dias_critico') + "" + );
-    console.log('? Par·metros insertados.');
+    console.log('Insertando par√°metros...');
+    await query(`INSERT INTO app_ops.parametros (clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por) SELECT 'atraso_dias_tolerancia', 2, 'd√≠as', 'D√≠as de atraso', 'Producci√≥n', CURRENT_DATE, 'sistema@probolsas.com' WHERE NOT EXISTS (SELECT 1 FROM app_ops.parametros WHERE clave = 'atraso_dias_tolerancia')`);
+    await query(`INSERT INTO app_ops.parametros (clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por) SELECT 'atraso_dias_critico', 10, 'd√≠as', 'D√≠as para cr√≠tica', 'Producci√≥n', CURRENT_DATE, 'sistema@probolsas.com' WHERE NOT EXISTS (SELECT 1 FROM app_ops.parametros WHERE clave = 'atraso_dias_critico')`);
+    console.log('‚úÖ Par√°metros insertados.');
   } catch (err) {
-    console.error('? Error:', err.message);
+    console.error('‚ùå Error:', err.message);
   } finally {
     process.exit(0);
   }
