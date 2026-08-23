@@ -610,7 +610,6 @@ async function kpiCostoProduccion({ mesNum, anio }, metas = {}) {
       pctPerdida,
       costoEjecutado:  fmt.format(totalCosto),
       valorProducido:  fmt.format(totalFact),
-      meta:            `Meta pérdida: < ${umbralAmarillo}% | OPs bajo meta: ${opsConPerdida} (${pctPerdida.toFixed(1)}%)`,
       detalle:         `OPs: ${opsMes} | Rentabilidad prom: ${margenProm}% | Meta: ${margenMinimo}%`,
       fechaActualizacion: maxDate,
       desactualizado: diffDias > limiteDias,
