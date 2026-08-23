@@ -12,6 +12,208 @@ const fmtCOPCierre = new Intl.NumberFormat('es-CO', { style: 'currency', currenc
 const fmtNum = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 4 });
 const fmtDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : '—';
 
+function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYears }: { defaultYear: number, defaultMonth: number, mockMonths: any[], availableYears: number[] }) {
+  const [year, setYear] = useState(defaultYear);
+  const [month, setMonth] = useState(defaultMonth);
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<{ code: string; concept: string; valor: number }[]>([]);
+  const [estado, setEstado] = useState('sin datos');
+
+  useEffect(() => {
+    let active = true;
+    const fetchReport = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/movimientos_materiales/reporte-siigo-detalle?anio=${year}&mes=${month}`);
+        if (!res.ok) throw new Error('Network response was not ok');
+        const json = await res.json();
+        if (active && json.ok) {
+          setData(json.data);
+          setEstado(json.estado_mes);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchReport();
+    return () => { active = false; };
+  }, [year, month]);
+
+  const total72 = data.filter(d => d.code.startsWith('72')).reduce((acc, curr) => acc + curr.valor, 0);
+  const total73 = data.filter(d => d.code.startsWith('73')).reduce((acc, curr) => acc + curr.valor, 0);
+  const total = total72 + total73;
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const monthName = mockMonths.find(m => m.val === month)?.label || '';
+    const now = new Date().toLocaleString('es-CO');
+    
+    let rowsHtml = data.map(d => `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.code}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.concept}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${fmtCOPCierre.format(d.valor)}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Reporte Cierre Costos SIIGO - ${monthName} ${year}</title>
+        <style>
+          body { font-family: sans-serif; color: #333; margin: 40px; }
+          h1 { font-size: 20px; margin-bottom: 5px; }
+          .meta { font-size: 12px; color: #666; margin-bottom: 30px; }
+          table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 30px; }
+          th { background: #f8f9fa; padding: 10px; text-align: left; border-bottom: 2px solid #ddd; }
+          .summary { max-width: 400px; margin-left: auto; border: 1px solid #ddd; padding: 15px; border-radius: 8px; }
+          .summary-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+          .summary-total { display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; border-top: 2px solid #333; padding-top: 10px; margin-top: 10px; }
+        </style>
+      </head>
+      <body>
+        <h1>Reporte para Cierre de Costos — SIIGO</h1>
+        <div class="meta">
+          Período: <strong>${monthName} ${year}</strong> &nbsp;|&nbsp; 
+          Estado del mes: <strong>${estado.toUpperCase()}</strong> &nbsp;|&nbsp; 
+          Generado: <strong>${now}</strong>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Cuenta</th>
+              <th>Concepto</th>
+              <th style="text-align: right;">Débito Acumulado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml || '<tr><td colspan="3" style="text-align:center; padding:20px;">Sin datos</td></tr>'}
+          </tbody>
+        </table>
+
+        <div class="summary">
+          <div class="summary-row">
+            <span>Total 72 - Mano de obra:</span>
+            <span>${fmtCOPCierre.format(total72)}</span>
+          </div>
+          <div class="summary-row">
+            <span>Total 73 - Otros costos de fabricación:</span>
+            <span>${fmtCOPCierre.format(total73)}</span>
+          </div>
+          <div class="summary-total">
+            <span>Total para cierre (72+73):</span>
+            <span>${fmtCOPCierre.format(total)}</span>
+          </div>
+        </div>
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-dashboard-textMain">Reporte para Cierre de Costos — SIIGO</h2>
+          <p className="text-sm text-dashboard-textMuted mt-1">
+            Detalle de cuentas 72 y 73 (excluye comprobantes de cierre).
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <select
+            className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500 bg-slate-50"
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+          >
+            {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <select
+            className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500 bg-slate-50"
+            value={month}
+            onChange={(e) => setMonth(Number(e.target.value))}
+          >
+            {mockMonths.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}
+          </select>
+          <button
+            onClick={handlePrint}
+            disabled={loading || data.length === 0}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
+          >
+            Imprimir / Descargar PDF
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row gap-8">
+        {loading ? (
+          <div className="flex-1 text-center py-8 text-slate-400">Cargando reporte...</div>
+        ) : (
+          <>
+            {/* Detalle */}
+            <div className="flex-1 overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap">
+                <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Cuenta</th>
+                    <th className="px-4 py-3 font-semibold">Concepto</th>
+                    <th className="px-4 py-3 font-semibold text-right">Débito Acumulado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {data.length === 0 ? (
+                    <tr><td colSpan={3} className="px-4 py-6 text-center text-slate-400">Sin datos para el período seleccionado</td></tr>
+                  ) : (
+                    data.map((r, i) => (
+                      <tr key={i} className="hover:bg-slate-50">
+                        <td className="px-4 py-2 font-medium text-slate-700">{r.code}</td>
+                        <td className="px-4 py-2 truncate max-w-[250px]" title={r.concept}>{r.concept}</td>
+                        <td className="px-4 py-2 text-right font-medium">{fmtCOPCierre.format(r.valor)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Resumen Sidebar */}
+            <div className="w-full md:w-[350px] bg-slate-50 rounded-xl p-5 border border-slate-100 flex flex-col gap-4 h-fit">
+              <div className="flex justify-between items-center pb-3 border-b border-slate-200">
+                <span className="text-xs font-semibold uppercase text-slate-500 tracking-wide">Resumen del Mes</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${estado === 'cerrado' ? 'bg-emerald-100 text-emerald-700' : estado === 'pendiente' ? 'bg-red-100 text-red-700' : estado === 'parcial' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-600'}`}>
+                  {estado.toUpperCase()}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm text-slate-600">Total 72 - Mano de obra</span>
+                <span className="text-lg font-semibold text-slate-800">{fmtCOPCierre.format(total72)}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm text-slate-600">Total 73 - Otros costos de fabricación</span>
+                <span className="text-lg font-semibold text-slate-800">{fmtCOPCierre.format(total73)}</span>
+              </div>
+              <div className="flex flex-col gap-1 pt-3 border-t border-slate-200 mt-2">
+                <span className="text-sm font-bold text-slate-800">Total para cierre (72+73)</span>
+                <span className="text-2xl font-bold text-indigo-700">{fmtCOPCierre.format(total)}</span>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { defaultYear: number, mockMonths: any[], availableYears: number[] }) {
   const [year, setYear] = useState(defaultYear);
   const [loading, setLoading] = useState(false);
@@ -543,6 +745,9 @@ export default function MovimientoMateriales() {
 
       {/* COHERENCIA DE COSTOS (ANUAL) */}
       <CoherenciaCostos defaultYear={year} mockMonths={mockMonths} availableYears={years} />
+
+      {/* REPORTE CIERRE COSTOS SIIGO */}
+      <ReporteCierreSiigo defaultYear={year} defaultMonth={month} mockMonths={mockMonths} availableYears={years} />
 
       {/* ÁREA DE RESULTADOS */}
       <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">

@@ -302,4 +302,59 @@ router.get('/filtros', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/movimientos_materiales/reporte-siigo-detalle
+ */
+router.get('/reporte-siigo-detalle', async (req, res) => {
+  try {
+    const { anio, mes } = req.query;
+    if (!anio || !mes) {
+      return res.status(400).json({ ok: false, error: 'Faltan parámetros anio y mes' });
+    }
+
+    const sqlDetalle = `
+      SELECT 
+        accounting_code, 
+        accounting_concept, 
+        SUM(debit) as total_debit
+      FROM app_ops.siigo_costos_produccion_detalle
+      WHERE anio = $1 
+        AND mes = $2 
+        AND (accounting_code LIKE '72%' OR accounting_code LIKE '73%')
+        AND es_cierre = FALSE
+      GROUP BY accounting_code, accounting_concept
+      ORDER BY accounting_code
+    `;
+
+    const sqlEstado = `
+      SELECT estado_mes
+      FROM app_ops.siigo_costos_produccion_resumen
+      WHERE anio = $1 AND mes = $2
+    `;
+
+    const params = [parseInt(anio, 10), parseInt(mes, 10)];
+    
+    const [resDetalle, resEstado] = await Promise.all([
+      query(sqlDetalle, params),
+      query(sqlEstado, params)
+    ]);
+
+    const items = resDetalle.rows.map(r => ({
+      code: r.accounting_code,
+      concept: r.accounting_concept,
+      valor: parseFloat(r.total_debit) || 0
+    }));
+
+    res.json({
+      ok: true,
+      data: items,
+      estado_mes: resEstado.rows[0]?.estado_mes || 'sin datos'
+    });
+
+  } catch (err) {
+    console.error('GET /api/movimientos_materiales/reporte-siigo-detalle error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 module.exports = router;
