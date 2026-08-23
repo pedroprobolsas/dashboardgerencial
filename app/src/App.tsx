@@ -135,15 +135,31 @@ function adaptarKPI(raw: KPIReal): KPI {
     const filas: FilaGrid[] = [];
     if (raw.valorProducido && raw.costoEjecutado) {
       filas.push({
-        izq: { label: 'Facturado', valor: raw.valorProducido },
+        izq: { label: 'Valor Producción Cumplida', valor: raw.valorProducido },
         der: { label: 'Costo',     valor: raw.costoEjecutado },
       });
+      filas.push({
+        izq: { label: 'Rentabilidad Promedio', valor: `${raw.margenProm}%` },
+        der: { label: '', valor: '' },
+      });
     }
+
+    let titular = base.valorFormateado;
+    if (raw.opsPerdidaReal != null) {
+      titular = `${base.valorFormateado} perdidos en ${raw.opsPerdidaReal} OPs`;
+    }
+
     const subtexto = [
-      raw.ordenes       != null ? `OPs: ${raw.ordenes}`                        : null,
-      raw.opsConPerdida != null ? `Bajo meta: ${raw.opsConPerdida} OPs`      : null,
+      raw.opsBajoMeta != null ? `${raw.opsBajoMeta} OPs bajo la meta de rentabilidad` : null,
     ].filter(Boolean).join(' | ');
-    return { ...base, descripcionAlerta: descCosto, filas: filas.length > 0 ? filas : undefined, subtexto: subtexto || undefined };
+
+    return { 
+      ...base, 
+      valorFormateado: titular,
+      descripcionAlerta: descCosto, 
+      filas: filas.length > 0 ? filas : undefined, 
+      subtexto: subtexto || undefined 
+    };
   }
 
   // ── Obligaciones por vencer: total + desglose por rango de días ─────────────

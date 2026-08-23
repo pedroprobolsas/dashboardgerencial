@@ -561,7 +561,9 @@ async function kpiCostoProduccion({ mesNum, anio }, metas = {}) {
          ROUND(AVG(margen_pct), 1)              AS margen_promedio_pct,
          ROUND(SUM(costo_total), 0)             AS total_costo_ejecutado,
          ROUND(SUM(valor_cumplido), 0)          AS total_facturado,
-         COUNT(*) FILTER (WHERE margen_pct < $2) AS ops_con_perdida
+         COUNT(*) FILTER (WHERE margen_pct < 0) AS ops_perdida_real,
+         SUM(costo_total - valor_cumplido) FILTER (WHERE margen_pct < 0) AS valor_perdida_real,
+         COUNT(*) FILTER (WHERE margen_pct >= 0 AND margen_pct < $2) AS ops_bajo_meta
        FROM crisolweb.costo_por_orden
        WHERE fecha >= $1::date
          AND fecha <  ($1::date + INTERVAL '1 month')
@@ -580,13 +582,16 @@ async function kpiCostoProduccion({ mesNum, anio }, metas = {}) {
                           : null;
     const totalCosto    = parseFloat(rows[0]?.total_costo_ejecutado || 0);
     const totalFact     = parseFloat(rows[0]?.total_facturado       || 0);
-    const opsConPerdida = parseInt(rows[0]?.ops_con_perdida          || 0, 10);
+    const opsPerdidaReal = parseInt(rows[0]?.ops_perdida_real      || 0, 10);
+    const valorPerdidaReal = parseFloat(rows[0]?.valor_perdida_real || 0);
+    const opsBajoMeta    = parseInt(rows[0]?.ops_bajo_meta         || 0, 10);
 
     if (opsMes === 0 || margenProm === null) {
       return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo', fechaActualizacion: maxDate, desactualizado: diffDias > limiteDias };
     }
 
     const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+    const opsConPerdida = opsPerdidaReal + opsBajoMeta; // Total bajo la meta
     const pctPerdida = (opsConPerdida / opsMes) * 100;
     
     const umbralAmarillo = getMeta(metas, 'ops_perdida_alerta_amarilla') || 10;
@@ -594,15 +599,19 @@ async function kpiCostoProduccion({ mesNum, anio }, metas = {}) {
 
     return {
       fuente:          'real',
-      valor:           margenProm,
-      valorFormateado: `${margenProm}%`,
+      valor:           valorPerdidaReal,
+      valorFormateado: `${fmt.format(valorPerdidaReal)}`,
       ordenes:         opsMes,
+      margenProm,
+      opsPerdidaReal,
+      valorPerdidaRealFormateado: fmt.format(valorPerdidaReal),
+      opsBajoMeta,
       opsConPerdida,
       pctPerdida,
       costoEjecutado:  fmt.format(totalCosto),
       valorProducido:  fmt.format(totalFact),
-      meta:            `Meta pérdida: < ${umbralAmarillo}% | OPs en pérdida: ${opsConPerdida} (${pctPerdida.toFixed(1)}%)`,
-      detalle:         `OPs: ${opsMes} | Bajo meta (<18%): ${opsConPerdida}`,
+      meta:            `Meta pérdida: < ${umbralAmarillo}% | OPs bajo meta: ${opsConPerdida} (${pctPerdida.toFixed(1)}%)`,
+      detalle:         `OPs: ${opsMes} | Rentabilidad prom: ${margenProm}% | Meta: ${margenMinimo}%`,
       fechaActualizacion: maxDate,
       desactualizado: diffDias > limiteDias,
       alerta: alertaColor(pctPerdida, {

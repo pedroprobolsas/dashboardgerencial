@@ -116,6 +116,10 @@ export interface KPIReal {
   opsAtrasadas?: number;
   totalDiasAtraso?: number;
   opsConPerdida?: number;
+  margenProm?: number;
+  opsPerdidaReal?: number;
+  valorPerdidaRealFormateado?: string;
+  opsBajoMeta?: number;
   margenProduccion?: number;
   valorProducido?: string;
   costoEjecutado?: string;
