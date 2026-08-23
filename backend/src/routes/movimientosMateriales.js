@@ -205,14 +205,19 @@ router.get('/cierre-costos', async (req, res) => {
           ) t
         ) as lista_anomalias
       FROM base_req
+    const sqlSiigo = `
+      SELECT anio, mes, costos_mano_obra_72, costos_otros_73, estado_mes
+      FROM app_ops.siigo_costos_produccion_resumen
+      WHERE anio = $1 AND mes = $2
     `;
 
     const params = [primerDia, primerDiaSiguiente];
-    const [resConsumo, resProduccion, resCompras, resControl] = await Promise.all([
+    const [resConsumo, resProduccion, resCompras, resControl, resSiigo] = await Promise.all([
       query(sqlConsumo, params),
       query(sqlProduccion, params),
       query(sqlCompras, params),
-      query(sqlControlCierre, params)
+      query(sqlControlCierre, params),
+      query(sqlSiigo, [anio, mes])
     ]);
 
     // Extraer totales globales nativos de Postgres (vienen como string por ser NUMERIC, se envían así para evitar pérdida en JS)
@@ -257,7 +262,12 @@ router.get('/cierre-costos', async (req, res) => {
         consumoDepurado: resControl.rows[0]?.consumo_depurado || "0",
         ajustesDepurado: resControl.rows[0]?.ajustes_depurado || "0",
         listaAnomalias: resControl.rows[0]?.lista_anomalias || []
-      }
+      },
+      siigo: resSiigo.rows[0] ? {
+        costos_mano_obra_72: resSiigo.rows[0].costos_mano_obra_72,
+        costos_otros_73: resSiigo.rows[0].costos_otros_73,
+        estado_mes: resSiigo.rows[0].estado_mes
+      } : null
     });
 
   } catch (err) {

@@ -67,6 +67,9 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
                 <th className="px-5 py-3 font-semibold text-right">Consumo Real MP (Depurado)</th>
                 <th className="px-5 py-3 font-semibold text-right">Producción Terminada</th>
                 <th className="px-5 py-3 font-semibold text-right">Otros costos Crisol</th>
+                <th className="px-5 py-3 font-semibold text-right">Otros costos SIIGO</th>
+                <th className="px-5 py-3 font-semibold text-right" title="Diferencia por analizar">Dif. Crisol vs SIIGO</th>
+                <th className="px-5 py-3 font-semibold text-right">% Dif.</th>
                 <th className="px-5 py-3 font-semibold text-right">Compras MP</th>
                 <th className="px-5 py-3 font-semibold text-right">% Ajustes</th>
               </tr>
@@ -74,14 +77,14 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
             <tbody className="divide-y divide-slate-100 relative">
               {loading && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-slate-400">
+                  <td colSpan={9} className="px-5 py-8 text-center text-slate-400">
                     Calculando meses del año...
                   </td>
                 </tr>
               )}
               {!loading && dataPorMes.map((row, i) => {
                 if (!row.data || !row.data.controlCierre) return (
-                   <tr key={i}><td className="px-5 py-3 font-medium text-slate-700">{row.mes}</td><td colSpan={5} className="text-slate-400 px-5 py-3 text-center">Sin datos</td></tr>
+                   <tr key={i}><td className="px-5 py-3 font-medium text-slate-700">{row.mes}</td><td colSpan={8} className="text-slate-400 px-5 py-3 text-center">Sin datos</td></tr>
                 );
 
                 const c = row.data;
@@ -94,12 +97,39 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
                 const pctAjustes = depurado > 0 ? (ajustes / depurado) * 100 : 0;
                 const isAlert = Math.abs(pctAjustes) > 30;
 
+                // SIIGO
+                const siigo = c.siigo;
+                const siigoManoObra = Number(siigo?.costos_mano_obra_72) || 0;
+                const siigoOtros = Number(siigo?.costos_otros_73) || 0;
+                const otrosCostosSiigo = siigoManoObra + siigoOtros;
+                const diffSiigo = otrosCostos - otrosCostosSiigo;
+                const pctDiffSiigo = otrosCostosSiigo !== 0 ? (diffSiigo / otrosCostosSiigo) * 100 : 0;
+                const estadoSiigo = siigo?.estado_mes || '';
+
+                let estadoIcon = null;
+                if (estadoSiigo === 'pendiente') estadoIcon = <span className="inline-block w-2 h-2 rounded-full bg-red-400 ml-1.5" title="Estado Pendiente (puede cambiar)"></span>;
+                else if (estadoSiigo === 'parcial') estadoIcon = <span className="inline-block w-2 h-2 rounded-full bg-amber-400 ml-1.5" title="Estado Parcial (puede cambiar)"></span>;
+                else if (estadoSiigo === 'cerrado') estadoIcon = <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 ml-1.5" title="Estado Cerrado"></span>;
+
                 return (
                   <tr key={i} className={`hover:bg-slate-50 transition-colors ${isAlert ? 'bg-red-50' : ''}`}>
-                    <td className={`px-5 py-3 font-medium ${isAlert ? 'text-red-700' : 'text-slate-700'}`}>{row.mes}</td>
+                    <td className={`px-5 py-3 font-medium flex items-center ${isAlert ? 'text-red-700' : 'text-slate-700'}`}>
+                      {row.mes} {estadoIcon}
+                    </td>
                     <td className={`px-5 py-3 text-right font-semibold ${isAlert ? 'text-red-700' : 'text-slate-800'}`}>{fmtCOP.format(depurado)}</td>
                     <td className={`px-5 py-3 text-right font-medium ${isAlert ? 'text-red-600' : 'text-emerald-700'}`}>{fmtCOP.format(produccion)}</td>
                     <td className={`px-5 py-3 text-right font-semibold text-amber-700`}>{fmtCOPCierre.format(otrosCostos)}</td>
+                    
+                    <td className="px-5 py-3 text-right font-semibold text-blue-700" title={`Mano de obra (72): ${fmtCOPCierre.format(siigoManoObra)}\nOtros fábrica (73): ${fmtCOPCierre.format(siigoOtros)}`}>
+                      {fmtCOPCierre.format(otrosCostosSiigo)}
+                    </td>
+                    <td className="px-5 py-3 text-right font-semibold text-slate-600" title="Diferencia por analizar">
+                      {fmtCOPCierre.format(diffSiigo)}
+                    </td>
+                    <td className="px-5 py-3 text-right font-medium text-slate-500">
+                      {siigo ? `${pctDiffSiigo.toFixed(2)}%` : '—'}
+                    </td>
+
                     <td className={`px-5 py-3 text-right font-medium ${isAlert ? 'text-red-600' : 'text-indigo-700'}`}>{fmtCOP.format(compras)}</td>
                     <td className={`px-5 py-3 text-right font-bold ${isAlert ? 'text-red-700' : 'text-slate-600'}`}>
                       {pctAjustes.toFixed(1)}%
