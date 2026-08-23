@@ -21,6 +21,8 @@ import { type KPI, type AlertaColor, type FilaGrid } from './data/kpis';
 import { fetchKPIs, fetchVentasMes, fetchCarteraAsesor, fetchMargenGlobal, enviarCierre, actualizarEstadoCierre, fetchBandeja, fetchMe, logout as apiLogout, fetchTarjetasDashboard, periodoToRango, type KPIReal, type KPIDiario, type Usuario, type TarjetaDashboard } from './services/api';
 import VistazoDiario from './components/Dashboard/VistazoDiario';
 import type { InformeCierre, AreaCierre } from './types/cierres';
+import InformePDFModal from './components/Produccion/InformePDFModal';
+import OpTrazabilidadModal from './components/Produccion/OpTrazabilidadModal';
 
 // ── Adaptador: KPIReal (backend) → KPI (componente tarjeta) ──────────────────
 
@@ -262,6 +264,9 @@ function Dashboard({ onNavegar }: { onNavegar: (vista: Vista) => void }) {
   const [fuentesListas, setFuentesListas] = useState(0);
   const [fuentesTotales] = useState(4); // ventas, cartera, margen, monolítico
   const [tarjetasConfig, setTarjetasConfig] = useState<TarjetaDashboard[] | null>(null);
+  
+  const [reporteOrdenes, setReporteOrdenes] = useState<KPIReal | null>(null);
+  const [opSeleccionada, setOpSeleccionada] = useState<string | null>(null);
 
   // Cargar configuración de tarjetas (una sola vez)
   useEffect(() => {
@@ -307,6 +312,10 @@ function Dashboard({ onNavegar }: { onNavegar: (vista: Vista) => void }) {
           window.history.pushState({}, '', url);
           onNavegar('costo-produccion-detalle');
         };
+      }
+
+      if (id === 'ordenes-cumplidas') {
+        data.onClickReporte = () => setReporteOrdenes(raw);
       }
 
       setWidgets(prev => ({
@@ -417,6 +426,65 @@ function Dashboard({ onNavegar }: { onNavegar: (vista: Vista) => void }) {
           return <KPICardSkeleton key={id} />;
         })}
       </section>
+
+      {/* MODAL DE REPORTE ÓRDENES CRÍTICAS */}
+      {reporteOrdenes && (
+        <InformePDFModal
+          tipoInforme="ordenes-criticas"
+          requestData={{ periodo }}
+          titulo="Órdenes en Producción Críticas"
+          entidadLabel="Período"
+          entidadValue={formatPeriodo(periodo)}
+          firmaLabel="Líder de Planta"
+          firmaDerechaLabel="Gerencia Operativa"
+          onClose={() => setReporteOrdenes(null)}
+          infoExtra={
+            <div className="mt-2 text-sm text-slate-500">
+              <p>OPs totales producidas: {reporteOrdenes.ordenes}</p>
+              <p>OPs críticas por atraso: {reporteOrdenes.opsCriticas}</p>
+              {reporteOrdenes.fechaActualizacion && (
+                <p className="mt-2 text-xs">Datos calculados hasta: {new Date(reporteOrdenes.fechaActualizacion).toLocaleDateString('es-CO')} {reporteOrdenes.desactualizado && '(Con retraso)'}</p>
+              )}
+            </div>
+          }
+        >
+          <div className="mb-8">
+            <h3 className="text-lg font-bold text-slate-800 border-b-2 border-slate-800 pb-2 mb-4">Detalle de Órdenes Críticas</h3>
+            {reporteOrdenes.listaCriticas && reporteOrdenes.listaCriticas.length > 0 ? (
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-600 uppercase tracking-wider text-xs border-b border-slate-200">
+                    <th className="px-4 py-3 font-semibold">Nro OP</th>
+                    <th className="px-4 py-3 font-semibold">Referencia</th>
+                    <th className="px-4 py-3 font-semibold text-right">Días Atraso</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {reporteOrdenes.listaCriticas.map((op, idx) => (
+                    <tr key={idx} onClick={() => setOpSeleccionada(op.nro_op)} className="hover:bg-slate-50 cursor-pointer print:hover:bg-transparent">
+                      <td className="px-4 py-3 font-medium text-slate-800">{op.nro_op}</td>
+                      <td className="px-4 py-3 text-slate-600">{op.referencia}</td>
+                      <td className="px-4 py-3 font-bold text-red-600 text-right">{op.dias_atraso}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-8 text-center bg-slate-50 rounded-lg">
+                <p className="text-slate-500">No hay órdenes críticas registradas en este período.</p>
+              </div>
+            )}
+          </div>
+        </InformePDFModal>
+      )}
+
+      {/* MODAL TRAZABILIDAD (desde el reporte PDF) */}
+      {opSeleccionada && (
+        <OpTrazabilidadModal
+          nro_op={opSeleccionada}
+          onClose={() => setOpSeleccionada(null)}
+        />
+      )}
     </div>
   );
 }

@@ -25,6 +25,7 @@ export interface KPI {
   detalle?: string;
   onClickValor?: () => void;
   onClickSubtexto?: () => void;
+  onClickReporte?: () => void;
 }
 
 // Umbrales definidos según documento_maestro.md

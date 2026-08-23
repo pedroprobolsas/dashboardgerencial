@@ -496,22 +496,46 @@ async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
 
 // ── KPI: Producción desde costo_por_orden (PostgreSQL) ───────────────────────
 
-async function kpiOrdenesCumplidas({ mesNum, anio }) {
+async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
   try {
     const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
+    
+    // Leer umbrales, permitiendo que sean 0 explícitamente
+    const metaTol = getMeta(metas, 'atraso_dias_tolerancia');
+    const umbralTolerancia = metaTol !== null && metaTol !== undefined ? Number(metaTol) : 2;
+    
+    const metaCrit = getMeta(metas, 'atraso_dias_critico');
+    const umbralCritico = metaCrit !== null && metaCrit !== undefined ? Number(metaCrit) : 10;
+
     const { rows } = await query(
       `SELECT
          COUNT(*)                                                                        AS total_ops,
          ROUND(AVG(cantidad_cumplida / NULLIF(cantidad_pedida,0) * 100), 1)             AS cumplimiento_prom_pct,
+         
          COUNT(*) FILTER (
-           WHERE ABS((cantidad_cumplida / NULLIF(cantidad_pedida,0) - 1) * 100) > 5
+           WHERE dias_vencido < 0 AND ABS(dias_vencido) > $2 AND ABS(dias_vencido) <= $3
+         )                                                                               AS ops_atrasadas,
+         
+         COUNT(*) FILTER (
+           WHERE dias_vencido < 0 AND ABS(dias_vencido) > $3
          )                                                                               AS ops_criticas,
+         
          SUM(CASE WHEN dias_vencido < 0 THEN ABS(dias_vencido) ELSE 0 END)             AS total_dias_atraso,
-         COUNT(*) FILTER (WHERE dias_vencido < 0)                                       AS ops_atrasadas
+         
+         JSON_AGG(
+           JSON_BUILD_OBJECT(
+             'nro_op', nro_op,
+             'referencia', referencia,
+             'dias_atraso', ABS(dias_vencido)
+           )
+         ) FILTER (WHERE dias_vencido < 0 AND ABS(dias_vencido) > $3) AS lista_ops_criticas,
+         
+         MAX(fecha_cumplimiento)::date as max_date
+         
        FROM crisolweb.ordenes_cumplidas
        WHERE fecha_cumplimiento >= $1::date
          AND fecha_cumplimiento <  ($1::date + INTERVAL '1 month')`,
-      [primerDiaMes]
+      [primerDiaMes, umbralTolerancia, umbralCritico]
     );
 
     const totalOps      = parseInt(rows[0]?.total_ops         || 0, 10);
@@ -521,12 +545,27 @@ async function kpiOrdenesCumplidas({ mesNum, anio }) {
     const opsCriticas   = parseInt(rows[0]?.ops_criticas      || 0, 10);
     const totalAtraso   = parseInt(rows[0]?.total_dias_atraso || 0, 10);
     const opsAtrasadas  = parseInt(rows[0]?.ops_atrasadas     || 0, 10);
+    const listaCriticas = rows[0]?.lista_ops_criticas         || [];
+    
+    const maxDate = rows[0]?.max_date;
+    const diffDias = maxDate ? Math.floor((new Date() - new Date(maxDate)) / (1000 * 60 * 60 * 24)) : 0;
+    const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
 
     if (totalOps === 0 || cumplimiento === null) {
       return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo' };
     }
 
     const pctCriticas = totalOps > 0 ? (opsCriticas / totalOps * 100) : 0;
+    
+    let colorAlerta = alertaColor(pctCriticas, {
+      verde:    v => v === 0,
+      amarillo: v => v <= 15,
+    });
+    
+    // Forzar rojo si hay 1 o más OPs críticas
+    if (opsCriticas > 0) {
+      colorAlerta = 'rojo';
+    }
 
     return {
       fuente:          'real',
@@ -536,12 +575,12 @@ async function kpiOrdenesCumplidas({ mesNum, anio }) {
       opsCriticas,
       opsAtrasadas,
       totalDiasAtraso: totalAtraso,
-      meta:            `Meta: entre 95% y 105% | OPs: ${totalOps}`,
-      detalle:         `Críticas: ${opsCriticas} OPs | Atraso acum.: ${totalAtraso} días`,
-      alerta: alertaColor(pctCriticas, {
-        verde:    v => v === 0,
-        amarillo: v => v <= 15,
-      }),
+      listaCriticas,
+      meta:            `Meta: Atraso tol. ${umbralTolerancia}d | OPs: ${totalOps}`,
+      detalle:         `Críticas: ${opsCriticas} OPs | Atrasadas: ${opsAtrasadas} OPs`,
+      alerta:          colorAlerta,
+      fechaActualizacion: maxDate,
+      desactualizado: diffDias > limiteDias,
     };
   } catch (err) {
     console.error('kpiOrdenesCumplidas:', err.message);
@@ -1066,7 +1105,7 @@ router.get('/', async (req, res) => {
       kpiCarteraPorAsesor(metas),
       kpiFlujoCaja({ mesNum, anio }, metas),
       kpiCierreMensual(periodo, metas),
-      kpiOrdenesCumplidas({ mesNum, anio }),
+      kpiOrdenesCumplidas({ mesNum, anio }, metas),
       kpiCostoProduccion({ mesNum, anio }, metas),
       kpiRotacionPersonal(periodo, metas),
       kpiObligacionesPorVencer(),
