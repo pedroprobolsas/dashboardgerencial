@@ -524,7 +524,7 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
          
          JSON_AGG(
            JSON_BUILD_OBJECT(
-             'nro_op', nro_op,
+             'nro_op', nro_orden,
              'referencia', referencia,
              'dias_atraso', ABS(dias_vencido)
            )
