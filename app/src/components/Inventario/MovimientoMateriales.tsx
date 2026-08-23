@@ -340,11 +340,11 @@ export default function MovimientoMateriales() {
         ) : (
           <div className="flex flex-col gap-6">
             {/* Tarjetas Principales */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
-                <span className="text-sm font-semibold text-slate-600">Consumo de Materia Prima</span>
-                <p className="text-3xl font-bold text-slate-800 my-1">{fmtCOPCierre.format(cierreCostos.consumoMateriaPrima.total)}</p>
-                <p className="text-[10px] text-slate-400 font-mono">Origen Crisolweb: Cumplido Requisicion / CONSUMO MATERIA PRIMA</p>
+                <span className="text-sm font-semibold text-slate-600">Consumo Real de MP</span>
+                <p className="text-3xl font-bold text-slate-800 my-1">{fmtCOPCierre.format(cierreCostos.controlCierre?.depurado || 0)}</p>
+                <p className="text-[10px] text-slate-400 font-mono">Cumplido Requisición Depurado</p>
               </div>
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
                 <span className="text-sm font-semibold text-slate-600">Producción Terminada</span>
@@ -356,6 +356,19 @@ export default function MovimientoMateriales() {
                 <p className="text-3xl font-bold text-indigo-700 my-1">{fmtCOPCierre.format(cierreCostos.comprasMateriaPrima.total)}</p>
                 <p className="text-[10px] text-slate-400 font-mono">Origen Crisolweb: Compra / Bodega 00 Materia Prima</p>
               </div>
+              {(() => {
+                const depurado = Number(cierreCostos.controlCierre?.depurado) || 0;
+                const ajustes = Number(cierreCostos.controlCierre?.ajustesDepurado) || 0;
+                const pctAjustes = depurado > 0 ? (ajustes / depurado) * 100 : 0;
+                const isAlert = Math.abs(pctAjustes) > 30;
+                return (
+                  <div className={`bg-white rounded-3xl shadow-sm border p-5 flex flex-col gap-1 ${isAlert ? 'border-red-300 bg-red-50/50' : 'border-slate-200'}`}>
+                    <span className={`text-sm font-semibold ${isAlert ? 'text-red-700' : 'text-slate-600'}`}>% Ajustes sobre Consumo Real de MP</span>
+                    <p className={`text-3xl font-bold my-1 ${isAlert ? 'text-red-700' : 'text-slate-600'}`}>{pctAjustes.toFixed(1)}%</p>
+                    <p className={`text-[10px] font-mono ${isAlert ? 'text-red-500' : 'text-slate-400'}`}>Ajustes válidos / Consumo Real de MP</p>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Detalle por bodega */}
