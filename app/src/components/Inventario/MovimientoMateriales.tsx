@@ -66,6 +66,7 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
                 <th className="px-5 py-3 font-semibold">Mes</th>
                 <th className="px-5 py-3 font-semibold text-right">Consumo Real MP (Depurado)</th>
                 <th className="px-5 py-3 font-semibold text-right">Producción Terminada</th>
+                <th className="px-5 py-3 font-semibold text-right">Otros costos Crisol</th>
                 <th className="px-5 py-3 font-semibold text-right">Compras MP</th>
                 <th className="px-5 py-3 font-semibold text-right">% Ajustes</th>
               </tr>
@@ -73,14 +74,14 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
             <tbody className="divide-y divide-slate-100 relative">
               {loading && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-slate-400">
+                  <td colSpan={6} className="px-5 py-8 text-center text-slate-400">
                     Calculando meses del año...
                   </td>
                 </tr>
               )}
               {!loading && dataPorMes.map((row, i) => {
                 if (!row.data || !row.data.controlCierre) return (
-                   <tr key={i}><td className="px-5 py-3 font-medium text-slate-700">{row.mes}</td><td colSpan={4} className="text-slate-400 px-5 py-3 text-center">Sin datos</td></tr>
+                   <tr key={i}><td className="px-5 py-3 font-medium text-slate-700">{row.mes}</td><td colSpan={5} className="text-slate-400 px-5 py-3 text-center">Sin datos</td></tr>
                 );
 
                 const c = row.data;
@@ -89,6 +90,7 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
                 const compras = Number(c.comprasMateriaPrima.total) || 0;
                 const ajustes = Number(c.controlCierre.ajustesDepurado) || 0;
                 
+                const otrosCostos = produccion - depurado;
                 const pctAjustes = depurado > 0 ? (ajustes / depurado) * 100 : 0;
                 const isAlert = Math.abs(pctAjustes) > 30;
 
@@ -97,6 +99,7 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
                     <td className={`px-5 py-3 font-medium ${isAlert ? 'text-red-700' : 'text-slate-700'}`}>{row.mes}</td>
                     <td className={`px-5 py-3 text-right font-semibold ${isAlert ? 'text-red-700' : 'text-slate-800'}`}>{fmtCOP.format(depurado)}</td>
                     <td className={`px-5 py-3 text-right font-medium ${isAlert ? 'text-red-600' : 'text-emerald-700'}`}>{fmtCOP.format(produccion)}</td>
+                    <td className={`px-5 py-3 text-right font-semibold text-amber-700`}>{fmtCOPCierre.format(otrosCostos)}</td>
                     <td className={`px-5 py-3 text-right font-medium ${isAlert ? 'text-red-600' : 'text-indigo-700'}`}>{fmtCOP.format(compras)}</td>
                     <td className={`px-5 py-3 text-right font-bold ${isAlert ? 'text-red-700' : 'text-slate-600'}`}>
                       {pctAjustes.toFixed(1)}%
