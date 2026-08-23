@@ -300,7 +300,7 @@ export async function updateParametro(clave: string, valor: number): Promise<voi
 const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
 /** Convierte periodo 'YYYY-MM' a { fecha_inicio, fecha_fin } */
-function periodoToRango(periodo: string): { fecha_inicio: string; fecha_fin: string } {
+export function periodoToRango(periodo: string): { fecha_inicio: string; fecha_fin: string } {
   const [y, m] = periodo.split('-').map(Number);
   const fecha_inicio = `${y}-${String(m).padStart(2, '0')}-01`;
   const lastDay = new Date(y, m, 0).getDate();

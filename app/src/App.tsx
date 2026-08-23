@@ -18,7 +18,7 @@ import Usuarios from './components/Gerencia/Usuarios';
 import Login from './components/Auth/Login';
 import { AuthContext } from './components/Auth/AuthContext';
 import { type KPI, type AlertaColor, type FilaGrid } from './data/kpis';
-import { fetchKPIs, fetchVentasMes, fetchCarteraAsesor, fetchMargenGlobal, enviarCierre, actualizarEstadoCierre, fetchBandeja, fetchMe, logout as apiLogout, fetchTarjetasDashboard, type KPIReal, type KPIDiario, type Usuario, type TarjetaDashboard } from './services/api';
+import { fetchKPIs, fetchVentasMes, fetchCarteraAsesor, fetchMargenGlobal, enviarCierre, actualizarEstadoCierre, fetchBandeja, fetchMe, logout as apiLogout, fetchTarjetasDashboard, periodoToRango, type KPIReal, type KPIDiario, type Usuario, type TarjetaDashboard } from './services/api';
 import VistazoDiario from './components/Dashboard/VistazoDiario';
 import type { InformeCierre, AreaCierre } from './types/cierres';
 
@@ -255,7 +255,7 @@ interface KPIWidgetState {
   error: string | null;
 }
 
-function Dashboard({ onNavegar }: { onNavegar: (vista: string) => void }) {
+function Dashboard({ onNavegar }: { onNavegar: (vista: Vista) => void }) {
   const [periodo, setPeriodo] = useState<string>(periodoActual);
   const [widgets, setWidgets] = useState<Record<string, KPIWidgetState>>({});
   const [rawKpisMap, setRawKpisMap] = useState<Record<string, KPIReal>>({});
