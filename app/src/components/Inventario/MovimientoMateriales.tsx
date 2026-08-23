@@ -12,6 +12,105 @@ const fmtCOPCierre = new Intl.NumberFormat('es-CO', { style: 'currency', currenc
 const fmtNum = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 4 });
 const fmtDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : '—';
 
+function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { defaultYear: number, mockMonths: any[], availableYears: number[] }) {
+  const [year, setYear] = useState(defaultYear);
+  const [loading, setLoading] = useState(false);
+  const [dataPorMes, setDataPorMes] = useState<any[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const fetchAnual = async () => {
+      setLoading(true);
+      try {
+        const promises = mockMonths.map(async (m) => {
+          const res = await fetch(`/api/movimientos_materiales/cierre-costos?anio=${year}&mes=${m.val}`);
+          if (!res.ok) return { mes: m.label, error: true };
+          const json = await res.json();
+          return { mes: m.label, data: json.ok ? json : null };
+        });
+        const results = await Promise.all(promises);
+        if (active) setDataPorMes(results);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchAnual();
+    return () => { active = false; };
+  }, [year, mockMonths]);
+
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-dashboard-textMain">Coherencia de Costos (Anual)</h2>
+          <p className="text-sm text-dashboard-textMuted mt-1">
+            Análisis de Cierre Mensual · No es modificado por los filtros de Bodega y Origen
+          </p>
+        </div>
+        <select
+          className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all bg-slate-50"
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+        >
+          {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap">
+            <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th className="px-5 py-3 font-semibold">Mes</th>
+                <th className="px-5 py-3 font-semibold text-right">Consumo Real MP (Depurado)</th>
+                <th className="px-5 py-3 font-semibold text-right">Producción Terminada</th>
+                <th className="px-5 py-3 font-semibold text-right">Compras MP</th>
+                <th className="px-5 py-3 font-semibold text-right">% Ajustes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 relative">
+              {loading && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-8 text-center text-slate-400">
+                    Calculando meses del año...
+                  </td>
+                </tr>
+              )}
+              {!loading && dataPorMes.map((row, i) => {
+                if (!row.data || !row.data.controlCierre) return (
+                   <tr key={i}><td className="px-5 py-3 font-medium text-slate-700">{row.mes}</td><td colSpan={4} className="text-slate-400 px-5 py-3 text-center">Sin datos</td></tr>
+                );
+
+                const c = row.data;
+                const depurado = Number(c.controlCierre.depurado) || 0;
+                const produccion = Number(c.produccionTerminada.total) || 0;
+                const compras = Number(c.comprasMateriaPrima.total) || 0;
+                const ajustes = Number(c.controlCierre.ajustesDepurado) || 0;
+                
+                const pctAjustes = depurado > 0 ? (ajustes / depurado) * 100 : 0;
+                const isAlert = Math.abs(pctAjustes) > 30;
+
+                return (
+                  <tr key={i} className={`hover:bg-slate-50 transition-colors ${isAlert ? 'bg-red-50' : ''}`}>
+                    <td className={`px-5 py-3 font-medium ${isAlert ? 'text-red-700' : 'text-slate-700'}`}>{row.mes}</td>
+                    <td className={`px-5 py-3 text-right font-semibold ${isAlert ? 'text-red-700' : 'text-slate-800'}`}>{fmtCOP.format(depurado)}</td>
+                    <td className={`px-5 py-3 text-right font-medium ${isAlert ? 'text-red-600' : 'text-emerald-700'}`}>{fmtCOP.format(produccion)}</td>
+                    <td className={`px-5 py-3 text-right font-medium ${isAlert ? 'text-red-600' : 'text-indigo-700'}`}>{fmtCOP.format(compras)}</td>
+                    <td className={`px-5 py-3 text-right font-bold ${isAlert ? 'text-red-700' : 'text-slate-600'}`}>
+                      {pctAjustes.toFixed(1)}%
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
 export default function MovimientoMateriales() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -395,6 +494,9 @@ export default function MovimientoMateriales() {
           </div>
         </div>
       )}
+
+      {/* COHERENCIA DE COSTOS (ANUAL) */}
+      <CoherenciaCostos defaultYear={year} mockMonths={mockMonths} availableYears={years} />
 
       {/* ÁREA DE RESULTADOS */}
       <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
