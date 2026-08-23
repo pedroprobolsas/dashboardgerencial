@@ -115,6 +115,7 @@ export interface KPIReal {
   listaCriticas?: Array<{ nro_op: string; referencia: string; dias_atraso: number }>;
   opsCriticas?: number;
   opsAtrasadas?: number;
+  umbralCritico?: number;
   totalDiasAtraso?: number;
   opsConPerdida?: number;
   margenProm?: number;

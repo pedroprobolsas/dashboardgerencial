@@ -118,7 +118,7 @@ function adaptarKPI(raw: KPIReal): KPI {
     const filas: FilaGrid[] = [];
     if (raw.opsCriticas != null && raw.opsAtrasadas != null) {
       filas.push({
-        izq: { label: 'OPs críticas (>5%)', valor: `${raw.opsCriticas}` },
+        izq: { label: `OPs críticas (+${raw.umbralCritico || 10}d)`, valor: `${raw.opsCriticas}` },
         der: { label: 'OPs atrasadas',       valor: `${raw.opsAtrasadas}` },
       });
     }

@@ -580,6 +580,7 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
       listaCriticas,
       meta:            `Meta: Atraso tol. ${umbralTolerancia}d | OPs: ${totalOps}`,
       detalle:         `Críticas: ${opsCriticas} OPs | Atrasadas: ${opsAtrasadas} OPs`,
+      umbralCritico:   umbralCritico,
       alerta:          colorAlerta,
       fechaActualizacion: maxDate,
       desactualizado: diffDias > limiteDias,
