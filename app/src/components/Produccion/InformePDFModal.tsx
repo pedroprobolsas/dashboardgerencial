@@ -114,7 +114,9 @@ export default function InformePDFModal({
             </div>
           </div>
           <div className="text-right flex flex-col items-end">
-            <span className="text-xl font-bold text-slate-800 tracking-tight">Informe N° {consecutivo}</span>
+            <span className="text-xl font-bold text-slate-800 tracking-tight">
+              {consecutivo === '[Borrador]' ? 'Informe' : `Informe N° ${consecutivo}`}
+            </span>
             <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
               <span>Fecha:</span>
               <input 
