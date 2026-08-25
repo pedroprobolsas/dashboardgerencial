@@ -171,7 +171,6 @@ function adaptarKPI(raw: KPIReal): KPI {
     return {
       ...base,
       descripcionAlerta: descMaterial,
-      subtexto: raw.detalle || undefined,
     };
   }
 

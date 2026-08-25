@@ -662,13 +662,15 @@ async function kpiSobrecostoMateriales({ mesNum, anio }, metas = {}) {
     const metaAlertaRaw = getMeta(metas, 'sobrecosto_materiales_alerta');
     const umbralAlerta = metaAlertaRaw !== null && metaAlertaRaw !== undefined ? Number(metaAlertaRaw) : 1000000;
     
-    // Alerta roja si el sobrecosto es negativo (es decir, pérdida) y su valor absoluto supera el umbral
-    const alertaColor = (sobrecostoTotal < 0 && absSobrecosto >= umbralAlerta) ? 'rojo' : 'verde';
+    const esAhorro = sobrecostoTotal >= 0;
+    const alertaColor = (!esAhorro && absSobrecosto >= umbralAlerta) ? 'rojo' : 'verde';
+    const nombreDinamico = esAhorro ? 'Ahorro en Materiales' : 'Sobrecosto de Materiales';
 
     return {
       fuente: 'real',
+      nombre: nombreDinamico,
       valor: sobrecostoTotal,
-      valorFormateado: fmt.format(sobrecostoTotal),
+      valorFormateado: fmt.format(absSobrecosto),
       meta: 'Mide exceso en consumo y precio',
       detalle: `Por cantidad: ${fmt.format(totalEfectoCantidad)} | Por precio: ${fmt.format(totalEfectoPrecio)}`,
       alerta: alertaColor
@@ -1214,7 +1216,7 @@ router.get('/', async (req, res) => {
         cierre_mensual:          { id: 'cierre-mensual',          nombre: '% Cierre mensual',           area: 'Todas las áreas', ...cierre        },
         ordenes_cumplidas:       { id: 'ordenes-cumplidas',       nombre: 'Órdenes Cumplidas',          area: 'Producción',      ...produccion    },
         costo_produccion:        { id: 'costo-produccion',        nombre: 'Producción Cumplida (Valorizada)',        area: 'Producción',      ...costo         },
-        sobrecosto_materiales:   { id: 'sobrecosto-materiales',   nombre: 'Sobrecosto de Materiales',   area: 'Producción',      ...sobrecostoMateriales },
+        sobrecosto_materiales:   { id: 'sobrecosto-materiales',   nombre: sobrecostoMateriales.nombre || 'Sobrecosto de Materiales', area: 'Producción', ...sobrecostoMateriales },
         rotacion_personal:       { id: 'rotacion-personal',       nombre: 'Rotación de personal',       area: 'Talento Humano',  ...rotacion      },
       },
       diario,
