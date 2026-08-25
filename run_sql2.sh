@@ -1,0 +1,2 @@
+DB_CONTAINER=$(docker ps -q -f name=postgres_postgres | head -n 1)
+docker exec $DB_CONTAINER psql -U probolsas_user -d probolsas_db -c "INSERT INTO app_ops.parametros (clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por) SELECT 'sobrecosto_materiales_alerta', 1000000, 'COP', 'Alerta roja de sobrecosto total de materiales en el mes', 'Producci?n', CURRENT_DATE, 'sistema@probolsas.com' WHERE NOT EXISTS (SELECT 1 FROM app_ops.parametros WHERE clave = 'sobrecosto_materiales_alerta');"

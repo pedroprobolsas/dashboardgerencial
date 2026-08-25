@@ -165,6 +165,16 @@ function adaptarKPI(raw: KPIReal): KPI {
     };
   }
 
+  // ── Sobrecosto de Materiales ───────────────────────────────────────────────
+  if (raw.id === 'sobrecosto-materiales' && raw.fuente === 'real') {
+    const descMaterial = raw.sinDatos ? 'Sin datos' : alerta === 'verde' ? 'En meta' : 'Excedido';
+    return {
+      ...base,
+      descripcionAlerta: descMaterial,
+      subtexto: raw.detalle || undefined,
+    };
+  }
+
   // ── Obligaciones por vencer: total + desglose por rango de días ─────────────
   if (raw.id === 'obligaciones-por-vencer' && raw.fuente === 'real') {
     const descOblig = raw.sinDatos ? 'Sin datos' : raw.alerta === 'verde' ? 'Al día' : raw.alerta === 'amarillo' ? 'Con vencidos' : 'Vencidos urgentes';
@@ -234,9 +244,9 @@ function generarPeriodos(): string[] {
 // ── Vista Dashboard ───────────────────────────────────────────────────────────
 
 // IDs de KPIs que siguen usando el endpoint monolítico /api/kpis
-const KPIS_MONOLITICOS = ['flujo-caja', 'cierre-mensual', 'ordenes-cumplidas', 'costo-produccion', 'calidad-registro', 'rotacion-personal', 'obligaciones-por-vencer'] as const;
+const KPIS_MONOLITICOS = ['flujo-caja', 'cierre-mensual', 'ordenes-cumplidas', 'costo-produccion', 'sobrecosto-materiales', 'rotacion-personal', 'obligaciones-por-vencer'] as const;
 // Orden de visualización de todos los KPIs
-const KPI_ORDER = ['ventas-meta', 'margen-caja', 'cartera-asesores', 'flujo-caja', 'cierre-mensual', 'ordenes-cumplidas', 'costo-produccion', 'calidad-registro', 'rotacion-personal', 'obligaciones-por-vencer'];
+const KPI_ORDER = ['ventas-meta', 'margen-caja', 'cartera-asesores', 'flujo-caja', 'cierre-mensual', 'ordenes-cumplidas', 'costo-produccion', 'sobrecosto-materiales', 'rotacion-personal', 'obligaciones-por-vencer'];
 
 const KPI_META: Record<string, { nombre: string; area: string }> = {
   'ventas-meta':             { nombre: 'Ventas Reales (Facturado)',  area: 'Ventas' },
@@ -246,7 +256,7 @@ const KPI_META: Record<string, { nombre: string; area: string }> = {
   'cierre-mensual':          { nombre: '% Cierre mensual',        area: 'Todas las áreas' },
   'ordenes-cumplidas':       { nombre: 'Órdenes Cumplidas',       area: 'Producción' },
   'costo-produccion':        { nombre: 'Producción Cumplida (Valorizada)',     area: 'Producción' },
-  'calidad-registro':        { nombre: 'Calidad de Registro',     area: 'Producción' },
+  'sobrecosto-materiales':   { nombre: 'Sobrecosto de Materiales',area: 'Producción' },
   'rotacion-personal':       { nombre: 'Rotación de personal',    area: 'Talento Humano' },
   'obligaciones-por-vencer': { nombre: 'Obligaciones por vencer', area: 'Proveedores' },
 };
@@ -317,6 +327,17 @@ function Dashboard({ onNavegar }: { onNavegar: (vista: Vista) => void }) {
 
       if (id === 'ordenes-cumplidas') {
         data.onClickReporte = () => setReporteOrdenes(raw);
+      }
+      
+      if (id === 'sobrecosto-materiales') {
+        const { fecha_inicio, fecha_fin } = periodoToRango(periodo);
+        data.onClickValor = () => {
+          const url = new URL(window.location.href);
+          url.searchParams.set('fecha_inicio', fecha_inicio);
+          url.searchParams.set('fecha_fin', fecha_fin);
+          window.history.pushState({}, '', url);
+          onNavegar('analisis-materiales');
+        };
       }
 
       setWidgets(prev => ({

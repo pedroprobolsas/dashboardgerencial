@@ -609,6 +609,76 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
 
 // ── KPI: Costo de Producción (margen_pct desde crisolweb.costo_por_orden) ────
 
+async function kpiSobrecostoMateriales({ mesNum, anio }, metas = {}) {
+  try {
+    const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
+    const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+
+    const sql = `
+      SELECT
+        d.nro_op,
+        ROUND(d.cant_cotizada, 4) AS cant_cotizada,
+        ROUND(d.cant_ejecutada, 4) AS cant_ejecutada,
+        ROUND(d.valor_cotizado, 2) AS valor_cotizado,
+        ROUND(d.valor_ejecutado, 2) AS valor_ejecutado,
+        ROUND(d.valor_cotizado / NULLIF(d.cant_cotizada, 0), 2) AS precio_cotizado,
+        ROUND(d.valor_ejecutado / NULLIF(d.cant_ejecutada, 0), 2) AS precio_real
+      FROM crisolweb.costo_por_orden_detalle d
+      JOIN crisolweb.costo_por_orden o ON d.nro_op = o.nro_op AND d.referencia = o.referencia
+      WHERE o.fecha >= $1::date
+        AND o.fecha <  ($1::date + INTERVAL '1 month')
+        AND d.categoria = 'material'
+    `;
+
+    const { rows } = await query(sql, [primerDiaMes]);
+
+    const { calcularEfectosMaterial } = require('../utils/materialesLogic');
+
+    let totalEfectoCantidad = 0;
+    let totalEfectoPrecio = 0;
+
+    for (const r of rows) {
+      const pCot = parseFloat(r.precio_cotizado);
+      const pReal = parseFloat(r.precio_real);
+      const cantCot = parseFloat(r.cant_cotizada) || 0;
+      const cantEjec = parseFloat(r.cant_ejecutada) || 0;
+      const valEjec = parseFloat(r.valor_ejecutado) || 0;
+
+      const efectos = calcularEfectosMaterial({
+        cantCot,
+        cantEjec,
+        pCot: isNaN(pCot) ? null : pCot,
+        pReal: isNaN(pReal) ? null : pReal,
+        valEjec
+      });
+
+      if (efectos.efectoCantidad !== null) totalEfectoCantidad += efectos.efectoCantidad;
+      if (efectos.efectoPrecio !== null) totalEfectoPrecio += efectos.efectoPrecio;
+    }
+
+    const sobrecostoTotal = totalEfectoCantidad + totalEfectoPrecio;
+    const absSobrecosto = Math.abs(sobrecostoTotal);
+    
+    const metaAlertaRaw = getMeta(metas, 'sobrecosto_materiales_alerta');
+    const umbralAlerta = metaAlertaRaw !== null && metaAlertaRaw !== undefined ? Number(metaAlertaRaw) : 1000000;
+    
+    // Alerta roja si el sobrecosto es negativo (es decir, pérdida) y su valor absoluto supera el umbral
+    const alertaColor = (sobrecostoTotal < 0 && absSobrecosto >= umbralAlerta) ? 'rojo' : 'verde';
+
+    return {
+      fuente: 'real',
+      valor: sobrecostoTotal,
+      valorFormateado: fmt.format(sobrecostoTotal),
+      meta: 'Mide exceso en consumo y precio',
+      detalle: `Por cantidad: ${fmt.format(totalEfectoCantidad)} | Por precio: ${fmt.format(totalEfectoPrecio)}`,
+      alerta: alertaColor
+    };
+  } catch (err) {
+    console.error('kpiSobrecostoMateriales:', err.message);
+    return { fuente: 'error', detalle: err.message };
+  }
+}
+
 async function kpiCostoProduccion({ mesNum, anio }, metas = {}) {
   try {
     const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
@@ -1118,7 +1188,7 @@ router.get('/', async (req, res) => {
     // Cargar metas desde Sheets (con fallback a .env si falla o no existe la clave)
     const metas = await loadParametrosFromDB();
 
-    const [ventas, margen, cartera, flujo, cierre, produccion, costo, rotacion, obligaciones, diario, calidad] = await Promise.all([
+    const [ventas, margen, cartera, flujo, cierre, produccion, costo, rotacion, obligaciones, diario, calidad, sobrecostoMateriales] = await Promise.all([
       kpiVentasMeta({ mesNum, anio }, metas),
       kpiMargenCaja({ mesNum, anio }, metas),
       kpiCarteraPorAsesor(metas),
@@ -1130,6 +1200,7 @@ router.get('/', async (req, res) => {
       kpiObligacionesPorVencer(),
       kpiDiario(req.query.fecha, metas).catch(() => null),
       kpiCalidadRegistro({ mesNum, anio }, metas),
+      kpiSobrecostoMateriales({ mesNum, anio }, metas),
     ]);
 
     res.json({
@@ -1143,7 +1214,7 @@ router.get('/', async (req, res) => {
         cierre_mensual:          { id: 'cierre-mensual',          nombre: '% Cierre mensual',           area: 'Todas las áreas', ...cierre        },
         ordenes_cumplidas:       { id: 'ordenes-cumplidas',       nombre: 'Órdenes Cumplidas',          area: 'Producción',      ...produccion    },
         costo_produccion:        { id: 'costo-produccion',        nombre: 'Producción Cumplida (Valorizada)',        area: 'Producción',      ...costo         },
-        calidad_registro:        { id: 'calidad-registro',        nombre: 'Calidad de Registro',        area: 'Producción',      ...calidad       },
+        sobrecosto_materiales:   { id: 'sobrecosto-materiales',   nombre: 'Sobrecosto de Materiales',   area: 'Producción',      ...sobrecostoMateriales },
         rotacion_personal:       { id: 'rotacion-personal',       nombre: 'Rotación de personal',       area: 'Talento Humano',  ...rotacion      },
       },
       diario,

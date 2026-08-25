@@ -77,24 +77,15 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     const valEjec = parseFloat(r.valor_ejecutado) || 0;
     const cump = parseFloat(r.cumplimiento) || 0;
 
-    let efectoCantidad = 0;
-    let efectoPrecio = 0;
-    let calculable = false;
-
-    if (cantCot > 0 && !isNaN(pCot)) {
-      calculable = true;
-      efectoCantidad = (cantCot - cantEjec) * pCot;
-      
-      if (!isNaN(pReal) && cantEjec > 0) {
-        efectoPrecio = (pCot - pReal) * cantEjec;
-      } else if (cantEjec === 0) {
-        efectoPrecio = 0;
-      }
-    } else if (cantCot === 0 && cantEjec > 0) {
-      // No cotizado -> Todo el valor ejecutado es sobrecosto de cantidad
-      efectoCantidad = -valEjec;
-      calculable = false;
-    }
+    const { calcularEfectosMaterial } = require('../utils/materialesLogic');
+    
+    const efectos = calcularEfectosMaterial({
+      cantCot: cantCot,
+      cantEjec: cantEjec,
+      pCot: isNaN(pCot) ? null : pCot,
+      pReal: isNaN(pReal) ? null : pReal,
+      valEjec: valEjec
+    });
 
     return {
       nro_op: r.nro_op,
@@ -109,11 +100,11 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       cumplimiento: cump,
       precio_cotizado: isNaN(pCot) ? null : pCot,
       precio_real: isNaN(pReal) ? null : pReal,
-      efecto_cantidad: calculable || (cantCot === 0 && cantEjec > 0) ? parseFloat(efectoCantidad.toFixed(2)) : null,
-      efecto_precio: calculable && cantEjec > 0 ? parseFloat(efectoPrecio.toFixed(2)) : null,
+      efecto_cantidad: efectos.efectoCantidad,
+      efecto_precio: efectos.efectoPrecio,
       op_cantidad_cotizada: r.op_cantidad_cotizada !== null && r.op_cantidad_cotizada !== undefined ? parseFloat(r.op_cantidad_cotizada) : null,
       op_cantidad_ejecutada: r.op_cantidad_ejecutada !== null && r.op_cantidad_ejecutada !== undefined ? parseFloat(r.op_cantidad_ejecutada) : null,
-      calculable
+      calculable: efectos.calculable
     };
   });
 

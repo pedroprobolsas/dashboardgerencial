@@ -9,11 +9,19 @@ const fmtNum4 = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 4 });
 
 export default function AnalisisMateriales() {
   const [fechaInicio, setFechaInicio] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pFecha = params.get('fecha_inicio');
+    if (pFecha) return pFecha;
     const d = new Date();
     d.setDate(1);
     return d.toISOString().split('T')[0];
   });
-  const [fechaFin, setFechaFin] = useState(() => new Date().toISOString().split('T')[0]);
+  const [fechaFin, setFechaFin] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pFecha = params.get('fecha_fin');
+    if (pFecha) return pFecha;
+    return new Date().toISOString().split('T')[0];
+  });
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +60,13 @@ export default function AnalisisMateriales() {
 
   useEffect(() => {
     fetchData();
+    // Limpiar URL si venimos de la tarjeta
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('fecha_inicio')) {
+      url.searchParams.delete('fecha_inicio');
+      url.searchParams.delete('fecha_fin');
+      window.history.replaceState({}, '', url);
+    }
   }, [fechaInicio, fechaFin]);
 
   const getParamValor = (clave: string, fecha?: string) => {
