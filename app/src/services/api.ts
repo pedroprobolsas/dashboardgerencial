@@ -638,3 +638,21 @@ export async function updateTarjetasDashboard(tarjetas: Array<{ clave: string; v
     throw new Error(err.error || `Error ${res.status} al guardar tarjetas`);
   }
 }
+export interface KpiIncentivo {
+  kpi: string;
+  tipo_calculo: string;
+  lider: string;
+  ops_dentro?: number;
+  ops_fuera?: number;
+  incentivo_total?: number;
+  recomendacion?: string;
+  estado?: string;
+}
+
+export async function fetchKpiIncentivos(anio: number, mes: number): Promise<KpiIncentivo[]> {
+  const res = await fetch(/api/kpi-incentivos?anio=$anio&mes=$mes);
+  checkAuthError(res);
+  if (!res.ok) throw new Error(Error $res.status al cargar kpi incentivos);
+  const data = await res.json();
+  return data.data || [];
+}

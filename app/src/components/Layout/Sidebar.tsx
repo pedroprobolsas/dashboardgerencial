@@ -14,6 +14,7 @@ export type Vista =
   | 'analisis-responsables'
   | 'analisis-materiales'
   | 'movimiento-materiales'
+  | 'kpi-incentivos'
   | 'configuracion'
   | 'usuarios';
 
@@ -51,6 +52,7 @@ export default function Sidebar({ vistaActual, onNavegar, pendientesAprobacion }
         { id: 'analisis-responsables', etiqueta: 'Análisis Responsables', icono: '👥' },
         { id: 'analisis-materiales', etiqueta: 'Análisis Materiales', icono: '📦' },
         { id: 'movimiento-materiales', etiqueta: 'Movimiento de Materiales', icono: '🔄' },
+        { id: 'kpi-incentivos', etiqueta: 'KPIs e Incentivos', icono: '🏆' },
       ]
     },
     {

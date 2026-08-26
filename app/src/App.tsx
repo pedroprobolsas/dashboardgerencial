@@ -13,6 +13,7 @@ import CostoProduccionDetalle from './components/Produccion/CostoProduccionDetal
 import AnalisisResponsables from './components/Produccion/AnalisisResponsables';
 import AnalisisMateriales from './components/Produccion/AnalisisMateriales';
 import MovimientoMateriales from './components/Inventario/MovimientoMateriales';
+import KpiIncentivos from './components/Analisis/KpiIncentivos';
 import ConfiguracionMetas from './components/Gerencia/ConfiguracionMetas';
 import Usuarios from './components/Gerencia/Usuarios';
 import Login from './components/Auth/Login';
@@ -731,6 +732,7 @@ export default function App() {
       {vistaActual === 'analisis-responsables'    && <AnalisisResponsables />}
       {vistaActual === 'analisis-materiales'      && <AnalisisMateriales />}
       {vistaActual === 'movimiento-materiales'    && <MovimientoMateriales />}
+      {vistaActual === 'kpi-incentivos'           && <KpiIncentivos />}
       {vistaActual === 'configuracion'            && <ConfiguracionMetas />}
       {vistaActual === 'usuarios'                 && <Usuarios />}
     </Layout>
