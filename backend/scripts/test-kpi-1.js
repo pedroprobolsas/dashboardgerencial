@@ -1,22 +1,60 @@
 const { query } = require('../src/dbClient.js');
 
-async function kpiCumplimientoCantidad(anio, mesNum, paramsSimulados) {
+async function loadParametrosFromDB(fecha = null) {
+  try {
+    let sql;
+    let params = [];
+    
+    if (fecha) {
+      sql = `
+        SELECT clave, valor
+        FROM app_ops.parametros
+        WHERE vigente_desde <= $1::date 
+          AND (vigente_hasta IS NULL OR vigente_hasta > $1::date)
+      `;
+      params.push(fecha);
+    } else {
+      sql = `
+        SELECT clave, valor
+        FROM app_ops.parametros
+        WHERE vigente_hasta IS NULL
+      `;
+    }
+    
+    const { rows } = await query(sql, params);
+    const mapa = {};
+    rows.forEach(r => {
+      mapa[r.clave] = parseFloat(r.valor);
+    });
+    return mapa;
+  } catch (err) {
+    console.error('loadParametrosFromDB error:', err.message);
+    return {};
+  }
+}
+
+async function kpiCumplimientoCantidad(anio, mesNum) {
   const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
+  const paramsBD = await loadParametrosFromDB(primerDiaMes);
+  
   const sql = `
     SELECT
       nro_orden,
       cantidad_pedida,
       cantidad_cumplida,
-      (cantidad_cumplida / NULLIF(cantidad_pedida, 0)) AS ratio
+      (cantidad_cumplida / cantidad_pedida) AS ratio
     FROM crisolweb.ordenes_cumplidas
     WHERE fecha_cumplimiento >= $1::date
       AND fecha_cumplimiento < ($1::date + INTERVAL '1 month')
-      AND cantidad_pedida IS NOT NULL
+      AND cantidad_pedida > 0
   `;
   
   const { rows } = await query(sql, [primerDiaMes]);
 
-  const margen = paramsSimulados.kpi_cumplimiento_margen / 100;
+  const margen = (paramsBD.kpi_cumplimiento_margen || 0) / 100;
+  const incentivoPositivo = paramsBD.kpi_cumplimiento_incentivo_positivo || 0;
+  const incentivoNegativo = paramsBD.kpi_cumplimiento_incentivo_negativo || 0;
+
   const minRatio = 1 - margen;
   const maxRatio = 1 + margen;
 
@@ -33,8 +71,8 @@ async function kpiCumplimientoCantidad(anio, mesNum, paramsSimulados) {
   }
 
   const incentivoTotal = 
-    (opsDentro * paramsSimulados.kpi_cumplimiento_incentivo_positivo) +
-    (opsFuera * paramsSimulados.kpi_cumplimiento_incentivo_negativo);
+    (opsDentro * incentivoPositivo) +
+    (opsFuera * incentivoNegativo);
 
   let mensaje = '';
   if (incentivoTotal > 0) {
@@ -55,20 +93,8 @@ async function kpiCumplimientoCantidad(anio, mesNum, paramsSimulados) {
 
 async function run() {
   try {
-    const paramsJulio = {
-      kpi_cumplimiento_margen: 5,
-      kpi_cumplimiento_incentivo_positivo: 2000,
-      kpi_cumplimiento_incentivo_negativo: -4000
-    };
-    
-    const paramsAgosto = {
-      kpi_cumplimiento_margen: 5,
-      kpi_cumplimiento_incentivo_positivo: 2000,
-      kpi_cumplimiento_incentivo_negativo: -4000
-    };
-
-    await kpiCumplimientoCantidad(2026, 7, paramsJulio);
-    await kpiCumplimientoCantidad(2026, 8, paramsAgosto);
+    await kpiCumplimientoCantidad(2026, 7);
+    await kpiCumplimientoCantidad(2026, 8);
   } catch (err) {
     console.error('Error calculando:', err);
   } finally {
