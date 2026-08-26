@@ -63,7 +63,7 @@ async function kpiCumplimientoCantidad(anio, mesNum, liderNombre) {
   };
 }
 
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', asyncHandler('/api/kpi-incentivos', async (req, res) => {
   const anio = parseInt(req.query.anio, 10);
   const mes = parseInt(req.query.mes, 10);
 
