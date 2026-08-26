@@ -33,7 +33,7 @@ async function loadParametrosFromDB(fecha = null) {
   }
 }
 
-async function kpiCumplimientoCantidad(anio, mesNum) {
+async function kpiCumplimientoCantidad(anio, mesNum, liderNombre) {
   const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
   const paramsBD = await loadParametrosFromDB(primerDiaMes);
   
@@ -78,12 +78,12 @@ async function kpiCumplimientoCantidad(anio, mesNum) {
   if (incentivoTotal > 0) {
     mensaje = `Buen desempeño en [KPI]. ${opsDentro} OPs dentro de margen este mes.`;
   } else if (incentivoTotal < 0) {
-    mensaje = `Revisar con [líder] las causas de bajo desempeño en [KPI] — ${opsFuera} OPs fuera de margen este mes.`;
+    mensaje = `Revisar con ${liderNombre} las causas de bajo desempeño en [KPI] — ${opsFuera} OPs fuera de margen este mes.`;
   } else {
     mensaje = `Desempeño neutro en [KPI].`;
   }
 
-  console.log(`\n=== Resultado ${anio}-${String(mesNum).padStart(2, '0')} ===`);
+  console.log(`\n=== Resultado ${anio}-${String(mesNum).padStart(2, '0')} (Líder: ${liderNombre}) ===`);
   console.log(`Total OPs analizadas: ${rows.length}`);
   console.log(`OPs dentro de margen: ${opsDentro}`);
   console.log(`OPs fuera de margen:  ${opsFuera}`);
@@ -91,10 +91,27 @@ async function kpiCumplimientoCantidad(anio, mesNum) {
   console.log(`Recomendación:        ${mensaje}`);
 }
 
+async function procesarKpisParaMes(anio, mesNum) {
+  const sql = `
+    SELECT k.nombre AS kpi_nombre, k.tipo_calculo, l.nombre AS lider_nombre
+    FROM app_ops.kpi_definiciones k
+    JOIN app_ops.lideres l ON k.lider_id = l.id
+  `;
+  const { rows } = await query(sql);
+
+  for (const row of rows) {
+    if (row.tipo_calculo === 'cumplimiento_cantidad') {
+      await kpiCumplimientoCantidad(anio, mesNum, row.lider_nombre);
+    } else {
+      console.log(`Tipo de cálculo ${row.tipo_calculo} no implementado todavía.`);
+    }
+  }
+}
+
 async function run() {
   try {
-    await kpiCumplimientoCantidad(2026, 7);
-    await kpiCumplimientoCantidad(2026, 8);
+    await procesarKpisParaMes(2026, 7);
+    await procesarKpisParaMes(2026, 8);
   } catch (err) {
     console.error('Error calculando:', err);
   } finally {
