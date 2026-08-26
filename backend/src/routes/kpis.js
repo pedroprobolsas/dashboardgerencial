@@ -1381,3 +1381,4 @@ router.get('/sheets/:spreadsheet', async (req, res) => {
 
 module.exports = router;
 module.exports.ejecutarSnapshot = ejecutarSnapshot;
+module.exports.loadParametrosFromDB = loadParametrosFromDB;

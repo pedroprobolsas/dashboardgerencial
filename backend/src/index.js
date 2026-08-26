@@ -28,6 +28,7 @@ const parametrosRouter     = require('./routes/parametros');
 const metasMensualesRouter = require('./routes/metasMensuales');
 const tarjetasDashboardRouter = require('./routes/tarjetasDashboard');
 const movimientosMaterialesRouter = require('./routes/movimientosMateriales');
+const kpiIncentivosRouter  = require('./routes/kpiIncentivos');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -151,6 +152,7 @@ app.use('/api/parametros',        parametrosRouter);
 app.use('/api/metas_mensuales',   metasMensualesRouter);
 app.use('/api/tarjetas_dashboard', tarjetasDashboardRouter);
 app.use('/api/usuarios',          usuariosRouter);
+app.use('/api/kpi-incentivos',    kpiIncentivosRouter);
 
 // ── Error handler global ──────────────────────────────────────────────────────
 
