@@ -650,9 +650,9 @@ export interface KpiIncentivo {
 }
 
 export async function fetchKpiIncentivos(anio: number, mes: number): Promise<KpiIncentivo[]> {
-  const res = await fetch(/api/kpi-incentivos?anio=$anio&mes=$mes);
+  const res = await fetch(`/api/kpi-incentivos?anio=${anio}&mes=${mes}`);
   checkAuthError(res);
-  if (!res.ok) throw new Error(Error $res.status al cargar kpi incentivos);
+  if (!res.ok) throw new Error(`Error ${res.status} al cargar kpi incentivos`);
   const data = await res.json();
   return data.data || [];
 }
