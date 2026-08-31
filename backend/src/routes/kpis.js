@@ -1253,10 +1253,7 @@ router.get('/', async (req, res) => {
     // Cargar metas desde Sheets (con fallback a .env si falla o no existe la clave)
     const metas = await loadParametrosFromDB();
 
-    const [ventas, margen, cartera, flujo, cierre, produccion, costo, rotacion, obligaciones, diario, calidad, sobrecostoMateriales] = await Promise.all([
-      kpiVentasMeta({ mesNum, anio }, metas),
-      kpiMargenCaja({ mesNum, anio }, metas),
-      kpiCarteraPorAsesor(metas),
+    const [flujo, cierre, produccion, costo, rotacion, obligaciones, diario, calidad, sobrecostoMateriales] = await Promise.all([
       kpiFlujoCaja({ mesNum, anio }, metas),
       kpiCierreMensual(periodo, metas),
       kpiOrdenesCumplidas({ mesNum, anio }, metas),
@@ -1271,9 +1268,6 @@ router.get('/', async (req, res) => {
     res.json({
       periodo,
       kpis: {
-        ventas_meta:             { id: 'ventas-meta',             nombre: 'Ventas Reales (Facturado)',    area: 'Ventas',          ...ventas        },
-        margen_caja:             { id: 'margen-caja',             nombre: 'Margen de caja',             area: 'Finanzas',        ...margen        },
-        cartera_asesores:        { id: 'cartera-asesores',        nombre: 'CxC por Asesor',               area: 'Cartera',      ...cartera       },
         flujo_caja:              { id: 'flujo-caja',              nombre: 'Flujo de caja disponible',      area: 'Finanzas',     ...flujo         },
         obligaciones_por_vencer: { id: 'obligaciones-por-vencer', nombre: 'Obligaciones por vencer',      area: 'Proveedores',  ...obligaciones  },
         cierre_mensual:          { id: 'cierre-mensual',          nombre: '% Cierre mensual',           area: 'Todas las áreas', ...cierre        },

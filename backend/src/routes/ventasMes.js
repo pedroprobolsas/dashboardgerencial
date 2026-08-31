@@ -97,6 +97,15 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
   const metaRow = metasResult.rows[0];
   const metaVentas = metaRow ? parseFloat(metaRow.valor) : 0;
 
+  const { loadParametrosFromDB } = require('./kpis');
+  const { diasHabilesEntre } = require('../utils/dateUtils');
+  const metas = await loadParametrosFromDB();
+
+  const maxDateResult = await query(`SELECT MAX(fecha_creacion)::date as max_date FROM crisolweb.facturas`);
+  const maxDate = maxDateResult.rows[0]?.max_date;
+  const diffDias = maxDate ? diasHabilesEntre(maxDate, new Date()) : 0;
+  const limiteDias = metas['datos_desactualizados_dias'] !== undefined ? Number(metas['datos_desactualizados_dias']) : 2;
+
   const resultado = {
     ok:      true,
     filtros: { fecha_inicio, fecha_fin, limit },
@@ -109,6 +118,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     },
     total:   detalleResult.rows.length,
     detalle: detalleResult.rows,
+    fechaActualizacion: maxDate,
+    desactualizado: diffDias > limiteDias,
   };
 
   // Guardar en cache (5 min)

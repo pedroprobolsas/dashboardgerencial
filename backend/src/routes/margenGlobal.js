@@ -58,7 +58,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     'CRUCE CREDITO 4114 MULTIABONOS', 'CAUSACION GASTOS BANCARIOS', 'PAGO IMPUESTOS',
   ];
 
-  const [ventasResult, egresosResult, desgloseResult] = await Promise.all([
+  const [ventasResult, egresosResult, desgloseResult, maxDateResult] = await Promise.all([
     query(
       `SELECT COALESCE(SUM(valor_neto), 0) AS total_ventas
        FROM crisolweb.facturas
@@ -82,6 +82,10 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
        GROUP BY concepto`,
       [fecha_inicio, fecha_fin]
     ),
+    query(`SELECT GREATEST(
+             (SELECT MAX(fecha_creacion)::date FROM crisolweb.facturas),
+             (SELECT MAX(fecha_contable)::date FROM crisolweb.egresos_agrupados_concepto)
+           ) as max_date`)
   ]);
 
   const ventas  = parseFloat(ventasResult.rows[0]?.total_ventas  || 0);
@@ -99,6 +103,14 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       gastos += val;
     }
   }
+
+  const { loadParametrosFromDB } = require('./kpis');
+  const { diasHabilesEntre } = require('../utils/dateUtils');
+  const metas = await loadParametrosFromDB();
+
+  const maxDate = maxDateResult.rows[0]?.max_date;
+  const diffDias = maxDate ? diasHabilesEntre(maxDate, new Date()) : 0;
+  const limiteDias = metas['datos_desactualizados_dias'] !== undefined ? Number(metas['datos_desactualizados_dias']) : 2;
 
   const fmt = new Intl.NumberFormat('es-CO', {
     style: 'currency', currency: 'COP', maximumFractionDigits: 0,
@@ -119,6 +131,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       sinDatos: true,
       detalle: egresos === 0 ? 'Sin datos de egresos' : 'Sin datos de ventas',
       desglose: { materia_prima: materiaPrima, materia_prima_fmt: fmt.format(materiaPrima), gastos, gastos_fmt: fmt.format(gastos), obligaciones, obligaciones_fmt: fmt.format(obligaciones) },
+      fechaActualizacion: maxDate,
+      desactualizado: diffDias > limiteDias,
     };
     cache.set(cacheKey, resultado);
     return res.json(resultado);
@@ -151,6 +165,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       obligaciones,
       obligaciones_fmt: fmt.format(obligaciones),
     },
+    fechaActualizacion: maxDate,
+    desactualizado: diffDias > limiteDias,
   };
 
   cache.set(cacheKey, resultado);

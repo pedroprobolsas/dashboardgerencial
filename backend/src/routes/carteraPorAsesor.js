@@ -35,24 +35,35 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
   }
 
   // ── Query ─────────────────────────────────────────────────────────────
-  const { rows } = await query(
-    `SELECT
-       COALESCE(vendedor, 'SIN ASESOR') AS asesor,
-       COUNT(*)                          AS facturas,
-       ROUND(SUM(saldo), 0)             AS saldo_total,
-       ROUND(SUM(CASE WHEN dias_vencido > 0  THEN saldo ELSE 0 END), 0) AS vencido,
-       ROUND(SUM(CASE WHEN dias_vencido <= 0 THEN saldo ELSE 0 END), 0) AS corriente
-     FROM crisolweb.cartera_vendedor
-     WHERE saldo > 0
-     GROUP BY vendedor
-     ORDER BY saldo_total DESC`
-  );
+  const [{ rows }, maxDateResult] = await Promise.all([
+    query(
+      `SELECT
+         COALESCE(vendedor, 'SIN ASESOR') AS asesor,
+         COUNT(*)                          AS facturas,
+         ROUND(SUM(saldo), 0)             AS saldo_total,
+         ROUND(SUM(CASE WHEN dias_vencido > 0  THEN saldo ELSE 0 END), 0) AS vencido,
+         ROUND(SUM(CASE WHEN dias_vencido <= 0 THEN saldo ELSE 0 END), 0) AS corriente
+       FROM crisolweb.cartera_vendedor
+       WHERE saldo > 0
+       GROUP BY vendedor
+       ORDER BY saldo_total DESC`
+    ),
+    query(`SELECT MAX(_sync_fecha)::date as max_date FROM crisolweb.cartera_vendedor`)
+  ]);
 
   // ── Calcular totales ──────────────────────────────────────────────────
   const totalSaldo     = rows.reduce((s, r) => s + parseFloat(r.saldo_total || 0), 0);
   const totalVencido   = rows.reduce((s, r) => s + parseFloat(r.vencido     || 0), 0);
   const totalCorriente = rows.reduce((s, r) => s + parseFloat(r.corriente   || 0), 0);
   const pctVencido     = totalSaldo > 0 ? parseFloat((totalVencido / totalSaldo * 100).toFixed(1)) : 0;
+
+  const { loadParametrosFromDB } = require('./kpis');
+  const { diasHabilesEntre } = require('../utils/dateUtils');
+  const metas = await loadParametrosFromDB();
+
+  const maxDate = maxDateResult.rows[0]?.max_date;
+  const diffDias = maxDate ? diasHabilesEntre(maxDate, new Date()) : 0;
+  const limiteDias = metas['datos_desactualizados_dias'] !== undefined ? Number(metas['datos_desactualizados_dias']) : 2;
 
   const resultado = {
     ok:          true,
@@ -71,6 +82,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       vencido:     parseFloat(r.vencido     || 0),
       corriente:   parseFloat(r.corriente   || 0),
     })),
+    fechaActualizacion: maxDate,
+    desactualizado: diffDias > limiteDias,
   };
 
   cache.set(cacheKey, resultado, CACHE_TTL);

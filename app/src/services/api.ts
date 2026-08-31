@@ -334,6 +334,8 @@ export async function fetchVentasMes(periodo: string): Promise<KPIReal> {
     valorNetoTotal: fmtCOP.format(neto),
     meta: meta > 0 ? `Meta: ${fmtCOP.format(meta)}` : 'Meta no configurada',
     alerta: meta === 0 ? 'gris' : (pct >= 90 ? 'verde' : pct >= 80 ? 'amarillo' : 'rojo'),
+    fechaActualizacion: data.fechaActualizacion,
+    desactualizado: data.desactualizado,
   };
 }
 
@@ -358,6 +360,8 @@ export async function fetchCarteraAsesor(): Promise<KPIReal> {
       vencido: fmtCOP.format(a.vencido),
     })),
     alerta: pct_vencido <= 20 ? 'verde' : pct_vencido <= 40 ? 'amarillo' : 'rojo',
+    fechaActualizacion: data.fechaActualizacion,
+    desactualizado: data.desactualizado,
   };
 }
 
@@ -384,6 +388,8 @@ export async function fetchMargenGlobal(periodo: string): Promise<KPIReal> {
       obligaciones: desglose.obligaciones_fmt,
       total: data.egresos_fmt,
     } : undefined,
+    fechaActualizacion: data.fechaActualizacion,
+    desactualizado: data.desactualizado,
   };
 }
 
