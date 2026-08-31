@@ -211,6 +211,30 @@ function calcularDiasHabiles(anio, mesNum) {
   return { transcurridos: habilesTranscurridos, totales: habilesTotales, esMesActual, esMesPasado, esMesFuturo };
 }
 
+/**
+ * Calcula la diferencia en días hábiles (lunes a viernes) entre dos fechas.
+ * Utilizado para el cálculo preciso de la desactualización.
+ */
+function diasHabilesEntre(startDate, endDate) {
+  if (!startDate || !endDate) return 0;
+  let count = 0;
+  let cur = new Date(startDate);
+  cur.setHours(0,0,0,0);
+  const end = new Date(endDate);
+  end.setHours(0,0,0,0);
+  
+  if (cur > end) return 0; 
+  
+  while (cur < end) {
+    cur.setDate(cur.getDate() + 1);
+    const day = cur.getDay();
+    if (day !== 0 && day !== 6) { // Omitir Domingo(0) y Sábado(6)
+      count++;
+    }
+  }
+  return count;
+}
+
 // ── KPI: Ventas del mes vs meta ───────────────────────────────────────────────
 
 async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
@@ -239,7 +263,7 @@ async function kpiVentasMeta({ mesNum, anio }, metas = {}) {
     const rows = ventasResult.rows;
     const facturas = parseInt(rows[0]?.facturas || 0, 10);
     const maxDate = maxDateResult.rows[0]?.max_date;
-    const diffDias = maxDate ? Math.floor((new Date() - new Date(maxDate)) / (1000 * 60 * 60 * 24)) : 0;
+    const diffDias = maxDate ? diasHabilesEntre(maxDate, new Date()) : 0;
     const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
 
     const metaRow = metasResult.rows[0];
@@ -325,7 +349,7 @@ async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
     const primerDiaMes = `${anio}-${String(mesNum).padStart(2, '0')}-01`;
     const mesStr       = `${anio}-${String(mesNum).padStart(2, '0')}`;
 
-    const [{ rows: rowsV }, { rows: rowsE }] = await Promise.all([
+    const [{ rows: rowsV }, { rows: rowsE }, { rows: maxRows }] = await Promise.all([
       query(
         `SELECT COALESCE(SUM(valor_neto), 0) AS total
          FROM crisolweb.facturas
@@ -341,6 +365,10 @@ async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
            AND fecha_contable <  ($1::date + INTERVAL '1 month')`,
         [primerDiaMes]
       ),
+      query(`SELECT GREATEST(
+               (SELECT MAX(fecha_creacion)::date FROM crisolweb.facturas),
+               (SELECT MAX(fecha_contable)::date FROM crisolweb.egresos_agrupados_concepto)
+             ) as max_date`)
     ]);
 
     const ventas  = parseFloat(rowsV[0]?.total || 0);
@@ -348,8 +376,12 @@ async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
     const margen  = ventas - egresos;
     const pct     = ventas !== 0 ? parseFloat((margen / ventas * 100).toFixed(1)) : null;
 
+    const maxDate = maxRows[0]?.max_date;
+    const diffDias = maxDate ? diasHabilesEntre(maxDate, new Date()) : 0;
+    const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
+
     if (ventas === 0 || egresos === 0 || pct === null || isNaN(pct)) {
-      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'gris', detalle: egresos === 0 ? 'Sin datos de egresos' : 'Sin datos de ventas' };
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'gris', detalle: egresos === 0 ? 'Sin datos de egresos' : 'Sin datos de ventas', fechaActualizacion: maxDate, desactualizado: diffDias > limiteDias };
     }
 
     const fmt           = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
@@ -363,6 +395,8 @@ async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
       valorAbsoluto: fmt.format(margen),
       detalle: `Ventas: ${fmt.format(ventas)} | Egresos: ${fmt.format(egresos)}`,
       meta: `Meta: ≥ ${umbralVerde}%`,
+      fechaActualizacion: maxDate,
+      desactualizado: diffDias > limiteDias,
       alerta: alertaColor(pct, {
         verde:    v => v >= umbralVerde,
         amarillo: v => v >= umbralAmari,
@@ -380,22 +414,29 @@ async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
 
 async function kpiCarteraPorAsesor(metas = {}) {
   try {
-    const { rows } = await query(
-      `SELECT
-         COALESCE(vendedor, 'TOTAL') AS vendedor,
-         COUNT(*)                                                             AS facturas,
-         ROUND(SUM(saldo), 0)                                                AS saldo_total,
-         ROUND(SUM(CASE WHEN dias_vencido > 0  THEN saldo ELSE 0 END), 0)   AS vencido,
-         ROUND(SUM(CASE WHEN dias_vencido <= 0 THEN saldo ELSE 0 END), 0)   AS corriente
-       FROM crisolweb.cartera_vendedor
-       WHERE saldo > 0
-       GROUP BY ROLLUP(vendedor)
-       ORDER BY saldo_total DESC NULLS LAST`
-    );
+    const [{ rows }, { rows: maxRows }] = await Promise.all([
+      query(
+        `SELECT
+           COALESCE(vendedor, 'TOTAL') AS vendedor,
+           COUNT(*)                                                             AS facturas,
+           ROUND(SUM(saldo), 0)                                                AS saldo_total,
+           ROUND(SUM(CASE WHEN dias_vencido > 0  THEN saldo ELSE 0 END), 0)   AS vencido,
+           ROUND(SUM(CASE WHEN dias_vencido <= 0 THEN saldo ELSE 0 END), 0)   AS corriente
+         FROM crisolweb.cartera_vendedor
+         WHERE saldo > 0
+         GROUP BY ROLLUP(vendedor)
+         ORDER BY saldo_total DESC NULLS LAST`
+      ),
+      query(`SELECT MAX(_sync_fecha)::date as max_date FROM crisolweb.cartera_vendedor`)
+    ]);
+
+    const maxDate = maxRows[0]?.max_date;
+    const diffDias = maxDate ? diasHabilesEntre(maxDate, new Date()) : 0;
+    const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
 
     const totalRow = rows.find(r => r.vendedor === 'TOTAL');
     if (!totalRow) {
-      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo' };
+      return { fuente: 'real', sinDatos: true, valor: 0, valorFormateado: '—', alerta: 'amarillo', fechaActualizacion: maxDate, desactualizado: diffDias > limiteDias };
     }
 
     const total    = parseFloat(totalRow.saldo_total || 0);
@@ -423,6 +464,8 @@ async function kpiCarteraPorAsesor(metas = {}) {
       vencidoRaw:     vencido,
       corrienteRaw:   corriente,
       topAsesores,
+      fechaActualizacion: maxDate,
+      desactualizado: diffDias > limiteDias,
       alerta: alertaColor(vencidoPct, {
         verde:    v => v <= (getMeta(metas, 'cartera_vencida_alerta_amarilla') || 20),
         amarillo: v => v <= (getMeta(metas, 'cartera_vencida_alerta') || 40),
@@ -464,6 +507,9 @@ async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
     const fechaObj = new Date(rows[0].fecha);
     const fechaActualizacion = fechaObj.toISOString().split('T')[0];
 
+    const diffDias = diasHabilesEntre(fechaObj, new Date());
+    const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
+
     let nota = '';
     if (cuentas < 9) {
       nota = `(⚠️ Solo ${cuentas}/9 cuentas)`;
@@ -486,7 +532,8 @@ async function kpiFlujoCaja({ mesNum, anio }, metas = {}) {
       }),
       cuentasIncluidas: cuentas,
       cuentasDesglose,
-      fechaActualizacion // Para que el frontend lo use y formatee con su timezone correcta
+      fechaActualizacion, // Para que el frontend lo use y formatee con su timezone correcta
+      desactualizado: diffDias > limiteDias
     };
   } catch (err) {
     console.error('kpiFlujoCaja:', err.message);
@@ -557,7 +604,7 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
     const promedioAtraso = opsCaidas > 0 ? Number((totalAtraso / opsCaidas).toFixed(1)) : 0;
     
     const maxDate = rows[0]?.max_date;
-    const diffDias = maxDate ? Math.floor((new Date() - new Date(maxDate)) / (1000 * 60 * 60 * 24)) : 0;
+    const diffDias = maxDate ? diasHabilesEntre(maxDate, new Date()) : 0;
     const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
 
     if (totalOps === 0 || cumplimiento === null) {
@@ -630,7 +677,14 @@ async function kpiSobrecostoMateriales({ mesNum, anio }, metas = {}) {
         AND d.categoria = 'material'
     `;
 
-    const { rows } = await query(sql, [primerDiaMes]);
+    const [ { rows }, { rows: maxRows } ] = await Promise.all([
+      query(sql, [primerDiaMes]),
+      query('SELECT MAX(fecha)::date as max_date FROM crisolweb.costo_por_orden')
+    ]);
+
+    const maxDate = maxRows[0]?.max_date;
+    const diffDias = maxDate ? diasHabilesEntre(maxDate, new Date()) : 0;
+    const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
 
     const { calcularEfectosMaterial } = require('../utils/materialesLogic');
 
@@ -673,6 +727,8 @@ async function kpiSobrecostoMateriales({ mesNum, anio }, metas = {}) {
       valorFormateado: fmt.format(absSobrecosto),
       meta: 'Mide exceso en consumo y precio',
       detalle: `Por cantidad: ${fmt.format(totalEfectoCantidad)} | Por precio: ${fmt.format(totalEfectoPrecio)}`,
+      fechaActualizacion: maxDate,
+      desactualizado: diffDias > limiteDias,
       alerta: alertaColor
     };
   } catch (err) {
@@ -703,7 +759,7 @@ async function kpiCostoProduccion({ mesNum, anio }, metas = {}) {
 
     const { rows: rowsMax } = await query('SELECT MAX(fecha)::date as max_date FROM crisolweb.costo_por_orden');
     const maxDate = rowsMax[0]?.max_date;
-    const diffDias = maxDate ? Math.floor((new Date() - new Date(maxDate)) / (1000 * 60 * 60 * 24)) : 0;
+    const diffDias = maxDate ? diasHabilesEntre(maxDate, new Date()) : 0;
     const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
 
     const opsMes        = parseInt(rows[0]?.ops_mes              || 0, 10);
@@ -777,7 +833,7 @@ async function kpiCalidadRegistro({ mesNum, anio }, metas = {}) {
     ]);
     
     const maxDate = maxRows[0]?.max_date;
-    const diffDias = maxDate ? Math.floor((new Date() - new Date(maxDate)) / (1000 * 60 * 60 * 24)) : 0;
+    const diffDias = maxDate ? diasHabilesEntre(maxDate, new Date()) : 0;
     const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
     
     const totalOps = parseInt(tRows[0]?.total_ops || 0, 10);
@@ -812,11 +868,11 @@ async function kpiCalidadRegistro({ mesNum, anio }, metas = {}) {
 // dias_vencido <= 0 → por vencer (negativo = días restantes hasta el vencimiento)
 // No filtra por período: liquidez en tiempo real.
 
-async function kpiObligacionesPorVencer() {
+async function kpiObligacionesPorVencer(metas = {}) {
   try {
     const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
-    const [{ rows: totales }, { rows: topRows }] = await Promise.all([
+    const [{ rows: totales }, { rows: topRows }, { rows: maxRows }] = await Promise.all([
       query(`
         SELECT
           COALESCE(SUM(saldo), 0)                                                        AS total,
@@ -836,7 +892,12 @@ async function kpiObligacionesPorVencer() {
         ORDER BY monto DESC
         LIMIT 5
       `),
+      query(`SELECT MAX(_sync_fecha)::date as max_date FROM crisolweb.cartera_por_pagar`)
     ]);
+
+    const maxDate = maxRows[0]?.max_date;
+    const diffDias = maxDate ? diasHabilesEntre(maxDate, new Date()) : 0;
+    const limiteDias = getMeta(metas, 'datos_desactualizados_dias') || 2;
 
     const total          = parseFloat(totales[0]?.total   || 0);
     const totalVencido   = parseFloat(totales[0]?.vencido || 0);
@@ -869,6 +930,8 @@ async function kpiObligacionesPorVencer() {
       totalVencidoRaw: totalVencido,
       d15Raw:          d15,
       d30Raw:          d30,
+      fechaActualizacion: maxDate,
+      desactualizado: diffDias > limiteDias,
       alerta: alertaColor(totalVencido, {
         verde:    v => v <= 0,
         amarillo: v => v <= 10_000_000,
@@ -1199,7 +1262,7 @@ router.get('/', async (req, res) => {
       kpiOrdenesCumplidas({ mesNum, anio }, metas),
       kpiCostoProduccion({ mesNum, anio }, metas),
       kpiRotacionPersonal(periodo, metas),
-      kpiObligacionesPorVencer(),
+      kpiObligacionesPorVencer(metas),
       kpiDiario(req.query.fecha, metas).catch(() => null),
       kpiCalidadRegistro({ mesNum, anio }, metas),
       kpiSobrecostoMateriales({ mesNum, anio }, metas),
