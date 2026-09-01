@@ -15,7 +15,7 @@ interface Props {
 export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, onClose }: Props) {
   
   const actividades = detalle.map(d => {
-    // Para el informe nos centramos en el impacto final calculado
+    // Usamos el impacto final (ajustado por volumen) para agrupar, igual que en la vista principal
     const cant = (d as any).impacto_final || 0;
     return { ...d, impacto: cant };
   });
@@ -86,7 +86,7 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
                 <th className="py-2">Material</th>
                 <th className="py-2 text-right">Cant. Cot.</th>
                 <th className="py-2 text-right">Cant. Ejec.</th>
-                <th className="py-2 text-right">Efecto ($)</th>
+                <th className="py-2 text-right">Cumplimiento</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -96,7 +96,7 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
                   <td className="py-2 text-slate-700 truncate max-w-[200px]">{a.material}</td>
                   <td className="py-2 text-right tabular-nums text-slate-500">{fmtNum4.format(a.cant_cotizada)}</td>
                   <td className="py-2 text-right tabular-nums font-medium">{fmtNum4.format(a.cant_ejecutada)}</td>
-                  <td className="py-2 text-right tabular-nums font-bold text-red-600">{fmtCOP.format(a.impacto)}</td>
+                  <td className="py-2 text-right tabular-nums font-bold text-red-600">{fmtCOP.format(a.cumplimiento as number)}</td>
                 </tr>
               ))}
             </tbody>
@@ -115,7 +115,7 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
                 <th className="py-2">Material</th>
                 <th className="py-2 text-right">Cant. Cot.</th>
                 <th className="py-2 text-right">Cant. Ejec.</th>
-                <th className="py-2 text-right">Efecto ($)</th>
+                <th className="py-2 text-right">Cumplimiento</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -125,7 +125,7 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
                   <td className="py-2 text-slate-700 truncate max-w-[200px]">{a.material}</td>
                   <td className="py-2 text-right tabular-nums text-slate-500">{fmtNum4.format(a.cant_cotizada)}</td>
                   <td className="py-2 text-right tabular-nums font-medium">{fmtNum4.format(a.cant_ejecutada)}</td>
-                  <td className="py-2 text-right tabular-nums font-bold text-emerald-600">+{fmtCOP.format(a.impacto)}</td>
+                  <td className="py-2 text-right tabular-nums font-bold text-emerald-600">+{fmtCOP.format(a.cumplimiento as number)}</td>
                 </tr>
               ))}
             </tbody>
