@@ -15,8 +15,8 @@ interface Props {
 export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, onClose }: Props) {
   
   const actividades = detalle.map(d => {
-    // Para el informe nos centramos en el efecto cantidad (o impacto_final si no está)
-    const cant = d.efecto_cantidad || 0;
+    // Para el informe nos centramos en el impacto final calculado
+    const cant = (d as any).impacto_final || 0;
     return { ...d, impacto: cant };
   });
 
