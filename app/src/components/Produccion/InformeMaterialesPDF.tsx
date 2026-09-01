@@ -72,7 +72,7 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
       </div>
 
       <div className="text-sm text-slate-600 mb-6 bg-slate-100 p-3 rounded-lg print:bg-transparent print:p-0 print:border-b print:border-slate-200 print:rounded-none">
-        Contexto: Se analizaron un total de <strong>{actividades.length}</strong> movimientos de materiales correspondientes a <strong>{uniqueOps}</strong> Órdenes de Producción (OP). Los consumos ejecutados se comparan directamente contra los cotizados sin ajuste por volumen de producción.
+        Contexto: Se analizaron un total de <strong>{actividades.length}</strong> movimientos de materiales correspondientes a <strong>{uniqueOps}</strong> Órdenes de Producción (OP). El reporte agrupa los materiales basándose en su <strong>Impacto Ajustado</strong> por el volumen de producción real, resolviendo las diferencias con el cumplimiento bruto.
       </div>
 
       {/* Table - Sobrecostos */}
@@ -86,7 +86,8 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
                 <th className="py-2">Material</th>
                 <th className="py-2 text-right">Cant. Cot.</th>
                 <th className="py-2 text-right">Cant. Ejec.</th>
-                <th className="py-2 text-right">Cumplimiento</th>
+                <th className="py-2 text-right" title="Valor bruto sin ajustar por volumen">Cumplimiento</th>
+                <th className="py-2 text-right" title="Impacto real ajustado por el volumen de la OP">Impacto Ajustado</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -96,7 +97,8 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
                   <td className="py-2 text-slate-700 truncate max-w-[200px]">{a.material}</td>
                   <td className="py-2 text-right tabular-nums text-slate-500">{fmtNum4.format(a.cant_cotizada)}</td>
                   <td className="py-2 text-right tabular-nums font-medium">{fmtNum4.format(a.cant_ejecutada)}</td>
-                  <td className="py-2 text-right tabular-nums font-bold text-red-600">{fmtCOP.format(a.cumplimiento as number)}</td>
+                  <td className="py-2 text-right tabular-nums text-slate-500">{fmtCOP.format(a.cumplimiento as number)}</td>
+                  <td className="py-2 text-right tabular-nums font-bold text-red-600">{fmtCOP.format(a.impacto)}</td>
                 </tr>
               ))}
             </tbody>
@@ -115,7 +117,8 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
                 <th className="py-2">Material</th>
                 <th className="py-2 text-right">Cant. Cot.</th>
                 <th className="py-2 text-right">Cant. Ejec.</th>
-                <th className="py-2 text-right">Cumplimiento</th>
+                <th className="py-2 text-right" title="Valor bruto sin ajustar por volumen">Cumplimiento</th>
+                <th className="py-2 text-right" title="Impacto real ajustado por el volumen de la OP">Impacto Ajustado</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -125,7 +128,8 @@ export default function InformeMaterialesPDF({ detalle, fechaInicio, fechaFin, o
                   <td className="py-2 text-slate-700 truncate max-w-[200px]">{a.material}</td>
                   <td className="py-2 text-right tabular-nums text-slate-500">{fmtNum4.format(a.cant_cotizada)}</td>
                   <td className="py-2 text-right tabular-nums font-medium">{fmtNum4.format(a.cant_ejecutada)}</td>
-                  <td className="py-2 text-right tabular-nums font-bold text-emerald-600">+{fmtCOP.format(a.cumplimiento as number)}</td>
+                  <td className="py-2 text-right tabular-nums text-slate-500">{fmtCOP.format(a.cumplimiento as number)}</td>
+                  <td className="py-2 text-right tabular-nums font-bold text-emerald-600">+{fmtCOP.format(a.impacto)}</td>
                 </tr>
               ))}
             </tbody>
