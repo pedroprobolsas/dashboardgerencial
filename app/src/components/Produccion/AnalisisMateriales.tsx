@@ -744,7 +744,7 @@ export default function AnalisisMateriales() {
 
       {informeAbierto && (
         <InformeMaterialesPDF
-          detalle={detalle}
+          detalle={dataProcesada}
           fechaInicio={fechaInicio}
           fechaFin={fechaFin}
           onClose={() => setInformeAbierto(false)}
