@@ -142,6 +142,30 @@ export default function AnalisisMateriales() {
       const matchedCot = new Set();
       const matchedEjec = new Set();
 
+      // 0. Agrupar Tintas (1 a muchos o muchos a muchos)
+      // Se considera tinta si empieza con 'Tinta' y NO es un alcohol
+      const isTinta = (name: string) => {
+        const n = name.toLowerCase();
+        if (n.includes('alcohol propi') || n.includes('alcohol dowanol')) return false;
+        return n.startsWith('tinta') || n.includes('tinta para cotizaciones');
+      };
+
+      const tintasCot = soloCot.filter(c => isTinta(c.material));
+      const tintasEjec = soloEjec.filter(e => isTinta(e.material));
+
+      if (tintasCot.length > 0 && tintasEjec.length > 0) {
+        tintasCot.forEach(c => {
+          c.tipo_especial = 'sustitucion';
+          c.par_id = 'Pool de Tintas';
+          matchedCot.add(c);
+        });
+        tintasEjec.forEach(e => {
+          e.tipo_especial = 'sustitucion';
+          e.par_id = 'Pool de Tintas';
+          matchedEjec.add(e);
+        });
+      }
+
       // 1. Encontrar Alias (Palabra compartida y ±5%)
       for (const c of soloCot) {
         if (matchedCot.has(c)) continue;
