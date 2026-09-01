@@ -77,7 +77,7 @@ export default function InformePDFModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-50 overflow-auto print-modal">
+    <div className="fixed inset-0 z-50 bg-slate-50 overflow-auto print-modal print:static print:block print:inset-auto print:bg-white print:overflow-visible print:w-full print:h-auto">
       
       {/* Top Action Bar (Hidden when printing) */}
       <div className="sticky top-0 bg-white border-b border-slate-200 p-4 flex justify-between items-center shadow-sm z-10 print:hidden">

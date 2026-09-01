@@ -336,8 +336,8 @@ export default function OpTrazabilidadModal({ nro_op, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-6" onClick={handleBackdropClick}>
-      <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 sm:p-6 print:static print:block print:inset-auto print:bg-white print:p-0 print:m-0" onClick={handleBackdropClick}>
+      <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 print:hidden">
         
         {/* Modal Header */}
         <div className="flex justify-between items-start p-6 border-b border-slate-100 shrink-0 relative">
