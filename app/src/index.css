@@ -39,4 +39,7 @@
     height: auto !important;
     overflow: visible !important;
   }
+  body.has-print-modal #root {
+    display: none !important;
+  }
 }

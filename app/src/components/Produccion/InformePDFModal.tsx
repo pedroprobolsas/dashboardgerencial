@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface Props {
   tipoInforme: string;
@@ -31,6 +32,13 @@ export default function InformePDFModal({
   const [consecutivo, setConsecutivo] = useState<string>(numeroInformeFijo || '[Borrador]');
   const [fechaInforme, setFechaInforme] = useState<string>(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.add('has-print-modal');
+    return () => {
+      document.body.classList.remove('has-print-modal');
+    };
+  }, []);
 
   const handlePrint = async () => {
     // Si ya tiene número O es fijo, solo imprimir
@@ -76,7 +84,7 @@ export default function InformePDFModal({
     }
   };
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-50 bg-slate-50 overflow-auto print-modal print:static print:block print:inset-auto print:bg-white print:overflow-visible print:w-full print:h-auto">
       
       {/* Top Action Bar (Hidden when printing) */}
@@ -180,4 +188,6 @@ export default function InformePDFModal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
