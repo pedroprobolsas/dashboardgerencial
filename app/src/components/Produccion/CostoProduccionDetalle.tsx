@@ -207,6 +207,23 @@ export default function CostoProduccionDetalle() {
           </div>
         )}
 
+        {/* Indicador de OPs sin valorizar */}
+        {resumen && resumen.ops_sin_valorizar > 0 && (
+          <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex items-start gap-3">
+            <span className="text-blue-500 mt-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-blue-800">
+                {resumen.ops_sin_valorizar} OP{resumen.ops_sin_valorizar === 1 ? '' : 's'} sin valorizar
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                Existen órdenes marcadas como cumplidas en producción para este período (ej. órdenes de STOCK) que no tienen valorización asignada. Estas órdenes han sido excluidas de este análisis financiero.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex-1 flex flex-col">
           
           <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">

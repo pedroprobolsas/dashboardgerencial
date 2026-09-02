@@ -591,6 +591,18 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
       [primerDiaMes, umbralTolerancia, umbralCritico]
     );
 
+    const { rows: rowsSinCosto } = await query(
+      `SELECT COUNT(*) AS ops_sin_valorizar
+       FROM crisolweb.ordenes_cumplidas
+       WHERE fecha_cumplimiento >= $1::date
+         AND fecha_cumplimiento <  ($1::date + INTERVAL '1 month')
+         AND NOT EXISTS (
+           SELECT 1 FROM crisolweb.costo_por_orden cpo 
+           WHERE cpo.nro_op = crisolweb.ordenes_cumplidas.nro_orden
+         )`,
+      [primerDiaMes]
+    );
+
     const totalOps      = parseInt(rows[0]?.total_ops         || 0, 10);
     const cumplimiento  = rows[0]?.cumplimiento_prom_pct !== null
                           ? parseFloat(rows[0].cumplimiento_prom_pct)
@@ -630,6 +642,9 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
       colorAlerta = 'amarillo';
     }
 
+    const opsSinValorizar = parseInt(rowsSinCosto[0]?.ops_sin_valorizar || 0, 10);
+    const detalleSinValorizar = opsSinValorizar > 0 ? ` | Sin valorizar: ${opsSinValorizar}` : '';
+
     return {
       fuente:          'real',
       valor:           cumplimiento,
@@ -641,7 +656,7 @@ async function kpiOrdenesCumplidas({ mesNum, anio }, metas = {}) {
       promedioAtraso,
       metaPromedioAtraso,
       listaProblema,
-      meta:            `Meta: Atraso tol. ${umbralTolerancia}d | OPs: ${totalOps}`,
+      meta:            `Meta: Atraso tol. ${umbralTolerancia}d | OPs: ${totalOps}${detalleSinValorizar}`,
       detalle:         `Críticas: ${opsCriticas} OPs | Atrasadas: ${opsAtrasadas} OPs`,
       umbralCritico:   umbralCritico,
       alerta:          colorAlerta,

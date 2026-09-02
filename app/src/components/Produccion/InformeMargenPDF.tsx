@@ -61,6 +61,11 @@ export default function InformeMargenPDF({ ordenes, resumen, fechaInicio, fechaF
 
       <div className="text-sm text-slate-600 mb-6 bg-slate-100 p-3 rounded-lg print:bg-transparent print:p-0 print:border-b print:border-slate-200 print:rounded-none">
         Contexto: Se analizan las Órdenes de Producción (OPs) listando únicamente la OP, el cliente, la referencia, la fecha y el margen.
+        {resumen.ops_sin_valorizar > 0 && (
+          <span className="block mt-2 font-medium text-slate-700">
+            Nota: {resumen.ops_sin_valorizar} OP(s) adicionales marcadas como cumplidas (ej. STOCK) no cuentan con valorización y fueron excluidas.
+          </span>
+        )}
       </div>
 
       {ordenes.length > 0 && (

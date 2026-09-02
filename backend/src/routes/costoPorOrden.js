@@ -91,15 +91,30 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     ORDER BY fecha DESC, margen_pct ASC
   `;
 
-  const [maxFechaResult, resumenResult, detalleResult] = await Promise.all([
+  const sqlSinValorizar = `
+    SELECT COUNT(*) AS ops_sin_valorizar
+    FROM crisolweb.ordenes_cumplidas
+    WHERE fecha_cumplimiento >= $1::date
+      AND fecha_cumplimiento <= $2::date
+      AND (
+        NOT EXISTS (
+          SELECT 1 FROM crisolweb.costo_por_orden cpo 
+          WHERE cpo.nro_op = crisolweb.ordenes_cumplidas.nro_orden
+        )
+      )
+  `;
+
+  const [maxFechaResult, resumenResult, detalleResult, sinValorizarResult] = await Promise.all([
     query(sqlMaxFecha),
     query(sqlResumen, [fecha_inicio, fecha_fin, umbral]),
-    query(sqlDetalle, [fecha_inicio, fecha_fin, umbral])
+    query(sqlDetalle, [fecha_inicio, fecha_fin, umbral]),
+    query(sqlSinValorizar, [fecha_inicio, fecha_fin])
   ]);
 
   const maxFecha = maxFechaResult.rows[0]?.ultima_actualizacion || null;
   const resumen = resumenResult.rows[0] || {};
   const rows = detalleResult.rows;
+  const opsSinValorizar = parseInt(sinValorizarResult.rows[0]?.ops_sin_valorizar || 0, 10);
 
   const resultado = {
     ok:            true,
@@ -110,6 +125,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       margen_promedio:     parseFloat(resumen.margen_promedio || 0),
       valor_facturado:     parseFloat(resumen.valor_facturado || 0),
       ops_bajo_umbral:     parseInt(resumen.ops_bajo_umbral || 0, 10),
+      ops_sin_valorizar:   opsSinValorizar,
     },
     total:         rows.length,
     ordenes:       rows,
