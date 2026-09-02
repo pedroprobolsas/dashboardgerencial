@@ -201,7 +201,7 @@ export default function CostoProduccionDetalle() {
               </span>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Valor Facturado</span>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1" title="Valor comercial equivalente a las cantidades cumplidas en producción">Valor Cumplido</span>
               <span className="text-2xl font-bold text-slate-800">{fmtCOP.format(resumen.valor_facturado)}</span>
             </div>
           </div>

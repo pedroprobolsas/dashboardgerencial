@@ -54,7 +54,7 @@ export default function InformeMargenPDF({ ordenes, resumen, fechaInicio, fechaF
           <span className="text-2xl font-black text-red-600">{resumen.ops_bajo_umbral}</span>
         </div>
         <div className="border-2 border-slate-100 rounded-xl p-4 bg-slate-50 print:bg-transparent print:border-slate-300">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Valor Facturado</span>
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Valor Cumplido</span>
           <span className="text-2xl font-black text-slate-800">{fmtCOP.format(resumen.valor_facturado)}</span>
         </div>
       </div>
