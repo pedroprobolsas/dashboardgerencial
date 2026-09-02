@@ -59,7 +59,12 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
   }
 
   // ── Queries a PostgreSQL ─────────────────────────────────────────────
-  const sqlMaxFecha = `SELECT MAX(fecha) AS ultima_actualizacion FROM crisolweb.costo_por_orden`;
+  const sqlMaxFecha = `
+    SELECT GREATEST(
+      (SELECT MAX(fecha) FROM crisolweb.costo_por_orden),
+      (SELECT MAX(fecha_cumplimiento) FROM crisolweb.ordenes_cumplidas)
+    ) AS ultima_actualizacion
+  `;
   
   const sqlResumen = `
     SELECT
