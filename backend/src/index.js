@@ -29,6 +29,7 @@ const metasMensualesRouter = require('./routes/metasMensuales');
 const tarjetasDashboardRouter = require('./routes/tarjetasDashboard');
 const movimientosMaterialesRouter = require('./routes/movimientosMateriales');
 const kpiIncentivosRouter  = require('./routes/kpiIncentivos');
+const saldosContablesRouter = require('./routes/saldosContables');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -72,6 +73,7 @@ const ENDPOINTS_REGISTRADOS = [
   'POST /api/auth/logout',
   'GET  /api/auth/me',
   'GET  /api/usuarios',
+  'GET  /api/saldos-contables',
 ];
 
 app.get('/api/health', async (_req, res) => {
@@ -153,6 +155,7 @@ app.use('/api/metas_mensuales',   metasMensualesRouter);
 app.use('/api/tarjetas_dashboard', tarjetasDashboardRouter);
 app.use('/api/usuarios',          usuariosRouter);
 app.use('/api/kpi-incentivos',    kpiIncentivosRouter);
+app.use('/api/saldos-contables',  saldosContablesRouter);
 
 // ── Error handler global ──────────────────────────────────────────────────────
 
