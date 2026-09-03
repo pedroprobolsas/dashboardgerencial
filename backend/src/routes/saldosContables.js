@@ -29,4 +29,36 @@ router.get('/', asyncHandler('/api/saldos-contables', async (req, res) => {
   res.json({ ok: true, data: rows });
 }));
 
+router.get('/detalle', asyncHandler('/api/saldos-contables/detalle', async (req, res) => {
+  const { clase, fecha } = req.query;
+
+  if (!clase || !fecha) {
+    return res.status(400).json({ ok: false, error: 'Se requieren parámetros clase y fecha' });
+  }
+
+  // Las clases de balance (Activos, Pasivos) usan saldo_final, 
+  // las de resultados (Gastos, Costos de Venta) usan movimiento_debito
+  const usaMovimiento = ['Gastos', 'Costos de Venta'].includes(clase);
+  const valorCol = usaMovimiento ? 'movimiento_debito' : 'saldo_final';
+
+  // Usamos el patrón de rango para cubrir la fecha de fin de mes
+  // Se asume que 'fecha' viene como YYYY-MM-DD
+  const primerDiaMes = `${fecha.substring(0, 7)}-01`;
+
+  const sql = `
+    SELECT 
+      codigo_cuenta, 
+      nombre_cuenta, 
+      ${valorCol} AS valor
+    FROM app_ops.saldos_contables_siigo
+    WHERE clase = $1
+      AND fecha >= $2::date AND fecha < ($2::date + INTERVAL '1 month')
+    ORDER BY codigo_cuenta ASC
+  `;
+  
+  const { rows } = await query(sql, [clase, primerDiaMes]);
+
+  res.json({ ok: true, data: rows });
+}));
+
 module.exports = router;
