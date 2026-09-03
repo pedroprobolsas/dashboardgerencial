@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import { fetchSaldosContables, fetchSaldosContablesDetalle, type SaldoContable, type SaldoContableDetalle } from '../../services/api';
 
 const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
@@ -151,9 +152,17 @@ export default function FinanzasDashboard() {
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold text-dashboard-textMain">Finanzas</h2>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wide border border-emerald-200">
-              ✅ Actualizado hoy
-            </span>
+            {dataActual.length > 0 ? (
+              <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wide border border-emerald-200 flex items-center gap-1.5">
+                <CheckCircle2 size={12} className="text-emerald-500" />
+                Actualizado {new Date(Math.max(...dataActual.map(d => new Date(d.fecha).getTime()))).toLocaleDateString('es-CO', { timeZone: 'UTC' })}
+              </span>
+            ) : (
+              <span className="px-2.5 py-1 rounded-full bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wide border border-slate-200 flex items-center gap-1.5">
+                <AlertTriangle size={12} className="text-slate-400" />
+                Sin datos
+              </span>
+            )}
           </div>
           <p className="text-sm text-dashboard-textMuted mt-1 capitalize">{labelMes} {fecha.split('-')[0]}</p>
         </div>
@@ -174,7 +183,7 @@ export default function FinanzasDashboard() {
            <div className="p-16 text-center text-slate-500 animate-pulse">Cargando saldos contables...</div>
         ) : error ? (
            <div className="p-16 text-center flex flex-col items-center">
-             <span className="text-3xl block mb-2">⚠️</span>
+             <span className="block mb-3 text-red-400"><AlertTriangle size={36} /></span>
              <p className="text-red-500 font-medium text-sm mb-1">No se pudo obtener la información</p>
              <p className="text-xs text-dashboard-textMuted">{error}</p>
            </div>
