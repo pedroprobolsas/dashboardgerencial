@@ -15,7 +15,7 @@ router.get('/', asyncHandler('/api/saldos-contables', async (req, res) => {
 
   if (anio && mes) {
     const primerDiaMes = `${anio}-${String(mes).padStart(2, '0')}-01`;
-    sql += ` WHERE fecha = $1::date`;
+    sql += ` WHERE fecha >= $1::date AND fecha < ($1::date + INTERVAL '1 month')`;
     params.push(primerDiaMes);
   } else if (anio) {
     sql += ` WHERE EXTRACT(YEAR FROM fecha) = $1`;
