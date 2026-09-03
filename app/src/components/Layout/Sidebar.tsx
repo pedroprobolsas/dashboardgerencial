@@ -14,6 +14,7 @@ export type Vista =
   | 'analisis-responsables'
   | 'analisis-materiales'
   | 'movimiento-materiales'
+  | 'finanzas-dashboard'
   | 'kpi-incentivos'
   | 'configuracion'
   | 'usuarios';
@@ -48,6 +49,7 @@ export default function Sidebar({ vistaActual, onNavegar, pendientesAprobacion }
       items: [
         { id: 'dashboard', etiqueta: 'Dashboard', icono: '▦' },
         { id: 'vista-diaria', etiqueta: 'Vistazo Diario', icono: '📅' },
+        { id: 'finanzas-dashboard', etiqueta: 'Finanzas (Saldos)', icono: '💰' },
         { id: 'costo-produccion-detalle', etiqueta: 'Margen por OP', icono: '⚙️' },
         { id: 'analisis-responsables', etiqueta: 'Análisis Responsables', icono: '👥' },
         { id: 'analisis-materiales', etiqueta: 'Análisis Materiales', icono: '📦' },

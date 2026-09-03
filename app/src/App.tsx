@@ -21,6 +21,7 @@ import { AuthContext } from './components/Auth/AuthContext';
 import { type KPI, type AlertaColor, type FilaGrid } from './data/kpis';
 import { fetchKPIs, fetchVentasMes, fetchCarteraAsesor, fetchMargenGlobal, enviarCierre, actualizarEstadoCierre, fetchBandeja, fetchMe, logout as apiLogout, fetchTarjetasDashboard, periodoToRango, type KPIReal, type KPIDiario, type Usuario, type TarjetaDashboard } from './services/api';
 import VistazoDiario from './components/Dashboard/VistazoDiario';
+import FinanzasDashboard from './components/Dashboard/FinanzasDashboard';
 import type { InformeCierre, AreaCierre } from './types/cierres';
 import InformePDFModal from './components/Produccion/InformePDFModal';
 import OpTrazabilidadModal from './components/Produccion/OpTrazabilidadModal';
@@ -728,6 +729,7 @@ export default function App() {
       {vistaActual === 'cierre-cartera'         && <CierreCarteraForm        onEnviar={registrarEnvio} />}
       {vistaActual === 'cierre-talento-humano'  && <CierreTalentoHumanoForm  onEnviar={registrarEnvio} />}
       {vistaActual === 'bandeja-aprobacion'     && <BandejaAprobacion informes={informes} onAprobar={aprobar} onRechazar={rechazar} />}
+      {vistaActual === 'finanzas-dashboard'     && <FinanzasDashboard />}
       {vistaActual === 'costo-produccion-detalle' && <CostoProduccionDetalle />}
       {vistaActual === 'analisis-responsables'    && <AnalisisResponsables />}
       {vistaActual === 'analisis-materiales'      && <AnalisisMateriales />}

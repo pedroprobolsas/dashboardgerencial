@@ -663,3 +663,38 @@ export async function fetchKpiIncentivos(anio: number, mes: number): Promise<Kpi
   const data = await res.json();
   return data.data || [];
 }
+
+export interface SaldoContable {
+  fecha: string;
+  clase: number | string;
+  valor: string;
+  tipo: string;
+}
+
+export async function fetchSaldosContables(anio?: number, mes?: number): Promise<SaldoContable[]> {
+  const params = new URLSearchParams();
+  if (anio) params.append('anio', anio.toString());
+  if (mes) params.append('mes', mes.toString());
+  const qs = params.toString();
+  const url = qs ? `/api/saldos-contables?${qs}` : '/api/saldos-contables';
+  
+  const res = await fetch(url);
+  checkAuthError(res);
+  if (!res.ok) throw new Error(`Error ${res.status} al cargar saldos contables`);
+  const data = await res.json();
+  return data.data || [];
+}
+
+export interface SaldoContableDetalle {
+  codigo_cuenta: string;
+  nombre_cuenta: string;
+  valor: string;
+}
+
+export async function fetchSaldosContablesDetalle(clase: number | string, fecha: string): Promise<SaldoContableDetalle[]> {
+  const res = await fetch(`/api/saldos-contables/detalle?clase=${clase}&fecha=${fecha}`);
+  checkAuthError(res);
+  if (!res.ok) throw new Error(`Error ${res.status} al cargar detalle saldos contables`);
+  const data = await res.json();
+  return data.data || [];
+}
