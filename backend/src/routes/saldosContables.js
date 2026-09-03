@@ -36,9 +36,10 @@ router.get('/detalle', asyncHandler('/api/saldos-contables/detalle', async (req,
     return res.status(400).json({ ok: false, error: 'Se requieren parámetros clase y fecha' });
   }
 
-  // Las clases de balance (Activos, Pasivos) usan saldo_final, 
-  // las de resultados (Gastos, Costos de Venta) usan movimiento_debito
-  const usaMovimiento = ['Gastos', 'Costos de Venta'].includes(clase);
+  // Las clases de balance (Activos=1, Pasivos=2) usan saldo_final, 
+  // las de resultados (Gastos=5, Costos de Venta=6) usan movimiento_debito
+  const claseNum = parseInt(clase, 10);
+  const usaMovimiento = [5, 6].includes(claseNum);
   const valorCol = usaMovimiento ? 'movimiento_debito' : 'saldo_final';
 
   // Usamos el patrón de rango para cubrir la fecha de fin de mes
@@ -56,7 +57,7 @@ router.get('/detalle', asyncHandler('/api/saldos-contables/detalle', async (req,
     ORDER BY codigo_cuenta ASC
   `;
   
-  const { rows } = await query(sql, [clase, primerDiaMes]);
+  const { rows } = await query(sql, [claseNum, primerDiaMes]);
 
   res.json({ ok: true, data: rows });
 }));
