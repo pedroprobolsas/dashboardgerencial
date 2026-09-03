@@ -21,10 +21,9 @@ export default function FinanzasDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Estados para detalles
-  const [detalleClase, setDetalleClase] = useState<number | null>(null);
-  const [detalles, setDetalles] = useState<SaldoContableDetalle[]>([]);
-  const [loadingDetalle, setLoadingDetalle] = useState(false);
+  // Estados para detalles completos
+  const [detallesClases, setDetallesClases] = useState<Record<number, SaldoContableDetalle[]>>({});
+  const [loadingDetalles, setLoadingDetalles] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -43,6 +42,36 @@ export default function FinanzasDashboard() {
     load();
     return () => { ignore = true; };
   }, []);
+
+  // Efecto para cargar los detalles de todas las tablas cuando cambia la fecha
+  useEffect(() => {
+    let ignore = false;
+    async function loadDetalles() {
+      setLoadingDetalles(true);
+      try {
+        const [y, m] = fecha.split('-');
+        const primerDia = `${y}-${m.padStart(2, '0')}-01`;
+        
+        const promesas = [1, 2, 5, 6].map(clase => fetchSaldosContablesDetalle(clase, primerDia));
+        const resultados = await Promise.all(promesas);
+        
+        if (!ignore) {
+          setDetallesClases({
+            1: resultados[0],
+            2: resultados[1],
+            5: resultados[2],
+            6: resultados[3]
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!ignore) setLoadingDetalles(false);
+      }
+    }
+    loadDetalles();
+    return () => { ignore = true; };
+  }, [fecha]);
 
   const dataActual = useMemo(() => {
     const [y, m] = fecha.split('-');
@@ -100,26 +129,6 @@ export default function FinanzasDashboard() {
     }
     return ultimos;
   }, [saldos, fecha]);
-
-  const toggleDetalle = async (clase: number) => {
-    if (detalleClase === clase) {
-      setDetalleClase(null);
-      return;
-    }
-    setDetalleClase(clase);
-    setLoadingDetalle(true);
-    try {
-      const [y, m] = fecha.split('-');
-      const primerDia = `${y}-${m.padStart(2, '0')}-01`;
-      const result = await fetchSaldosContablesDetalle(clase, primerDia);
-      setDetalles(result);
-    } catch (e) {
-      console.error(e);
-      setDetalles([]);
-    } finally {
-      setLoadingDetalle(false);
-    }
-  };
 
   const renderFlecha = (actual: number, anterior: number, inverso = false) => {
     if (!anterior) return null;
@@ -202,7 +211,6 @@ export default function FinanzasDashboard() {
                 <p className="text-2xl font-bold text-slate-800">{fmtCOP.format(patrimonioActual)}</p>
               </div>
               
-              {/* Sparkline */}
               <div className="flex items-end gap-2 h-12">
                 {evolucionPatrimonio.map((p, i) => {
                   const max = Math.max(...evolucionPatrimonio.map(x => x.valor));
@@ -211,7 +219,6 @@ export default function FinanzasDashboard() {
                     <div key={i} className="flex flex-col items-center justify-end h-full gap-1 group relative">
                       <div className="w-8 bg-probolsas-cyan/80 rounded-sm hover:bg-probolsas-cyan transition-colors mt-auto" style={{ height: `${hPct}%` }}></div>
                       <span className="text-[10px] text-slate-400 font-medium">{p.mes}</span>
-                      {/* Tooltip */}
                       <div className="absolute -top-8 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-10">
                         {fmtCOP.format(p.valor)}
                       </div>
@@ -221,66 +228,55 @@ export default function FinanzasDashboard() {
               </div>
             </div>
 
-            {/* Detalle por rubro */}
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mt-2 flex flex-col">
-              <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
-                <h3 className="text-sm font-semibold text-dashboard-textMain">Detalle por rubro</h3>
-              </div>
-              
-              <div className="divide-y divide-slate-100">
-                {[1, 2, 5, 6].map((claseNum) => {
-                  const title = CLASES[claseNum as keyof typeof CLASES];
-                  const isOpen = detalleClase === claseNum;
-                  const valorTotal = getValorClase(dataActual, claseNum);
-                  
-                  return (
-                    <div key={claseNum} className="flex flex-col">
-                      <button 
-                        onClick={() => toggleDetalle(claseNum)}
-                        className="flex justify-between items-center px-6 py-4 hover:bg-slate-50 transition-colors w-full text-left focus:outline-none"
-                      >
-                        <span className="font-semibold text-dashboard-textMain">{title}</span>
-                        <div className="flex items-center gap-4">
-                          <span className="font-bold text-slate-700">{fmtCOP.format(valorTotal)}</span>
-                          <span className={`text-slate-400 transform transition-transform ${isOpen ? 'rotate-180' : ''}`}>▼</span>
+            {/* Detalle por rubro: 4 Tablas Paralelas (Grid 2x2) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
+              {[1, 2, 5, 6].map((claseNum) => {
+                const title = CLASES[claseNum as keyof typeof CLASES];
+                const valorTotal = getValorClase(dataActual, claseNum);
+                const cuentas = detallesClases[claseNum] || [];
+                
+                return (
+                  <div key={claseNum} className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-[500px]">
+                    <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center shrink-0 rounded-t-2xl">
+                      <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">{title}</h3>
+                      <span className="font-bold text-indigo-700">{fmtCOP.format(valorTotal)}</span>
+                    </div>
+                    
+                    <div className="flex-1 overflow-auto relative">
+                      {loadingDetalles ? (
+                        <div className="flex items-center justify-center h-full">
+                          <span className="text-sm text-slate-400 animate-pulse">Cargando cuentas...</span>
                         </div>
-                      </button>
-                      
-                      {isOpen && (
-                        <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100">
-                          {loadingDetalle ? (
-                            <div className="text-xs text-slate-500 animate-pulse text-center py-4">Cargando cuentas...</div>
-                          ) : detalles.length === 0 ? (
-                            <div className="text-xs text-slate-500 text-center py-4">No hay datos detallados para esta clase en este período.</div>
-                          ) : (
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="text-left text-[10px] uppercase text-slate-500 tracking-wider border-b border-slate-100">
-                                  <th className="pb-2 font-semibold">Código</th>
-                                  <th className="pb-2 font-semibold">Cuenta</th>
-                                  <th className="pb-2 text-right font-semibold">Valor</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                {detalles
-                                  .sort((a, b) => Math.abs(parseFloat(b.valor)) - Math.abs(parseFloat(a.valor)))
-                                  .slice(0, 10)
-                                  .map(d => (
-                                  <tr key={d.codigo_cuenta} className="group hover:bg-white transition-colors">
-                                    <td className="py-2.5 text-slate-500 w-24 font-mono text-xs">{d.codigo_cuenta}</td>
-                                    <td className="py-2.5 font-medium text-slate-700 truncate max-w-xs">{d.nombre_cuenta}</td>
-                                    <td className="py-2.5 text-right text-slate-800 font-semibold tabular-nums">{fmtCOP.format(parseFloat(d.valor))}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )}
+                      ) : cuentas.length === 0 ? (
+                        <div className="flex items-center justify-center h-full">
+                          <span className="text-sm text-slate-400">Sin datos para el período seleccionado</span>
                         </div>
+                      ) : (
+                        <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap">
+                          <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-100 sticky top-0 z-10 shadow-sm">
+                            <tr>
+                              <th className="px-4 py-3 font-semibold bg-slate-50">Cuenta</th>
+                              <th className="px-4 py-3 font-semibold bg-slate-50">Concepto</th>
+                              <th className="px-4 py-3 font-semibold text-right bg-slate-50">Valor</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {cuentas
+                              .sort((a, b) => Math.abs(parseFloat(b.valor)) - Math.abs(parseFloat(a.valor)))
+                              .map(d => (
+                              <tr key={d.codigo_cuenta} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-2.5 font-medium text-slate-700 w-24">{d.codigo_cuenta}</td>
+                                <td className="px-4 py-2.5 truncate max-w-[180px]" title={d.nombre_cuenta}>{d.nombre_cuenta}</td>
+                                <td className="px-4 py-2.5 text-right font-medium tabular-nums text-slate-800">{fmtCOP.format(parseFloat(d.valor))}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       )}
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                );
+              })}
             </div>
           </>
         )}
