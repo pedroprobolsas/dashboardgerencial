@@ -19,6 +19,7 @@ export default function FinanzasDashboard() {
   });
 
   const [saldos, setSaldos] = useState<SaldoContable[]>([]);
+  const [ultimaActualizacion, setUltimaActualizacion] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,8 +33,11 @@ export default function FinanzasDashboard() {
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchSaldosContables();
-        if (!ignore) setSaldos(data);
+        const resp = await fetchSaldosContables();
+        if (!ignore) {
+          setSaldos(resp.data);
+          setUltimaActualizacion(resp.ultima_actualizacion);
+        }
       } catch (err: any) {
         if (!ignore) setError(err.message);
       } finally {
@@ -91,7 +95,7 @@ export default function FinanzasDashboard() {
   const pasivosActual = getValorClase(dataActual, 2);
   const gastosActual = getValorClase(dataActual, 5);
   const costosActual = getValorClase(dataActual, 6);
-  const patrimonioActual = activosActual - pasivosActual;
+  const patrimonioActual = activosActual + pasivosActual;
 
   const dataAnterior = useMemo(() => {
     const [y, m] = fecha.split('-').map(Number);
@@ -126,20 +130,26 @@ export default function FinanzasDashboard() {
       });
       const act = getValorClase(mesData, 1);
       const pas = getValorClase(mesData, 2);
-      ultimos.push({ mes: MESES[curM - 1].substring(0, 3), valor: act - pas });
+      ultimos.push({ mes: MESES[curM - 1].substring(0, 3), valor: act + pas });
     }
     return ultimos;
   }, [saldos, fecha]);
 
   const renderFlecha = (actual: number, anterior: number, inverso = false) => {
     if (!anterior) return null;
-    const dif = actual - anterior;
+    
+    const valActual = inverso ? Math.abs(actual) : actual;
+    const valAnterior = inverso ? Math.abs(anterior) : anterior;
+    
+    const dif = valActual - valAnterior;
     if (dif === 0) return <span className="text-slate-400">igual</span>;
-    const esPositivo = dif > 0;
-    const esVerde = inverso ? !esPositivo : esPositivo;
+    
+    const esAumento = dif > 0;
+    const esVerde = inverso ? !esAumento : esAumento;
+    
     return (
       <span className={`flex items-center gap-1 ${esVerde ? 'text-emerald-600' : 'text-red-600'}`}>
-        {esPositivo ? '↑' : '↓'} {Math.abs(Math.round((dif / anterior) * 100))}% vs mes ant.
+        {esAumento ? '↑' : '↓'} {Math.abs(Math.round((dif / valAnterior) * 100))}% vs mes ant.
       </span>
     );
   };
@@ -152,10 +162,10 @@ export default function FinanzasDashboard() {
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold text-dashboard-textMain">Finanzas</h2>
-            {dataActual.length > 0 ? (
+            {ultimaActualizacion ? (
               <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wide border border-emerald-200 flex items-center gap-1.5">
                 <CheckCircle2 size={12} className="text-emerald-500" />
-                Actualizado {new Date(Math.max(...dataActual.map(d => new Date(d.fecha).getTime()))).toLocaleDateString('es-CO', { timeZone: 'UTC' })}
+                Actualizado {new Date(ultimaActualizacion).toLocaleDateString('es-CO', { timeZone: 'UTC' })}
               </span>
             ) : (
               <span className="px-2.5 py-1 rounded-full bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wide border border-slate-200 flex items-center gap-1.5">

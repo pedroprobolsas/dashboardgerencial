@@ -671,7 +671,12 @@ export interface SaldoContable {
   tipo: string;
 }
 
-export async function fetchSaldosContables(anio?: number, mes?: number): Promise<SaldoContable[]> {
+export interface FetchSaldosContablesResponse {
+  data: SaldoContable[];
+  ultima_actualizacion: string | null;
+}
+
+export async function fetchSaldosContables(anio?: number, mes?: number): Promise<FetchSaldosContablesResponse> {
   const params = new URLSearchParams();
   if (anio) params.append('anio', anio.toString());
   if (mes) params.append('mes', mes.toString());
@@ -682,7 +687,10 @@ export async function fetchSaldosContables(anio?: number, mes?: number): Promise
   checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status} al cargar saldos contables`);
   const data = await res.json();
-  return data.data || [];
+  return {
+    data: data.data || [],
+    ultima_actualizacion: data.ultima_actualizacion || null
+  };
 }
 
 export interface SaldoContableDetalle {

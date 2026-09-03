@@ -24,9 +24,16 @@ router.get('/', asyncHandler('/api/saldos-contables', async (req, res) => {
 
   sql += ` ORDER BY fecha ASC, clase ASC`;
 
-  const { rows } = await query(sql, params);
+  const [saldosRes, maxFechaRes] = await Promise.all([
+    query(sql, params),
+    query(`SELECT MAX(creado_en) as max_fecha FROM app_ops.saldos_contables_siigo`)
+  ]);
 
-  res.json({ ok: true, data: rows });
+  res.json({ 
+    ok: true, 
+    data: saldosRes.rows,
+    ultima_actualizacion: maxFechaRes.rows[0]?.max_fecha || null
+  });
 }));
 
 router.get('/detalle', asyncHandler('/api/saldos-contables/detalle', async (req, res) => {
