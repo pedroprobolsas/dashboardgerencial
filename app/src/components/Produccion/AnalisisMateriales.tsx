@@ -35,6 +35,7 @@ export default function AnalisisMateriales() {
   const [opSeleccionada, setOpSeleccionada] = useState<string | null>(null);
   const [opFilaDesplegada, setOpFilaDesplegada] = useState<string | null>(null);
   const [filtroEspecial, setFiltroEspecial] = useState<'alias' | 'cotizado_sin_usar' | 'sustitucion' | 'consumo_extra' | null>(null);
+  const [filtroImprimir, setFiltroImprimir] = useState<'alias' | 'cotizado_sin_usar' | 'sustitucion' | 'consumo_extra' | null>(null);
   
   const [informeAbierto, setInformeAbierto] = useState(false);
 
@@ -401,7 +402,7 @@ export default function AnalisisMateriales() {
 
         {detalle.length > 0 && (
           <button 
-            onClick={() => setInformeAbierto(true)}
+            onClick={() => { setFiltroImprimir(null); setInformeAbierto(true); }}
             className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold rounded-lg shadow-sm transition-colors flex items-center gap-2"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
@@ -542,41 +543,77 @@ export default function AnalisisMateriales() {
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               
-              <button 
-                onClick={() => setFiltroEspecial(filtroEspecial === 'alias' ? null : 'alias')}
-                className={`bg-white p-4 rounded-xl border text-left flex flex-col items-start transition-all ${filtroEspecial === 'alias' ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-sm' : 'border-slate-200 hover:border-indigo-200 hover:bg-indigo-50/30'}`}
-              >
-                <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${filtroEspecial === 'alias' ? 'text-indigo-700' : 'text-slate-500'}`}>Alias de Catálogo</span>
-                <span className="text-xl font-black text-slate-800">{fmtCOP.format(groupedData.metricas.cantidadAlias)}</span>
-                <span className="text-xs text-slate-400 font-medium mt-1">{groupedData.metricas.countAliasPares} pares detectados</span>
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setFiltroEspecial(filtroEspecial === 'alias' ? null : 'alias')}
+                  className={`w-full bg-white p-4 rounded-xl border text-left flex flex-col items-start transition-all ${filtroEspecial === 'alias' ? 'border-indigo-400 ring-2 ring-indigo-100 shadow-sm' : 'border-slate-200 hover:border-indigo-200 hover:bg-indigo-50/30'}`}
+                >
+                  <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${filtroEspecial === 'alias' ? 'text-indigo-700' : 'text-slate-500'}`}>Alias de Catálogo</span>
+                  <span className="text-xl font-black text-slate-800">{fmtCOP.format(groupedData.metricas.cantidadAlias)}</span>
+                  <span className="text-xs text-slate-400 font-medium mt-1">{groupedData.metricas.countAliasPares} pares detectados</span>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setFiltroImprimir('alias'); setInformeAbierto(true); }}
+                  className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                  title="Imprimir informe de Alias de Catálogo"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                </button>
+              </div>
 
-              <button 
-                onClick={() => setFiltroEspecial(filtroEspecial === 'cotizado_sin_usar' ? null : 'cotizado_sin_usar')}
-                className={`bg-white p-4 rounded-xl border text-left flex flex-col items-start transition-all ${filtroEspecial === 'cotizado_sin_usar' ? 'border-sky-400 ring-2 ring-sky-100 shadow-sm' : 'border-slate-200 hover:border-sky-200 hover:bg-sky-50/30'}`}
-              >
-                <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${filtroEspecial === 'cotizado_sin_usar' ? 'text-sky-700' : 'text-slate-500'}`}>Cotizado sin usar</span>
-                <span className="text-xl font-black text-slate-800">{fmtCOP.format(groupedData.metricas.cantidadCotizadoSinUsar)}</span>
-                <span className="text-xs text-slate-400 font-medium mt-1">En {groupedData.metricas.countCotizadoSinUsar} materiales</span>
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setFiltroEspecial(filtroEspecial === 'cotizado_sin_usar' ? null : 'cotizado_sin_usar')}
+                  className={`w-full bg-white p-4 rounded-xl border text-left flex flex-col items-start transition-all ${filtroEspecial === 'cotizado_sin_usar' ? 'border-sky-400 ring-2 ring-sky-100 shadow-sm' : 'border-slate-200 hover:border-sky-200 hover:bg-sky-50/30'}`}
+                >
+                  <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${filtroEspecial === 'cotizado_sin_usar' ? 'text-sky-700' : 'text-slate-500'}`}>Cotizado sin usar</span>
+                  <span className="text-xl font-black text-slate-800">{fmtCOP.format(groupedData.metricas.cantidadCotizadoSinUsar)}</span>
+                  <span className="text-xs text-slate-400 font-medium mt-1">En {groupedData.metricas.countCotizadoSinUsar} materiales</span>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setFiltroImprimir('cotizado_sin_usar'); setInformeAbierto(true); }}
+                  className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                  title="Imprimir informe de Cotizado sin usar"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                </button>
+              </div>
 
-              <button 
-                onClick={() => setFiltroEspecial(filtroEspecial === 'sustitucion' ? null : 'sustitucion')}
-                className={`bg-white p-4 rounded-xl border text-left flex flex-col items-start transition-all ${filtroEspecial === 'sustitucion' ? 'border-amber-400 ring-2 ring-amber-100 shadow-sm' : 'border-slate-200 hover:border-amber-200 hover:bg-amber-50/30'}`}
-              >
-                <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${filtroEspecial === 'sustitucion' ? 'text-amber-700' : 'text-slate-500'}`}>Sustitución Real</span>
-                <span className="text-xl font-black text-slate-800">{fmtCOP.format(groupedData.metricas.cantidadSustitucion)}</span>
-                <span className="text-xs text-slate-400 font-medium mt-1">En {groupedData.metricas.countSustitucion} materiales/pares</span>
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setFiltroEspecial(filtroEspecial === 'sustitucion' ? null : 'sustitucion')}
+                  className={`w-full bg-white p-4 rounded-xl border text-left flex flex-col items-start transition-all ${filtroEspecial === 'sustitucion' ? 'border-amber-400 ring-2 ring-amber-100 shadow-sm' : 'border-slate-200 hover:border-amber-200 hover:bg-amber-50/30'}`}
+                >
+                  <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${filtroEspecial === 'sustitucion' ? 'text-amber-700' : 'text-slate-500'}`}>Sustitución Real</span>
+                  <span className="text-xl font-black text-slate-800">{fmtCOP.format(groupedData.metricas.cantidadSustitucion)}</span>
+                  <span className="text-xs text-slate-400 font-medium mt-1">En {groupedData.metricas.countSustitucion} materiales/pares</span>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setFiltroImprimir('sustitucion'); setInformeAbierto(true); }}
+                  className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                  title="Imprimir informe de Sustitución Real"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                </button>
+              </div>
 
-              <button 
-                onClick={() => setFiltroEspecial(filtroEspecial === 'consumo_extra' ? null : 'consumo_extra')}
-                className={`bg-white p-4 rounded-xl border text-left flex flex-col items-start transition-all ${filtroEspecial === 'consumo_extra' ? 'border-rose-400 ring-2 ring-rose-100 shadow-sm' : 'border-slate-200 hover:border-rose-200 hover:bg-rose-50/30'}`}
-              >
-                <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${filtroEspecial === 'consumo_extra' ? 'text-rose-700' : 'text-slate-500'}`}>Consumo no presup.</span>
-                <span className="text-xl font-black text-slate-800">{fmtCOP.format(groupedData.metricas.cantidadConsumoExtra)}</span>
-                <span className="text-xs text-slate-400 font-medium mt-1">En {groupedData.metricas.countConsumoExtra} materiales</span>
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setFiltroEspecial(filtroEspecial === 'consumo_extra' ? null : 'consumo_extra')}
+                  className={`w-full bg-white p-4 rounded-xl border text-left flex flex-col items-start transition-all ${filtroEspecial === 'consumo_extra' ? 'border-rose-400 ring-2 ring-rose-100 shadow-sm' : 'border-slate-200 hover:border-rose-200 hover:bg-rose-50/30'}`}
+                >
+                  <span className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${filtroEspecial === 'consumo_extra' ? 'text-rose-700' : 'text-slate-500'}`}>Consumo no presup.</span>
+                  <span className="text-xl font-black text-slate-800">{fmtCOP.format(groupedData.metricas.cantidadConsumoExtra)}</span>
+                  <span className="text-xs text-slate-400 font-medium mt-1">En {groupedData.metricas.countConsumoExtra} materiales</span>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setFiltroImprimir('consumo_extra'); setInformeAbierto(true); }}
+                  className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+                  title="Imprimir informe de Consumo no presupuestado"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                </button>
+              </div>
 
             </div>
           </div>
