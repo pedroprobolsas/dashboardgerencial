@@ -808,7 +808,11 @@ export default function AnalisisMateriales() {
           detalle={dataProcesada}
           fechaInicio={fechaInicio}
           fechaFin={fechaFin}
-          onClose={() => setInformeAbierto(false)}
+          filtroEspecial={filtroImprimir}
+          onClose={() => {
+            setInformeAbierto(false);
+            setFiltroImprimir(null);
+          }}
         />
       )}
     </div>
