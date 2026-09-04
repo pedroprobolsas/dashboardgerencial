@@ -20,6 +20,8 @@ export default function FinanzasDashboard() {
 
   const [saldos, setSaldos] = useState<SaldoContable[]>([]);
   const [ultimaActualizacion, setUltimaActualizacion] = useState<string | null>(null);
+  const [ventasSinIva, setVentasSinIva] = useState(0);
+  const [costosProduccion, setCostosProduccion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,10 +35,13 @@ export default function FinanzasDashboard() {
       setLoading(true);
       setError(null);
       try {
-        const resp = await fetchSaldosContables();
+        const [y, m] = fecha.split('-').map(Number);
+        const resp = await fetchSaldosContables(undefined, undefined, y, m);
         if (!ignore) {
           setSaldos(resp.data);
           setUltimaActualizacion(resp.ultima_actualizacion);
+          setVentasSinIva(resp.ventas_sin_iva || 0);
+          setCostosProduccion(resp.costos_produccion || 0);
         }
       } catch (err: any) {
         if (!ignore) setError(err.message);
@@ -135,6 +140,13 @@ export default function FinanzasDashboard() {
     return ultimos;
   }, [saldos, fecha]);
 
+  const renderPorcentaje = (valor: number) => {
+    if (!ventasSinIva || ventasSinIva === 0 || !valor) return <span className="text-slate-500">—</span>;
+    const pct = (valor / ventasSinIva) * 100;
+    const pctStr = pct < 1 && pct > 0 ? pct.toFixed(1) : Math.round(pct).toString();
+    return <span className="text-slate-500 font-medium">{pctStr}% de ventas</span>;
+  };
+
   const renderFlecha = (actual: number, anterior: number, inverso = false) => {
     if (!anterior) return null;
     
@@ -211,8 +223,8 @@ export default function FinanzasDashboard() {
            </div>
         ) : (
           <>
-            {/* 4 Metric Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* 5 Metric Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <MetricCard 
                 title="Activos" 
                 value={activosActual} 
@@ -226,12 +238,17 @@ export default function FinanzasDashboard() {
               <MetricCard 
                 title="Gastos del Mes" 
                 value={gastosActual} 
-                subtext={<span className="text-slate-500">acumulado {labelMes}</span>}
+                subtext={renderPorcentaje(gastosActual)}
               />
               <MetricCard 
                 title="Costos de Venta" 
                 value={costosActual} 
-                subtext={<span className="text-slate-500">acumulado {labelMes}</span>}
+                subtext={renderPorcentaje(costosActual)}
+              />
+              <MetricCard 
+                title="Cost. Producción" 
+                value={costosProduccion} 
+                subtext={renderPorcentaje(costosProduccion)}
               />
             </div>
 

@@ -674,12 +674,16 @@ export interface SaldoContable {
 export interface FetchSaldosContablesResponse {
   data: SaldoContable[];
   ultima_actualizacion: string | null;
+  ventas_sin_iva?: number;
+  costos_produccion?: number;
 }
 
-export async function fetchSaldosContables(anio?: number, mes?: number): Promise<FetchSaldosContablesResponse> {
+export async function fetchSaldosContables(anio?: number, mes?: number, anioMeta?: number, mesMeta?: number): Promise<FetchSaldosContablesResponse> {
   const params = new URLSearchParams();
   if (anio) params.append('anio', anio.toString());
   if (mes) params.append('mes', mes.toString());
+  if (anioMeta) params.append('anio_meta', anioMeta.toString());
+  if (mesMeta) params.append('mes_meta', mesMeta.toString());
   const qs = params.toString();
   const url = qs ? `/api/saldos-contables?${qs}` : '/api/saldos-contables';
   
@@ -689,6 +693,8 @@ export async function fetchSaldosContables(anio?: number, mes?: number): Promise
   const data = await res.json();
   return {
     data: data.data || [],
+    ventas_sin_iva: data.ventas_sin_iva || 0,
+    costos_produccion: data.costos_produccion || 0,
     ultima_actualizacion: data.ultima_actualizacion || null
   };
 }

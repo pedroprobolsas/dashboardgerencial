@@ -6,6 +6,11 @@ const { query } = require('../dbClient');
 router.get('/', asyncHandler('/api/saldos-contables', async (req, res) => {
   const anio = parseInt(req.query.anio, 10);
   const mes = parseInt(req.query.mes, 10);
+  
+  // Parametros para la metadata (ventas, costos) del mes seleccionado en el frontend
+  // Permite traer la metadata de un mes especifico SIN filtrar el historial completo de saldos.
+  const anioMeta = parseInt(req.query.anio_meta, 10) || anio;
+  const mesMeta = parseInt(req.query.mes_meta, 10) || mes;
 
   let sql = `
     SELECT fecha, clase, valor, tipo
@@ -24,14 +29,48 @@ router.get('/', asyncHandler('/api/saldos-contables', async (req, res) => {
 
   sql += ` ORDER BY fecha ASC, clase ASC`;
 
-  const [saldosRes, maxFechaRes] = await Promise.all([
+  // Promesas base
+  const promesas = [
     query(sql, params),
     query(`SELECT MAX(creado_en) as max_fecha FROM app_ops.saldos_contables_siigo`)
-  ]);
+  ];
+
+  // Si nos piden metadata de un mes (via anio_meta/mes_meta, o anio/mes normal), agregamos las consultas
+  if (anioMeta && mesMeta) {
+    const primerDiaMeta = `${anioMeta}-${String(mesMeta).padStart(2, '0')}-01`;
+    promesas.push(
+      query(`
+        SELECT COALESCE(SUM(valor_bruto), 0) AS total_bruto
+        FROM crisolweb.facturas
+        WHERE fecha_creacion >= $1::date
+          AND fecha_creacion < ($1::date + INTERVAL '1 month')
+          AND (estado IS NULL OR UPPER(TRIM(estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))
+      `, [primerDiaMeta]),
+      query(`
+        SELECT COALESCE(costos_mano_obra_72, 0) + COALESCE(costos_otros_73, 0) AS total_produccion
+        FROM app_ops.siigo_costos_produccion_resumen
+        WHERE anio = $1 AND mes = $2
+      `, [anioMeta, mesMeta])
+    );
+  }
+
+  const resultados = await Promise.all(promesas);
+  const saldosRes = resultados[0];
+  const maxFechaRes = resultados[1];
+  
+  let ventas_sin_iva = 0;
+  let costos_produccion = 0;
+
+  if (anioMeta && mesMeta) {
+    ventas_sin_iva = parseFloat(resultados[2].rows[0]?.total_bruto || 0);
+    costos_produccion = parseFloat(resultados[3].rows[0]?.total_produccion || 0);
+  }
 
   res.json({ 
     ok: true, 
     data: saldosRes.rows,
+    ventas_sin_iva,
+    costos_produccion,
     ultima_actualizacion: maxFechaRes.rows[0]?.max_fecha || null
   });
 }));
@@ -40,17 +79,12 @@ router.get('/detalle', asyncHandler('/api/saldos-contables/detalle', async (req,
   const { clase, fecha } = req.query;
 
   if (!clase || !fecha) {
-    return res.status(400).json({ ok: false, error: 'Se requieren parámetros clase y fecha' });
+    return res.status(400).json({ ok: false, error: 'Se requieren parǭmetros clase y fecha' });
   }
 
-  // Las clases de balance (Activos=1, Pasivos=2) usan saldo_final, 
-  // las de resultados (Gastos=5, Costos de Venta=6) usan movimiento_debito
   const claseNum = parseInt(clase, 10);
   const usaMovimiento = [5, 6].includes(claseNum);
   const valorCol = usaMovimiento ? 'movimiento_debito' : 'saldo_final';
-
-  // Usamos el patrón de rango para cubrir la fecha de fin de mes
-  // Se asume que 'fecha' viene como YYYY-MM-DD
   const primerDiaMes = `${fecha.substring(0, 7)}-01`;
 
   const sql = `
