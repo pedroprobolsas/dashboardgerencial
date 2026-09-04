@@ -138,18 +138,30 @@ export default function FinanzasDashboard() {
   const renderFlecha = (actual: number, anterior: number, inverso = false) => {
     if (!anterior) return null;
     
+    // Para pasivos u otras cuentas inversas, usamos el valor absoluto 
+    // porque un "aumento" significa aumento de deuda.
     const valActual = inverso ? Math.abs(actual) : actual;
     const valAnterior = inverso ? Math.abs(anterior) : anterior;
     
     const dif = valActual - valAnterior;
-    if (dif === 0) return <span className="text-slate-400">igual</span>;
+    if (dif === 0) return <span className="text-slate-400">sin cambios</span>;
+    
+    const pctReal = Math.abs((dif / valAnterior) * 100);
+    // Mostrar 1 decimal si es menor a 1%, sino redondear a entero
+    const pctStr = pctReal < 1 ? pctReal.toFixed(1) : Math.round(pctReal).toString();
+    
+    if (pctStr === '0.0' || pctStr === '0') {
+      return <span className="text-slate-400">sin cambios</span>;
+    }
     
     const esAumento = dif > 0;
+    // inverso = true (Pasivos): si aumenta la deuda (esAumento=true), es rojo (malo). Si baja (esAumento=false), es verde (bueno).
+    // inverso = false (Activos): si aumenta (esAumento=true), es verde (bueno). Si baja (esAumento=false), es rojo (malo).
     const esVerde = inverso ? !esAumento : esAumento;
     
     return (
       <span className={`flex items-center gap-1 ${esVerde ? 'text-emerald-600' : 'text-red-600'}`}>
-        {esAumento ? '↑' : '↓'} {Math.abs(Math.round((dif / valAnterior) * 100))}% vs mes ant.
+        {esAumento ? '↑' : '↓'} {pctStr}% vs mes ant.
       </span>
     );
   };
