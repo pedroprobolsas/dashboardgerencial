@@ -200,13 +200,13 @@ export default function CostoProduccionDetalle() {
                 {resumen.ops_bajo_umbral} <span className="text-sm font-normal text-slate-500 ml-1">OPs críticas</span>
               </span>
             </div>
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1" title="Valor comercial (Precio de Venta) equivalente a las cantidades cumplidas en producción">Valor Cumplido</span>
-              <span className="text-2xl font-bold text-slate-800">{fmtCOP.format(resumen.valor_facturado)}</span>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1" title="Valor comercial (Precio de Venta) equivalente a las cantidades cumplidas en producción">Valor Cumplido</span>
+              <span className="text-xl font-bold text-slate-800 whitespace-nowrap">{fmtCOP.format(resumen.valor_facturado)}</span>
             </div>
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1" title="Costo de inventario de los productos terminados en este período">Producción Terminada</span>
-              <span className="text-2xl font-bold text-slate-800">{fmtCOP.format(resumen.produccion_terminada)}</span>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-center">
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1" title="Costo de inventario de los productos terminados en este período">Prod. Terminada</span>
+              <span className="text-xl font-bold text-slate-800 whitespace-nowrap">{fmtCOP.format(resumen.produccion_terminada)}</span>
             </div>
           </div>
         )}

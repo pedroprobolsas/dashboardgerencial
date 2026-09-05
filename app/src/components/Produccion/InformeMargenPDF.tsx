@@ -38,28 +38,28 @@ export default function InformeMargenPDF({ ordenes, resumen, fechaInicio, fechaF
       onClose={onClose}
     >
       {/* Global Cards */}
-      <div className="grid grid-cols-5 gap-4 mb-8 mt-6">
-        <div className="border-2 border-slate-100 rounded-xl p-4 bg-slate-50 print:bg-transparent print:border-slate-300">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Total OPs Período</span>
-          <span className="text-2xl font-black text-slate-800">{resumen.total_ops}</span>
+      <div className="grid grid-cols-5 gap-3 mb-8 mt-6">
+        <div className="border-2 border-slate-100 rounded-xl p-3 bg-slate-50 print:bg-transparent print:border-slate-300 flex flex-col justify-center">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1 leading-tight">Total OPs Período</span>
+          <span className="text-xl font-black text-slate-800">{resumen.total_ops}</span>
         </div>
-        <div className="border-2 border-slate-100 rounded-xl p-4 bg-slate-50 print:bg-transparent print:border-slate-300">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Margen Promedio</span>
-          <span className={`text-2xl font-black ${resumen.margen_promedio < margenMinimo ? 'text-red-600' : 'text-slate-800'}`}>
+        <div className="border-2 border-slate-100 rounded-xl p-3 bg-slate-50 print:bg-transparent print:border-slate-300 flex flex-col justify-center">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1 leading-tight">Margen Promedio</span>
+          <span className={`text-xl font-black ${resumen.margen_promedio < margenMinimo ? 'text-red-600' : 'text-slate-800'}`}>
             {resumen.margen_promedio}%
           </span>
         </div>
-        <div className="border-2 border-red-100 rounded-xl p-4 bg-red-50 print:bg-transparent print:border-red-500">
-          <span className="text-xs font-bold text-red-600 uppercase tracking-wider block mb-1">Bajo Umbral</span>
-          <span className="text-2xl font-black text-red-600">{resumen.ops_bajo_umbral}</span>
+        <div className="border-2 border-red-100 rounded-xl p-3 bg-red-50 print:bg-transparent print:border-red-500 flex flex-col justify-center">
+          <span className="text-[10px] font-bold text-red-600 uppercase tracking-wide block mb-1 leading-tight">Bajo Umbral</span>
+          <span className="text-xl font-black text-red-600">{resumen.ops_bajo_umbral}</span>
         </div>
-        <div className="border-2 border-slate-100 rounded-xl p-4 bg-slate-50 print:bg-transparent print:border-slate-300">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Valor Cumplido</span>
-          <span className="text-2xl font-black text-slate-800">{fmtCOP.format(resumen.valor_facturado)}</span>
+        <div className="border-2 border-slate-100 rounded-xl p-3 bg-slate-50 print:bg-transparent print:border-slate-300 flex flex-col justify-center">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1 leading-tight">Valor Cumplido</span>
+          <span className="text-lg font-black text-slate-800 whitespace-nowrap">{fmtCOP.format(resumen.valor_facturado)}</span>
         </div>
-        <div className="border-2 border-slate-100 rounded-xl p-4 bg-slate-50 print:bg-transparent print:border-slate-300">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1 leading-tight">Producción Terminada</span>
-          <span className="text-2xl font-black text-slate-800">{fmtCOP.format(resumen.produccion_terminada)}</span>
+        <div className="border-2 border-slate-100 rounded-xl p-3 bg-slate-50 print:bg-transparent print:border-slate-300 flex flex-col justify-center">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1 leading-tight">Prod. Terminada</span>
+          <span className="text-lg font-black text-slate-800 whitespace-nowrap">{fmtCOP.format(resumen.produccion_terminada)}</span>
         </div>
       </div>
 
