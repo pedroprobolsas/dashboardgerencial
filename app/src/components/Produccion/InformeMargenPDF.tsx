@@ -38,7 +38,7 @@ export default function InformeMargenPDF({ ordenes, resumen, fechaInicio, fechaF
       onClose={onClose}
     >
       {/* Global Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-8 mt-6">
+      <div className="grid grid-cols-5 gap-4 mb-8 mt-6">
         <div className="border-2 border-slate-100 rounded-xl p-4 bg-slate-50 print:bg-transparent print:border-slate-300">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Total OPs Período</span>
           <span className="text-2xl font-black text-slate-800">{resumen.total_ops}</span>
@@ -56,6 +56,10 @@ export default function InformeMargenPDF({ ordenes, resumen, fechaInicio, fechaF
         <div className="border-2 border-slate-100 rounded-xl p-4 bg-slate-50 print:bg-transparent print:border-slate-300">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Valor Cumplido</span>
           <span className="text-2xl font-black text-slate-800">{fmtCOP.format(resumen.valor_facturado)}</span>
+        </div>
+        <div className="border-2 border-slate-100 rounded-xl p-4 bg-slate-50 print:bg-transparent print:border-slate-300">
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1 leading-tight">Producción Terminada</span>
+          <span className="text-2xl font-black text-slate-800">{fmtCOP.format(resumen.produccion_terminada)}</span>
         </div>
       </div>
 

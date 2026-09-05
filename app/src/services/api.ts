@@ -411,6 +411,7 @@ export interface CostoPorOrdenResumen {
   valor_facturado: number;
   ops_bajo_umbral: number;
   ops_sin_valorizar: number;
+  produccion_terminada: number;
 }
 
 export async function fetchCostoPorOrden(fechaInicio: string, fechaFin: string, margenMinimo: number): Promise<{ ordenes: OrdenProduccion[], total: number, resumen: CostoPorOrdenResumen }> {
@@ -421,7 +422,7 @@ export async function fetchCostoPorOrden(fechaInicio: string, fechaFin: string, 
   return {
     ordenes: data.ordenes || [],
     total: data.total || 0,
-    resumen: data.resumen || { ultima_actualizacion: null, total_ops: 0, margen_promedio: 0, valor_facturado: 0, ops_bajo_umbral: 0, ops_sin_valorizar: 0 },
+    resumen: data.resumen || { ultima_actualizacion: null, total_ops: 0, margen_promedio: 0, valor_facturado: 0, ops_bajo_umbral: 0, ops_sin_valorizar: 0, produccion_terminada: 0 },
   };
 }
 

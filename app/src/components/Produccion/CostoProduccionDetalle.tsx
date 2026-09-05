@@ -183,7 +183,7 @@ export default function CostoProduccionDetalle() {
 
         {/* Tarjetas de Métricas Globales */}
         {resumen && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total OPs Período</span>
               <span className="text-2xl font-bold text-slate-800">{resumen.total_ops}</span>
@@ -201,8 +201,12 @@ export default function CostoProduccionDetalle() {
               </span>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1" title="Valor comercial equivalente a las cantidades cumplidas en producción">Valor Cumplido</span>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1" title="Valor comercial (Precio de Venta) equivalente a las cantidades cumplidas en producción">Valor Cumplido</span>
               <span className="text-2xl font-bold text-slate-800">{fmtCOP.format(resumen.valor_facturado)}</span>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1" title="Costo de inventario de los productos terminados en este período">Producción Terminada</span>
+              <span className="text-2xl font-bold text-slate-800">{fmtCOP.format(resumen.produccion_terminada)}</span>
             </div>
           </div>
         )}

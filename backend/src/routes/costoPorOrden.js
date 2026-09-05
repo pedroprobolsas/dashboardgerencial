@@ -109,17 +109,26 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       )
   `;
 
-  const [maxFechaResult, resumenResult, detalleResult, sinValorizarResult] = await Promise.all([
+  const sqlProduccionTerminada = `
+    SELECT COALESCE(SUM(valor_total), 0) as produccion_terminada
+    FROM crisolweb.movimientos_materiales
+    WHERE fecha >= $1::date AND fecha <= $2::date
+      AND origen = 'Cumplido Produccion'
+  `;
+
+  const [maxFechaResult, resumenResult, detalleResult, sinValorizarResult, prodTerminadaResult] = await Promise.all([
     query(sqlMaxFecha),
     query(sqlResumen, [fecha_inicio, fecha_fin, umbral]),
     query(sqlDetalle, [fecha_inicio, fecha_fin, umbral]),
-    query(sqlSinValorizar, [fecha_inicio, fecha_fin])
+    query(sqlSinValorizar, [fecha_inicio, fecha_fin]),
+    query(sqlProduccionTerminada, [fecha_inicio, fecha_fin])
   ]);
 
   const maxFecha = maxFechaResult.rows[0]?.ultima_actualizacion || null;
   const resumen = resumenResult.rows[0] || {};
   const rows = detalleResult.rows;
   const opsSinValorizar = parseInt(sinValorizarResult.rows[0]?.ops_sin_valorizar || 0, 10);
+  const prodTerminada = parseFloat(prodTerminadaResult.rows[0]?.produccion_terminada || 0);
 
   const resultado = {
     ok:            true,
@@ -131,6 +140,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       valor_facturado:     parseFloat(resumen.valor_facturado || 0),
       ops_bajo_umbral:     parseInt(resumen.ops_bajo_umbral || 0, 10),
       ops_sin_valorizar:   opsSinValorizar,
+      produccion_terminada: prodTerminada
     },
     total:         rows.length,
     ordenes:       rows,
