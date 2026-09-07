@@ -507,6 +507,8 @@ export default function MovimientoMateriales() {
         </style>
       </head>
       <body>
+        <h1 style="text-align: center; color: #2e7d32; font-size: 18px; margin-bottom: 20px;">1er asiento contable para el cierre de costos</h1>
+        
         <div class="instructions">
           <strong>Instrucciones para el Asiento Contable (SIIGO):</strong><br/>
           - Este valor es el inventario de materia prima consumido.<br/>
@@ -597,7 +599,141 @@ export default function MovimientoMateriales() {
   };
 
   const handlePrintProduccionTerminada = () => {
-    alert('2do Reporte de cierre de costos (Producción Terminada) se implementará cuando se defina su estructura detallada para el PDF.');
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    const monthName = mockMonths.find(m => m.val === month)?.label || '';
+    const lastDayOfMonth = new Date(year, month, 0).getDate();
+    const fechaElaboracion = `${year}-${String(month).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
+    
+    const valor = cierreCostos?.produccionTerminada?.total || 0;
+    const fmtNumOnly = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const valorStr = fmtNumOnly.format(valor);
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>2do Reporte de cierre de costos</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #000; margin: 40px; font-size: 12px; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; }
+          .logo { width: 150px; }
+          .company-info { text-align: center; font-size: 11px; flex-grow: 1; }
+          .company-info strong { font-size: 13px; }
+          .doc-info { border: 1px solid #ccc; border-collapse: collapse; width: 250px; }
+          .doc-info td { border: 1px solid #ccc; padding: 5px; }
+          .doc-info .bg-gray { background-color: #eee; font-weight: bold; }
+          
+          table.items { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
+          table.items th, table.items td { border: 1px solid #ccc; padding: 6px; }
+          table.items th { background-color: #eee; text-align: center; font-weight: bold; }
+          table.items td { text-align: center; }
+          table.items td.left { text-align: left; }
+          table.items td.right { text-align: right; }
+          
+          .totals { display: flex; justify-content: flex-end; font-weight: bold; margin-bottom: 40px; }
+          .totals span { display: inline-block; width: 100px; text-align: right; }
+          .totals span.label { width: auto; margin-right: 20px; }
+          
+          .observations { margin-top: 20px; font-size: 11px; }
+          .observations strong { display: block; margin-bottom: 5px; }
+          
+          .watermark { position: fixed; right: -40px; top: 50%; transform: translateY(-50%) rotate(-90deg); font-size: 10px; color: #666; letter-spacing: 1px; }
+          
+          .instructions { margin-bottom: 20px; border: 1px dashed #999; padding: 10px; background: #fafafa; }
+        </style>
+      </head>
+      <body>
+        <h1 style="text-align: center; color: #2e7d32; font-size: 18px; margin-bottom: 20px;">2do Reporte de cierre de costos</h1>
+        
+        <div class="instructions">
+          <strong>Instrucciones para el Asiento Contable (SIIGO):</strong><br/>
+          - Este valor es la producción terminada del período.<br/>
+          - El asiento contable debe siempre bautizarse <strong>CC-102-</strong> seguido del consecutivo en SIIGO.<br/>
+          - Se lleva al <strong>DÉBITO</strong> en la cuenta <strong>14300501</strong> y la contrapartida (<strong>CRÉDITO</strong>) es contra la cuenta <strong>14100501</strong>.
+        </div>
+        
+        <div style="border: 1px solid #ccc; padding: 30px; position: relative;">
+          <div class="watermark">Elaborado por Siigo S.A.S Nit: 830.048.145-8</div>
+          
+          <div class="header">
+            <div class="logo">
+              <h2 style="color: #2e7d32; margin:0;">Probolsas<br><span style="font-size:10px;color:#8bc34a;">empaques</span></h2>
+            </div>
+            <div class="company-info">
+              <strong>INDUSTRIAS PLASTICAS<br>PROBOLSAS SAS</strong><br>
+              NIT 900.333.574-1<br>
+              AV 2 1243 BARRIO SAN LUIS<br>
+              Teléfono: (57) 3183409532<br>
+              Cúcuta - Colombia
+            </div>
+            <table class="doc-info">
+              <tr>
+                <td class="bg-gray">CUMPLIDOS DE<br>PRODUCCION No.</td>
+                <td style="text-align: center; font-weight: bold;">CC-102-___</td>
+              </tr>
+              <tr>
+                <td class="bg-gray">Fecha de elaboración</td>
+                <td style="text-align: center;">${fechaElaboracion}</td>
+              </tr>
+            </table>
+          </div>
+
+          <table class="items">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Cuenta contable</th>
+                <th>Tercero</th>
+                <th>Detalle</th>
+                <th>Descripción</th>
+                <th>Débito</th>
+                <th>Crédito</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td class="left">14300501 - Producto Terminado</td>
+                <td class="left">INDUSTRIAS PLASTICAS PROBOLSAS SAS</td>
+                <td class="left">Prod: 05 Cant: 0</td>
+                <td class="left">PRODUCCION TERMINADA</td>
+                <td class="right">${valorStr}</td>
+                <td class="right">0.00</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td class="left">14100501 - Producto en Proceso</td>
+                <td class="left">INDUSTRIAS PLASTICAS PROBOLSAS SAS</td>
+                <td class="left"></td>
+                <td class="left">Producto en Proceso</td>
+                <td class="right">0.00</td>
+                <td class="right">${valorStr}</td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <div class="totals">
+            <span class="label">Total</span>
+            <span style="margin-right: 6px;">${valorStr}</span>
+            <span>${valorStr}</span>
+          </div>
+          
+          <div class="observations">
+            <strong>Observaciones</strong><br>
+            CUMPLIDOS DE PRODUCCION TERMINADA - ${monthName.toUpperCase()}
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   useEffect(() => {
