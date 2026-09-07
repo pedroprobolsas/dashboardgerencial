@@ -517,7 +517,7 @@ export default function MovimientoMateriales() {
         </div>
         
         <div style="border: 1px solid #ccc; padding: 30px; position: relative;">
-          <div class="watermark">Elaborado por Siigo S.A.S Nit: 830.048.145-8</div>
+          <div class="watermark">Elaborado por Dashboard Gerencial</div>
           
           <div class="header">
             <div class="logo">
@@ -655,7 +655,7 @@ export default function MovimientoMateriales() {
         </div>
         
         <div style="border: 1px solid #ccc; padding: 30px; position: relative;">
-          <div class="watermark">Elaborado por Siigo S.A.S Nit: 830.048.145-8</div>
+          <div class="watermark">Elaborado por Dashboard Gerencial</div>
           
           <div class="header">
             <div class="logo">
