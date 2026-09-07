@@ -12,7 +12,7 @@ const fmtCOPCierre = new Intl.NumberFormat('es-CO', { style: 'currency', currenc
 const fmtNum = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 4 });
 const fmtDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : '—';
 
-function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYears }: { defaultYear: number, defaultMonth: number, mockMonths: any[], availableYears: number[] }) {
+function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYears, cierreCostos }: { defaultYear: number, defaultMonth: number, mockMonths: any[], availableYears: number[], cierreCostos: any }) {
   const [year, setYear] = useState(defaultYear);
   const [month, setMonth] = useState(defaultMonth);
   const [loading, setLoading] = useState(false);
@@ -50,71 +50,150 @@ function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYe
     if (!printWindow) return;
 
     const monthName = mockMonths.find(m => m.val === month)?.label || '';
-    const now = new Date().toLocaleString('es-CO');
+    const lastDayOfMonth = new Date(year, month, 0).getDate();
+    const fechaElaboracion = `${year}-${String(month).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
     
-    let rowsHtml = data.map(d => `
+    const valorMP = cierreCostos?.controlCierre?.depurado || 0;
+    const fmtNumOnly = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
+    // Sum of all 72, 73 + MP
+    const totalDebito = valorMP + total;
+    
+    let rowIndex = 1;
+    let rowsHtml = `
       <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.code}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${d.concept}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${fmtCOPCierre.format(d.valor)}</td>
+        <td>${rowIndex++}</td>
+        <td class="left">71050501 - Materia prima</td>
+        <td class="left">INDUSTRIAS PLASTICAS PROBOLSAS SAS</td>
+        <td class="left"></td>
+        <td class="left">Materia prima</td>
+        <td class="right">0.00</td>
+        <td class="right">${fmtNumOnly.format(valorMP)}</td>
       </tr>
-    `).join('');
+    `;
+
+    data.forEach(d => {
+      rowsHtml += `
+        <tr>
+          <td>${rowIndex++}</td>
+          <td class="left">${d.code} - ${d.concept}</td>
+          <td class="left">INDUSTRIAS PLASTICAS PROBOLSAS SAS</td>
+          <td class="left"></td>
+          <td class="left">${d.concept}</td>
+          <td class="right">0.00</td>
+          <td class="right">${fmtNumOnly.format(d.valor)}</td>
+        </tr>
+      `;
+    });
+
+    rowsHtml += `
+        <tr>
+          <td>${rowIndex++}</td>
+          <td class="left">14100501 - Producto en Proceso</td>
+          <td class="left">INDUSTRIAS PLASTICAS PROBOLSAS SAS</td>
+          <td class="left"></td>
+          <td class="left">Producto en Proceso</td>
+          <td class="right">${fmtNumOnly.format(totalDebito)}</td>
+          <td class="right">0.00</td>
+        </tr>
+    `;
 
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Reporte Cierre Costos SIIGO - ${monthName} ${year}</title>
+        <title>3er Reporte de cierre de costos</title>
         <style>
-          body { font-family: sans-serif; color: #333; margin: 40px; }
-          h1 { font-size: 20px; margin-bottom: 5px; }
-          .meta { font-size: 12px; color: #666; margin-bottom: 30px; }
-          table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 30px; }
-          th { background: #f8f9fa; padding: 10px; text-align: left; border-bottom: 2px solid #ddd; }
-          .summary { max-width: 400px; margin-left: auto; border: 1px solid #ddd; padding: 15px; border-radius: 8px; }
-          .summary-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
-          .summary-total { display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; border-top: 2px solid #333; padding-top: 10px; margin-top: 10px; }
+          body { font-family: Arial, sans-serif; color: #000; margin: 40px; font-size: 12px; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; }
+          .logo { width: 150px; }
+          .company-info { text-align: center; font-size: 11px; flex-grow: 1; }
+          .company-info strong { font-size: 13px; }
+          .doc-info { border: 1px solid #ccc; border-collapse: collapse; width: 250px; }
+          .doc-info td { border: 1px solid #ccc; padding: 5px; }
+          .doc-info .bg-gray { background-color: #eee; font-weight: bold; }
+          
+          table.items { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
+          table.items th, table.items td { border: 1px solid #ccc; padding: 6px; }
+          table.items th { background-color: #eee; text-align: center; font-weight: bold; }
+          table.items td { text-align: center; }
+          table.items td.left { text-align: left; }
+          table.items td.right { text-align: right; }
+          
+          .totals { display: flex; justify-content: flex-end; font-weight: bold; margin-bottom: 40px; }
+          .totals span { display: inline-block; width: 100px; text-align: right; }
+          .totals span.label { width: auto; margin-right: 20px; }
+          
+          .observations { margin-top: 20px; font-size: 11px; }
+          .observations strong { display: block; margin-bottom: 5px; }
+          
+          .watermark { position: fixed; right: -40px; top: 50%; transform: translateY(-50%) rotate(-90deg); font-size: 10px; color: #666; letter-spacing: 1px; }
+          
+          .instructions { margin-bottom: 20px; border: 1px dashed #999; padding: 10px; background: #fafafa; }
         </style>
       </head>
       <body>
-        <h1>Reporte para Cierre de Costos — SIIGO</h1>
-        <div class="meta">
-          Período: <strong>${monthName} ${year}</strong> &nbsp;|&nbsp; 
-          Estado del mes: <strong>${estado.toUpperCase()}</strong> &nbsp;|&nbsp; 
-          Generado: <strong>${now}</strong>
+        <h1 style="text-align: center; color: #2e7d32; font-size: 18px; margin-bottom: 20px;">3er asiento contable para el cierre de costos</h1>
+        
+        <div class="instructions">
+          <strong>Instrucciones para el Asiento Contable (SIIGO):</strong><br/>
+          - El asiento contable debe siempre bautizarse <strong>CC-100-</strong> seguido del consecutivo en SIIGO.<br/>
+          - Los valores de materia prima y costos de fabricación se llevan al <strong>CRÉDITO</strong> y la contrapartida global es al <strong>DÉBITO</strong> en <strong>14100501</strong>.
         </div>
         
-        <table>
-          <thead>
-            <tr>
-              <th>Cuenta</th>
-              <th>Concepto</th>
-              <th style="text-align: right;">Débito Acumulado</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml || '<tr><td colspan="3" style="text-align:center; padding:20px;">Sin datos</td></tr>'}
-          </tbody>
-        </table>
+        <div style="border: 1px solid #ccc; padding: 30px; position: relative;">
+          <div class="watermark">Elaborado por Dashboard Gerencial</div>
+          
+          <div class="header">
+            <div class="logo">
+              <h2 style="color: #2e7d32; margin:0;">Probolsas<br><span style="font-size:10px;color:#8bc34a;">empaques</span></h2>
+            </div>
+            <div class="company-info">
+              <strong>INDUSTRIAS PLASTICAS<br>PROBOLSAS SAS</strong><br>
+              NIT 900.333.574-1<br>
+              AV 2 1243 BARRIO SAN LUIS<br>
+              Teléfono: (57) 3183409532<br>
+              Cúcuta - Colombia
+            </div>
+            <table class="doc-info">
+              <tr>
+                <td class="bg-gray">CIERRE DE COSTOS<br>DE PRODUCCION No.</td>
+                <td style="text-align: center; font-weight: bold;">CC-100-___</td>
+              </tr>
+              <tr>
+                <td class="bg-gray">Fecha de elaboración</td>
+                <td style="text-align: center;">${fechaElaboracion}</td>
+              </tr>
+            </table>
+          </div>
 
-        <div class="summary">
-          <div class="summary-row">
-            <span>Total 72 - Mano de obra:</span>
-            <span>${fmtCOPCierre.format(total72)}</span>
+          <table class="items">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Cuenta contable</th>
+                <th>Tercero</th>
+                <th>Detalle</th>
+                <th>Descripción</th>
+                <th>Débito</th>
+                <th>Crédito</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          
+          <div class="totals">
+            <span class="label">Total</span>
+            <span style="margin-right: 6px;">${fmtNumOnly.format(totalDebito)}</span>
+            <span>${fmtNumOnly.format(totalDebito)}</span>
           </div>
-          <div class="summary-row">
-            <span>Total 73 - Otros costos de fabricación:</span>
-            <span>${fmtCOPCierre.format(total73)}</span>
+          
+          <div class="observations">
+            <strong>Observaciones</strong><br>
+            CIERRE DE COSTOS DE PRODUCCION - ${monthName.toUpperCase()}
           </div>
-          <div class="summary-total">
-            <span>Total para cierre (72+73):</span>
-            <span>${fmtCOPCierre.format(total)}</span>
-          </div>
-        </div>
-
-        <div style="margin-top: 30px; background: #eef2ff; border: 1px solid #c7d2fe; padding: 15px; border-radius: 8px;">
-          <p style="margin: 0 0 10px 0;"><strong>Nota para Contabilidad:</strong> Para realizar el cierre de costos del período, los valores de las cuentas 72 – Mano de obra y 73 – Otros costos de fabricación deben cruzarse contra la cuenta 14100501 – Producto en Proceso.</p>
-          <p style="margin: 0; font-size: 16px;"><strong>Valor a cruzar con Producto en Proceso (72 + 73):</strong> ${fmtCOPCierre.format(total)}</p>
         </div>
 
         <script>
@@ -1028,7 +1107,7 @@ export default function MovimientoMateriales() {
       <CoherenciaCostos defaultYear={year} mockMonths={mockMonths} availableYears={years} />
 
       {/* REPORTE CIERRE COSTOS SIIGO */}
-      <ReporteCierreSiigo defaultYear={year} defaultMonth={month} mockMonths={mockMonths} availableYears={years} />
+      <ReporteCierreSiigo defaultYear={year} defaultMonth={month} mockMonths={mockMonths} availableYears={years} cierreCostos={cierreCostos} />
 
       {/* ÁREA DE RESULTADOS */}
       <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
