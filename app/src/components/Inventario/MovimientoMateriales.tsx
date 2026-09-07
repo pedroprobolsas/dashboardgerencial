@@ -460,6 +460,146 @@ export default function MovimientoMateriales() {
     }
   };
 
+  const handlePrintConsumoRealMP = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    const monthName = mockMonths.find(m => m.val === month)?.label || '';
+    const lastDayOfMonth = new Date(year, month, 0).getDate();
+    const fechaElaboracion = `${year}-${String(month).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
+    
+    const valor = cierreCostos?.controlCierre?.depurado || 0;
+    const fmtNumOnly = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const valorStr = fmtNumOnly.format(valor);
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>CUMPLIDO DE MATERIA PRIMA</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #000; margin: 40px; font-size: 12px; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; }
+          .logo { width: 150px; }
+          .company-info { text-align: center; font-size: 11px; flex-grow: 1; }
+          .company-info strong { font-size: 13px; }
+          .doc-info { border: 1px solid #ccc; border-collapse: collapse; width: 250px; }
+          .doc-info td { border: 1px solid #ccc; padding: 5px; }
+          .doc-info .bg-gray { background-color: #eee; font-weight: bold; }
+          
+          table.items { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
+          table.items th, table.items td { border: 1px solid #ccc; padding: 6px; }
+          table.items th { background-color: #eee; text-align: center; font-weight: bold; }
+          table.items td { text-align: center; }
+          table.items td.left { text-align: left; }
+          table.items td.right { text-align: right; }
+          
+          .totals { display: flex; justify-content: flex-end; font-weight: bold; margin-bottom: 40px; }
+          .totals span { display: inline-block; width: 100px; text-align: right; }
+          .totals span.label { width: auto; margin-right: 20px; }
+          
+          .observations { margin-top: 20px; font-size: 11px; }
+          .observations strong { display: block; margin-bottom: 5px; }
+          
+          .watermark { position: fixed; right: -40px; top: 50%; transform: translateY(-50%) rotate(-90deg); font-size: 10px; color: #666; letter-spacing: 1px; }
+          
+          .instructions { margin-bottom: 20px; border: 1px dashed #999; padding: 10px; background: #fafafa; }
+        </style>
+      </head>
+      <body>
+        <div class="instructions">
+          <strong>Instrucciones para el Asiento Contable (SIIGO):</strong><br/>
+          - Este valor es el inventario de materia prima consumido.<br/>
+          - El asiento contable debe siempre bautizarse <strong>CC-99-</strong> seguido del consecutivo en SIIGO.<br/>
+          - Se lleva al <strong>CRÉDITO</strong> y la contrapartida es contra la cuenta <strong>710505.01</strong>.
+        </div>
+        
+        <div style="border: 1px solid #ccc; padding: 30px; position: relative;">
+          <div class="watermark">Elaborado por Siigo S.A.S Nit: 830.048.145-8</div>
+          
+          <div class="header">
+            <div class="logo">
+              <h2 style="color: #2e7d32; margin:0;">Probolsas<br><span style="font-size:10px;color:#8bc34a;">empaques</span></h2>
+            </div>
+            <div class="company-info">
+              <strong>INDUSTRIAS PLASTICAS<br>PROBOLSAS SAS</strong><br>
+              NIT 900.333.574-1<br>
+              AV 2 1243 BARRIO SAN LUIS<br>
+              Teléfono: (57) 3183409532<br>
+              Cúcuta - Colombia
+            </div>
+            <table class="doc-info">
+              <tr>
+                <td class="bg-gray">CUMPLIDOS DE<br>MATERIA PRIMA No.</td>
+                <td style="text-align: center; font-weight: bold;">CC-99-___</td>
+              </tr>
+              <tr>
+                <td class="bg-gray">Fecha de elaboración</td>
+                <td style="text-align: center;">${fechaElaboracion}</td>
+              </tr>
+            </table>
+          </div>
+
+          <table class="items">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Cuenta contable</th>
+                <th>Tercero</th>
+                <th>Detalle</th>
+                <th>Descripción</th>
+                <th>Débito</th>
+                <th>Crédito</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td class="left">14050501 - Inventario de Materia Prima</td>
+                <td class="left">INDUSTRIAS PLASTICAS PROBOLSAS SAS</td>
+                <td class="left">Prod: 05 Cant: 0</td>
+                <td class="left">MATERIA PRIMA</td>
+                <td class="right">0.00</td>
+                <td class="right">${valorStr}</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td class="left">71050501 - Materia prima</td>
+                <td class="left">INDUSTRIAS PLASTICAS PROBOLSAS SAS</td>
+                <td class="left"></td>
+                <td class="left">Materia prima</td>
+                <td class="right">${valorStr}</td>
+                <td class="right">0.00</td>
+              </tr>
+            </tbody>
+          </table>
+          
+          <div class="totals">
+            <span class="label">Total</span>
+            <span style="margin-right: 6px;">${valorStr}</span>
+            <span>${valorStr}</span>
+          </div>
+          
+          <div class="observations">
+            <strong>Observaciones</strong><br>
+            CONTABILIZACION DE CONSUMOS DE MATERIA PRIMA - ${monthName.toUpperCase()}
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  const handlePrintProduccionTerminada = () => {
+    alert('2do Reporte de cierre de costos (Producción Terminada) se implementará cuando se defina su estructura detallada para el PDF.');
+  };
+
   useEffect(() => {
     fetchFiltros();
   }, []);
@@ -590,15 +730,27 @@ export default function MovimientoMateriales() {
           <div className="flex flex-col gap-6">
             {/* Tarjetas Principales */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
-                <span className="text-sm font-semibold text-slate-600">Consumo Real de MP</span>
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1 relative group">
+                <div className="flex justify-between items-start">
+                  <span className="text-sm font-semibold text-slate-600">Consumo Real de MP</span>
+                  <button onClick={handlePrintConsumoRealMP} className="text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 p-1.5 rounded-lg transition-colors text-xs font-medium flex items-center" title="Imprimir PDF">
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    PDF
+                  </button>
+                </div>
                 <p className="text-3xl font-bold text-slate-800 my-1">{fmtCOPCierre.format(cierreCostos.controlCierre?.depurado || 0)}</p>
-                <p className="text-[10px] text-slate-400 font-mono">Cumplido Requisición Depurado</p>
+                <p className="text-[10px] text-indigo-600 font-bold">1er Reporte de cierre de costos</p>
               </div>
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
-                <span className="text-sm font-semibold text-slate-600">Producción Terminada</span>
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1 relative group">
+                <div className="flex justify-between items-start">
+                  <span className="text-sm font-semibold text-slate-600">Producción Terminada</span>
+                  <button onClick={handlePrintProduccionTerminada} className="text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 p-1.5 rounded-lg transition-colors text-xs font-medium flex items-center" title="Imprimir PDF">
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    PDF
+                  </button>
+                </div>
                 <p className="text-3xl font-bold text-emerald-700 my-1">{fmtCOPCierre.format(cierreCostos.produccionTerminada.total)}</p>
-                <p className="text-[10px] text-slate-400 font-mono">Origen Crisolweb: Cumplido Produccion</p>
+                <p className="text-[10px] text-emerald-600 font-bold">2do Reporte de cierre de costos</p>
               </div>
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
                 <span className="text-sm font-semibold text-slate-600">Compras de Materia Prima</span>
@@ -692,70 +844,46 @@ export default function MovimientoMateriales() {
         )}
       </div>
 
-      {/* CONTROL DE CIERRE */}
-      {cierreCostos?.controlCierre && (
+      {/* CONTROL DE CIERRE (Solo alertas) */}
+      {cierreCostos?.controlCierre && cierreCostos.controlCierre.listaAnomalias.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-lg font-bold text-dashboard-textMain mb-4">Control de Cierre (Movimientos Anómalos)</h2>
           <div className="flex flex-col gap-6">
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
-                <span className="text-sm font-semibold text-slate-600">Cumplido Requisición Bruto</span>
-                <p className="text-2xl font-bold text-slate-800 my-1">{fmtCOPCierre.format(cierreCostos.controlCierre.bruto)}</p>
-                <p className="text-[10px] text-slate-400 font-mono">Sin depurar anomalías</p>
+            <div className="bg-white rounded-2xl shadow-sm border border-red-200 overflow-hidden flex flex-col">
+              <div className="px-5 py-3 border-b border-red-100 bg-red-50 flex items-center gap-2">
+                <span className="text-lg">⚠️</span>
+                <h3 className="text-sm font-bold text-red-700">Existen movimientos con valores anómalos que requieren revisión en Crisolweb</h3>
               </div>
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
-                <span className="text-sm font-semibold text-slate-600">Movimientos Observados</span>
-                <p className="text-2xl font-bold text-red-600 my-1">{fmtCOPCierre.format(cierreCostos.controlCierre.totalAnomalias)}</p>
-                <p className="text-[10px] text-slate-400 font-mono">{cierreCostos.controlCierre.listaAnomalias.length} registro(s) detectado(s)</p>
-              </div>
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
-                <span className="text-sm font-semibold text-slate-600">Cumplido Requisición Depurado</span>
-                <p className="text-2xl font-bold text-emerald-700 my-1">{fmtCOPCierre.format(cierreCostos.controlCierre.depurado)}</p>
-                <p className="text-[10px] text-slate-400 font-mono">
-                  Consumo: {fmtCOPCierre.format(cierreCostos.controlCierre.consumoDepurado)} | Ajustes: {fmtCOPCierre.format(cierreCostos.controlCierre.ajustesDepurado)}
-                </p>
+              <div className="p-0 overflow-auto">
+                <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap">
+                  <thead className="text-xs text-slate-500 bg-white border-b border-slate-100">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Fecha</th>
+                      <th className="px-4 py-3 font-semibold">Consecutivo</th>
+                      <th className="px-4 py-3 font-semibold">Material</th>
+                      <th className="px-4 py-3 font-semibold">Concepto</th>
+                      <th className="px-4 py-3 font-semibold text-right">Precio</th>
+                      <th className="px-4 py-3 font-semibold text-right">Valor Total</th>
+                      <th className="px-4 py-3 font-semibold">Documento</th>
+                      <th className="px-4 py-3 font-semibold">Bodega</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {cierreCostos.controlCierre.listaAnomalias.map((a: any, i: number) => (
+                      <tr key={i} className="hover:bg-red-50/50">
+                        <td className="px-4 py-2.5">{fmtDate(a.fecha)}</td>
+                        <td className="px-4 py-2.5 font-medium">{a.consecutivo}</td>
+                        <td className="px-4 py-2.5 truncate max-w-[150px]" title={a.material}>{a.material}</td>
+                        <td className="px-4 py-2.5 text-xs">{a.concepto}</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-amber-600">{fmtCOPCierre.format(a.precio)}</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-red-600">{fmtCOPCierre.format(a.valor_total)}</td>
+                        <td className="px-4 py-2.5 text-xs">{a.documento}</td>
+                        <td className="px-4 py-2.5 text-xs">{a.bodega}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-
-            {cierreCostos.controlCierre.listaAnomalias.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-red-200 overflow-hidden flex flex-col">
-                <div className="px-5 py-3 border-b border-red-100 bg-red-50 flex items-center gap-2">
-                  <span className="text-lg">⚠️</span>
-                  <h3 className="text-sm font-bold text-red-700">Existen movimientos con valores anómalos que requieren revisión en Crisolweb</h3>
-                </div>
-                <div className="p-0 overflow-auto">
-                  <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap">
-                    <thead className="text-xs text-slate-500 bg-white border-b border-slate-100">
-                      <tr>
-                        <th className="px-4 py-3 font-semibold">Fecha</th>
-                        <th className="px-4 py-3 font-semibold">Consecutivo</th>
-                        <th className="px-4 py-3 font-semibold">Material</th>
-                        <th className="px-4 py-3 font-semibold">Concepto</th>
-                        <th className="px-4 py-3 font-semibold text-right">Precio</th>
-                        <th className="px-4 py-3 font-semibold text-right">Valor Total</th>
-                        <th className="px-4 py-3 font-semibold">Documento</th>
-                        <th className="px-4 py-3 font-semibold">Bodega</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {cierreCostos.controlCierre.listaAnomalias.map((a: any, i: number) => (
-                        <tr key={i} className="hover:bg-red-50/50">
-                          <td className="px-4 py-2.5">{fmtDate(a.fecha)}</td>
-                          <td className="px-4 py-2.5 font-medium">{a.consecutivo}</td>
-                          <td className="px-4 py-2.5 truncate max-w-[150px]" title={a.material}>{a.material}</td>
-                          <td className="px-4 py-2.5 text-xs">{a.concepto}</td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-amber-600">{fmtCOPCierre.format(a.precio)}</td>
-                          <td className="px-4 py-2.5 text-right font-bold text-red-600">{fmtCOPCierre.format(a.valor_total)}</td>
-                          <td className="px-4 py-2.5 text-xs">{a.documento}</td>
-                          <td className="px-4 py-2.5 text-xs">{a.bodega}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
