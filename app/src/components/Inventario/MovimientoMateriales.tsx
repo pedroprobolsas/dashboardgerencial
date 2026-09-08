@@ -41,8 +41,8 @@ function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYe
     return () => { active = false; };
   }, [year, month]);
 
-  const total72 = data.filter(d => d.code.startsWith('72')).reduce((acc, curr) => acc + curr.valor, 0);
-  const total73 = data.filter(d => d.code.startsWith('73')).reduce((acc, curr) => acc + curr.valor, 0);
+  const total72 = data.filter(d => d.code.startsWith('72')).reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+  const total73 = data.filter(d => d.code.startsWith('73')).reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
   const total = total72 + total73;
 
   const handlePrint = () => {
@@ -53,7 +53,7 @@ function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYe
     const lastDayOfMonth = new Date(year, month, 0).getDate();
     const fechaElaboracion = `${year}-${String(month).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
     
-    const valorMP = cierreCostos?.controlCierre?.depurado || 0;
+    const valorMP = Number(cierreCostos?.controlCierre?.depurado) || 0;
     const fmtNumOnly = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     
     // Sum of all 72, 73 + MP
@@ -81,7 +81,7 @@ function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYe
           <td class="left"></td>
           <td class="left">${d.concept}</td>
           <td class="right">0.00</td>
-          <td class="right">${fmtNumOnly.format(d.valor)}</td>
+          <td class="right">${fmtNumOnly.format(Number(d.valor) || 0)}</td>
         </tr>
       `;
     });
