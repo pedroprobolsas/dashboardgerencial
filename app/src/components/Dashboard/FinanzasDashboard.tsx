@@ -7,6 +7,7 @@ const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'CO
 const CLASES = {
   1: 'Activos',
   2: 'Pasivos',
+  4: 'Ingresos',
   5: 'Gastos',
   6: 'Costos de Venta'
 };
@@ -62,15 +63,16 @@ export default function FinanzasDashboard() {
         const [y, m] = fecha.split('-');
         const primerDia = `${y}-${m.padStart(2, '0')}-01`;
         
-        const promesas = [1, 2, 5, 6].map(clase => fetchSaldosContablesDetalle(clase, primerDia));
+        const promesas = [1, 2, 4, 5, 6].map(clase => fetchSaldosContablesDetalle(clase, primerDia));
         const resultados = await Promise.all(promesas);
         
         if (!ignore) {
           setDetallesClases({
             1: resultados[0],
             2: resultados[1],
-            5: resultados[2],
-            6: resultados[3]
+            4: resultados[2],
+            5: resultados[3],
+            6: resultados[4]
           });
         }
       } catch (e) {
@@ -98,6 +100,7 @@ export default function FinanzasDashboard() {
 
   const activosActual = getValorClase(dataActual, 1);
   const pasivosActual = getValorClase(dataActual, 2);
+  const ingresosActual = getValorClase(dataActual, 4);
   const gastosActual = getValorClase(dataActual, 5);
   const costosActual = getValorClase(dataActual, 6);
   const patrimonioActual = activosActual + pasivosActual;
@@ -118,6 +121,7 @@ export default function FinanzasDashboard() {
 
   const activosAnterior = getValorClase(dataAnterior, 1);
   const pasivosAnterior = getValorClase(dataAnterior, 2);
+  const ingresosAnterior = getValorClase(dataAnterior, 4);
 
   const evolucionPatrimonio = useMemo(() => {
     const [y, m] = fecha.split('-').map(Number);
@@ -223,8 +227,8 @@ export default function FinanzasDashboard() {
            </div>
         ) : (
           <>
-            {/* 5 Metric Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {/* 6 Metric Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <MetricCard 
                 title="Activos" 
                 value={activosActual} 
@@ -234,6 +238,11 @@ export default function FinanzasDashboard() {
                 title="Pasivos" 
                 value={pasivosActual} 
                 subtext={renderFlecha(pasivosActual, pasivosAnterior, true)} 
+              />
+              <MetricCard 
+                title="Ingresos" 
+                value={ingresosActual} 
+                subtext={renderFlecha(ingresosActual, ingresosAnterior, false)} 
               />
               <MetricCard 
                 title="Gastos del Mes" 
@@ -252,10 +261,10 @@ export default function FinanzasDashboard() {
               />
             </div>
 
-            {/* Patrimonio Neto */}
+            {/* Patrimonio Neto / Utilidad Neta */}
             <div className="bg-white rounded-2xl border-l-4 border-l-probolsas-cyan border-y border-r border-slate-200 p-5 shadow-sm flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Patrimonio Neto (Activos - Pasivos)</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Patrimonio Neto / Utilidad Neta (Activos - Pasivos)</p>
                 <p className="text-2xl font-bold text-slate-800">{fmtCOP.format(patrimonioActual)}</p>
               </div>
               
@@ -276,9 +285,9 @@ export default function FinanzasDashboard() {
               </div>
             </div>
 
-            {/* Detalle por rubro: 4 Tablas Paralelas (Grid 2x2) */}
+            {/* Detalle por rubro: 5 Tablas Paralelas */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
-              {[1, 2, 5, 6].map((claseNum) => {
+              {[1, 2, 4, 5, 6].map((claseNum) => {
                 const title = CLASES[claseNum as keyof typeof CLASES];
                 const valorTotal = getValorClase(dataActual, claseNum);
                 const cuentas = detallesClases[claseNum] || [];
