@@ -15,6 +15,7 @@ import AnalisisMateriales from './components/Produccion/AnalisisMateriales';
 import MovimientoMateriales from './components/Inventario/MovimientoMateriales';
 import KpiIncentivos from './components/Analisis/KpiIncentivos';
 import ConfiguracionMetas from './components/Gerencia/ConfiguracionMetas';
+import EstadoDatos from './components/Gerencia/EstadoDatos';
 import Usuarios from './components/Gerencia/Usuarios';
 import Login from './components/Auth/Login';
 import { AuthContext } from './components/Auth/AuthContext';
@@ -736,6 +737,7 @@ export default function App() {
       {vistaActual === 'movimiento-materiales'    && <MovimientoMateriales />}
       {vistaActual === 'kpi-incentivos'           && <KpiIncentivos />}
       {vistaActual === 'configuracion'            && <ConfiguracionMetas />}
+      {vistaActual === 'estado-datos'             && <EstadoDatos />}
       {vistaActual === 'usuarios'                 && <Usuarios />}
     </Layout>
     </AuthContext.Provider>

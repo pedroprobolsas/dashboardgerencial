@@ -7,6 +7,8 @@ export type Vista =
   | 'cierre-ventas'
   | 'cierre-finanzas'
   | 'cierre-produccion'
+  | 'cierre-finanzas'
+  | 'cierre-produccion'
   | 'cierre-cartera'
   | 'cierre-talento-humano'
   | 'bandeja-aprobacion'
@@ -17,6 +19,7 @@ export type Vista =
   | 'finanzas-dashboard'
   | 'kpi-incentivos'
   | 'configuracion'
+  | 'estado-datos'
   | 'usuarios';
 
 interface Props {
@@ -74,6 +77,7 @@ export default function Sidebar({ vistaActual, onNavegar, pendientesAprobacion }
       items: [
         { id: 'bandeja-aprobacion', etiqueta: 'Aprobaciones', icono: '📋', badge: pendientesAprobacion },
         { id: 'configuracion', etiqueta: 'Configuración', icono: '⚙️' },
+        { id: 'estado-datos', etiqueta: 'Estado de Datos', icono: '📡' },
         ...(user?.rol === 'admin' ? [{ id: 'usuarios' as Vista, etiqueta: 'Usuarios', icono: '🔐' }] : []),
       ]
     }

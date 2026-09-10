@@ -30,6 +30,7 @@ const tarjetasDashboardRouter = require('./routes/tarjetasDashboard');
 const movimientosMaterialesRouter = require('./routes/movimientosMateriales');
 const kpiIncentivosRouter  = require('./routes/kpiIncentivos');
 const saldosContablesRouter = require('./routes/saldosContables');
+const dataStatusRouter     = require('./routes/dataStatus');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -156,6 +157,7 @@ app.use('/api/tarjetas_dashboard', tarjetasDashboardRouter);
 app.use('/api/usuarios',          usuariosRouter);
 app.use('/api/kpi-incentivos',    kpiIncentivosRouter);
 app.use('/api/saldos-contables',  saldosContablesRouter);
+app.use('/api/data-status',       dataStatusRouter);
 
 // ── Error handler global ──────────────────────────────────────────────────────
 
