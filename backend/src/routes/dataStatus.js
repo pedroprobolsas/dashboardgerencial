@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../dbClient');
-const asyncHandler = require('../middleware/asyncHandler');
+const asyncHandler = require('../asyncHandler');
 
 router.get('/', asyncHandler(async (req, res) => {
   const query = `
