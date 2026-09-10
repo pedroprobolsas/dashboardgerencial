@@ -5,7 +5,7 @@ const router = express.Router();
 const db = require('../dbClient');
 const asyncHandler = require('../asyncHandler');
 
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', asyncHandler('/api/data-status', async (req, res) => {
   const query = `
     SELECT 
       pipeline_id as id,
