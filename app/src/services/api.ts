@@ -286,7 +286,7 @@ export async function fetchHistorialParametros(): Promise<Parametro[]> {
   return data.historico || [];
 }
 
-export async function updateParametro(clave: string, valor: number): Promise<void> {
+export async function updateParametro(clave: string, valor: number, motivo?: string): Promise<void> {
   const res = await fetch('/api/parametros', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
