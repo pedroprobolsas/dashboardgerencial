@@ -1,0 +1,13 @@
+{
+  "name": "probolsas-host-agent",
+  "version": "1.0.0",
+  "description": "Host Agent para ejecución de pipelines en VPS",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "yaml": "^2.4.1"
+  }
+}
