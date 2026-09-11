@@ -18,7 +18,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
   
   if (fecha) {
     sql = `
-      SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, vigente_hasta, modificado_por, modificado_en
+      SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, vigente_hasta, modificado_por, modificado_en, motivo
       FROM app_ops.parametros
       WHERE vigente_desde <= $1::date 
         AND (vigente_hasta IS NULL OR vigente_hasta > $1::date)
@@ -26,7 +26,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     params.push(fecha);
   } else {
     sql = `
-      SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por, modificado_en
+      SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por, modificado_en, motivo
       FROM app_ops.parametros
       WHERE vigente_hasta IS NULL
     `;
@@ -41,7 +41,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       descripcion: row.descripcion,
       categoria: row.categoria,
       vigente_desde: row.vigente_desde,
-      modificado_por: row.modificado_por
+      modificado_por: row.modificado_por,
+      motivo: row.motivo
     };
     return acc;
   }, {});
@@ -53,7 +54,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
 // Returns all parameters including closed ones
 router.get('/historico', asyncHandler(ENDPOINT + '/historico', async (req, res) => {
   const sql = `
-    SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, vigente_hasta, modificado_por, modificado_en
+    SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, vigente_hasta, modificado_por, modificado_en, motivo
     FROM app_ops.parametros
     ORDER BY categoria, clave, vigente_desde DESC
   `;
@@ -65,7 +66,7 @@ router.get('/historico', asyncHandler(ENDPOINT + '/historico', async (req, res) 
 // POST /api/parametros
 // Update a parameter by closing the current one and inserting a new one
 router.post('/', requireRole('admin'), asyncHandler(ENDPOINT, async (req, res) => {
-  const { clave, valor } = req.body;
+  const { clave, valor, motivo } = req.body;
   const modificado_por = req.user.email;
   
   if (!clave || valor === undefined || valor === null) {
@@ -99,9 +100,9 @@ router.post('/', requireRole('admin'), asyncHandler(ENDPOINT, async (req, res) =
     
     // Insert new
     await client.query(
-      `INSERT INTO app_ops.parametros (clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6)`,
-      [current.clave, valor, current.unidad, current.descripcion, current.categoria, modificado_por]
+      `INSERT INTO app_ops.parametros (clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por, motivo)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6, $7)`,
+      [current.clave, valor, current.unidad, current.descripcion, current.categoria, modificado_por, motivo || null]
     );
     
     await client.query('COMMIT');

@@ -16,6 +16,7 @@ export default function ConfiguracionMetas() {
   
   const [editando, setEditando] = useState<string | null>(null);
   const [editValor, setEditValor] = useState('');
+  const [editMotivo, setEditMotivo] = useState('');
   const [guardando, setGuardando] = useState(false);
   
   const [claveHistorial, setClaveHistorial] = useState<string | null>(null);
@@ -42,10 +43,10 @@ export default function ConfiguracionMetas() {
   }
 
   async function handleGuardar(clave: string) {
-    if (!editValor || isNaN(Number(editValor))) return;
+    if (!editValor || isNaN(Number(editValor)) || !editMotivo.trim()) return;
     setGuardando(true);
     try {
-      await updateParametro(clave, Number(editValor));
+      await updateParametro(clave, Number(editValor), editMotivo);
       await cargarDatos();
       setEditando(null);
     } catch (err: any) {
@@ -116,31 +117,41 @@ export default function ConfiguracionMetas() {
 
                     <div className="flex items-center gap-4 shrink-0">
                       {editando === param.clave ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                          <div className="flex items-center justify-end gap-2">
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={editValor}
+                              onChange={e => setEditValor(e.target.value)}
+                              className="w-24 text-right px-3 py-1.5 border border-slate-300 rounded-md focus:outline-none focus:border-indigo-500"
+                              autoFocus
+                            />
+                            <span className="text-slate-500 font-medium">{param.unidad}</span>
+                          </div>
                           <input
-                            type="number"
-                            step="0.1"
-                            value={editValor}
-                            onChange={e => setEditValor(e.target.value)}
-                            className="w-24 text-right px-3 py-1.5 border border-probolsas-cyan rounded-lg focus:outline-none focus:ring-2 focus:ring-probolsas-cyan/30"
-                            autoFocus
-                            onKeyDown={e => e.key === 'Enter' && handleGuardar(param.clave!)}
+                            type="text"
+                            placeholder="Motivo del cambio (obligatorio)"
+                            value={editMotivo}
+                            onChange={e => setEditMotivo(e.target.value)}
+                            className="w-full sm:w-64 px-3 py-1.5 text-sm border border-slate-300 rounded-md focus:outline-none focus:border-indigo-500 bg-slate-50"
                           />
-                          <span className="text-slate-500 font-medium">{param.unidad}</span>
-                          <button 
-                            onClick={() => handleGuardar(param.clave!)}
-                            disabled={guardando}
-                            className="ml-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
-                          >
-                            ✓
-                          </button>
-                          <button 
-                            onClick={() => setEditando(null)}
-                            disabled={guardando}
-                            className="text-slate-400 hover:text-slate-600 px-2 text-xl"
-                          >
-                            ×
-                          </button>
+                          <div className="flex justify-end gap-2 mt-1">
+                            <button 
+                              onClick={() => setEditando(null)}
+                              disabled={guardando}
+                              className="text-slate-500 hover:text-slate-700 px-3 py-1.5 text-sm font-medium"
+                            >
+                              Cancelar
+                            </button>
+                            <button 
+                              onClick={() => handleGuardar(param.clave!)}
+                              disabled={guardando || !editMotivo.trim()}
+                              className="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-1.5 rounded-md text-sm font-semibold transition-colors disabled:opacity-50"
+                            >
+                              Guardar
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <div className="flex items-center gap-4">
@@ -153,6 +164,7 @@ export default function ConfiguracionMetas() {
                               <button
                                 onClick={() => {
                                   setEditValor(String(param.valor));
+                                  setEditMotivo('');
                                   setEditando(param.clave!);
                                 }}
                                 className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-md font-semibold transition-colors"
@@ -187,6 +199,7 @@ export default function ConfiguracionMetas() {
                                   {new Date(h.vigente_desde).toLocaleDateString('es-CO')} - {h.vigente_hasta ? new Date(h.vigente_hasta).toLocaleDateString('es-CO') : 'Actualidad'}
                                 </span>
                                 <span className="text-[10px] text-slate-400">Por: {h.modificado_por}</span>
+                                {h.motivo && <span className="text-[11px] text-slate-500 font-medium mt-1">Motivo: {h.motivo}</span>}
                               </div>
                             </div>
                             {!h.vigente_hasta && <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full uppercase tracking-wider">Vigente</span>}

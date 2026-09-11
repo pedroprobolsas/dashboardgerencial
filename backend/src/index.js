@@ -134,6 +134,33 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/auth',              authRouter);
 app.use('/api/setup',             setupRouter);
 
+// Webhooks internos (bypassean auth de usuario)
+const requireInternalToken = (req, res, next) => {
+  const authHeader = req.headers?.authorization;
+  const hostAgentToken = process.env.HOST_AGENT_TOKEN;
+  if (authHeader && hostAgentToken && authHeader === `Bearer ${hostAgentToken}`) {
+    return next();
+  }
+  return res.status(403).json({ error: 'Token interno inválido' });
+};
+
+const webhookRouter = express.Router();
+const db = require('./dbClient');
+webhookRouter.post('/heartbeat/:lock_id', requireInternalToken, async (req, res) => {
+  try {
+    const { lock_id } = req.params;
+    await db.query(`
+      UPDATE app_ops.pipeline_locks 
+      SET last_heartbeat_at = NOW() 
+      WHERE pipeline_id = $1 AND status = 'in_progress'
+    `, [lock_id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.use('/api/data-status', webhookRouter);
+
 // Proteger el resto de las rutas
 const { requireAuth } = require('./middleware/auth');
 app.use('/api', requireAuth);

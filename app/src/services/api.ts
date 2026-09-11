@@ -263,6 +263,7 @@ export interface Parametro {
   vigente_desde: string;
   vigente_hasta?: string;
   modificado_por: string;
+  motivo?: string;
   modificado_en?: string;
   clave?: string;
   id?: number;
@@ -289,7 +290,7 @@ export async function updateParametro(clave: string, valor: number): Promise<voi
   const res = await fetch('/api/parametros', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ clave, valor }),
+    body: JSON.stringify({ clave, valor, motivo }),
   });
   checkAuthError(res);
   if (!res.ok) {

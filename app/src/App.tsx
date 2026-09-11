@@ -12,7 +12,7 @@ import BandejaAprobacion from './components/Aprobaciones/BandejaAprobacion';
 import CostoProduccionDetalle from './components/Produccion/CostoProduccionDetalle';
 import AnalisisResponsables from './components/Produccion/AnalisisResponsables';
 import AnalisisMateriales from './components/Produccion/AnalisisMateriales';
-import MovimientoMateriales from './components/Inventario/MovimientoMateriales';
+import CierreCosto from './components/Inventario/CierreCosto';
 import KpiIncentivos from './components/Analisis/KpiIncentivos';
 import ConfiguracionMetas from './components/Gerencia/ConfiguracionMetas';
 import EstadoDatos from './components/Gerencia/EstadoDatos';
@@ -734,7 +734,7 @@ export default function App() {
       {vistaActual === 'costo-produccion-detalle' && <CostoProduccionDetalle />}
       {vistaActual === 'analisis-responsables'    && <AnalisisResponsables />}
       {vistaActual === 'analisis-materiales'      && <AnalisisMateriales />}
-      {vistaActual === 'movimiento-materiales'    && <MovimientoMateriales />}
+      {vistaActual === 'cierre-costo'             && <CierreCosto />}
       {vistaActual === 'kpi-incentivos'           && <KpiIncentivos />}
       {vistaActual === 'configuracion'            && <ConfiguracionMetas />}
       {vistaActual === 'estado-datos'             && <EstadoDatos />}

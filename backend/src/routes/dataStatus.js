@@ -177,20 +177,6 @@ router.post('/retry/:pipeline', requireRole('admin'), asyncHandler('/api/data-st
 }));
 
 // POST /heartbeat/:lock_id
-router.post('/heartbeat/:lock_id', asyncHandler('/api/data-status/heartbeat', async (req, res) => {
-  // Validamos is_agent ya que en auth.js le inyectamos req.user.is_agent = true si usa el token correcto
-  if (!req.user || !req.user.is_agent) {
-    return res.status(403).json({ error: 'Solo el Host Agent puede enviar heartbeats' });
-  }
-
-  const { lock_id } = req.params;
-  await db.query(`
-    UPDATE app_ops.pipeline_locks 
-    SET last_heartbeat_at = NOW() 
-    WHERE pipeline_id = $1 AND status = 'in_progress'
-  `, [lock_id]);
-  
-  res.json({ ok: true });
-}));
+// Se movió a index.js para bypassear requireAuth de forma segura.
 
 module.exports = router;

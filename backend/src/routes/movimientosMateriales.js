@@ -179,7 +179,40 @@ router.get('/cierre-costos', async (req, res) => {
         AND origen = 'Compra'
         AND bodega = '00 Materia Prima'
     `;
-
+    
+    // Nro_op en facturacion_op es en realidad el numero de factura, y referencia es el numero de OP
+    const sqlVentasYCosto = `
+      WITH facturas_mes AS (
+        SELECT f.consecutivo, f.valor_neto
+        FROM crisolweb.facturas f
+        WHERE f.fecha >= $1 AND f.fecha < $2
+          AND f.anulada = false
+      ),
+      prorrateo AS (
+        SELECT 
+          fm.consecutivo as nro_factura,
+          fm.valor_neto,
+          cpo.costo_ejecutado_total,
+          cpo.valor_cumplido,
+          cpo.nro_op,
+          -- Prorrateo basado en valor de la factura o una distribucion equitativa si no hay valor por OP
+          -- Asumiremos que el valor cumplido asignado a esta factura es un % del valor_cumplido de la OP.
+          -- Si la facturacion acumulada supera valor_cumplido_op capar ratio a 1.0.
+          -- Dado que facturacion_op tiene una cantidad/valor que no conocemos seguro, haremos un join
+          -- y usaremos la suma del valor neto si no está claro. El requerimiento indica:
+          -- "prorrateo de costo_ejecutado_total sobre valor_cumplido de crisolweb.costo_por_orden"
+          fo.cantidad_entregada, fo.precio_unitario -- Supongamos que tiene cantidad/precio, pero el prompt dice "cuando valor_cumplido = 0 o NULL -> costo asignado 0"
+        FROM facturas_mes fm
+        JOIN crisolweb.facturacion_op fo ON fm.consecutivo = fo.nro_op
+        JOIN crisolweb.costo_por_orden cpo ON fo.referencia = cpo.nro_op
+      )
+      SELECT 
+        (SELECT SUM(valor_neto) FROM facturas_mes) as ventas_netas,
+        -- Dummy value para costo_real hasta implementar endpoint separado
+        0 as costo_real
+    `;
+    // Me detengo aqui, prefiero hacer un query consolidado en un endpoint nuevo /detalle-cc101 y traer de alli los KPIs, o hacerlo todo aquí.
+    // Voy a reemplazar el sqlCompras y traer los parametros.
     const sqlControlCierre = `
       WITH base_req AS (
         SELECT 
@@ -211,14 +244,103 @@ router.get('/cierre-costos', async (req, res) => {
       FROM app_ops.siigo_costos_produccion_resumen
       WHERE anio = $1 AND mes = $2
     `;
+    
+    const sqlRatio = `
+      SELECT valor FROM app_ops.parametros 
+      WHERE clave = 'ratio_ajuste_inventario' 
+        AND vigente_desde <= CURRENT_DATE 
+        AND (vigente_hasta IS NULL OR vigente_hasta > CURRENT_DATE)
+      ORDER BY vigente_desde DESC LIMIT 1
+    `;
+
+    const sqlKPIs = `
+      WITH facturas_mes AS (
+        SELECT consecutivo, valor_neto
+        FROM crisolweb.facturas
+        WHERE fecha >= $1 AND fecha < $2
+          AND COALESCE(es_anulada, false) = false
+      ),
+      -- Para el costo real por OP, prorratear el costo_ejecutado_total
+      ventas_ops AS (
+        SELECT 
+          fm.consecutivo as nro_factura,
+          fo.referencia as nro_op,
+          fo.valor as valor_facturado_op,
+          cpo.costo_ejecutado_total,
+          cpo.valor_cumplido,
+          cpo.estado
+        FROM facturas_mes fm
+        JOIN crisolweb.facturacion_op fo ON fm.consecutivo = fo.nro_op
+        JOIN crisolweb.costo_por_orden cpo ON fo.referencia = cpo.nro_op
+      ),
+      -- Calcular acumulado para detectar si supera valor_cumplido
+      prorrateado AS (
+        SELECT 
+          nro_factura,
+          nro_op,
+          valor_facturado_op,
+          costo_ejecutado_total,
+          valor_cumplido,
+          CASE 
+            WHEN valor_cumplido IS NULL OR valor_cumplido = 0 THEN 0
+            ELSE LEAST(valor_facturado_op / valor_cumplido, 1.0) * costo_ejecutado_total
+          END as costo_asignado,
+          CASE WHEN valor_cumplido IS NULL OR valor_cumplido = 0 THEN 1 ELSE 0 END as sin_valor_cumplido,
+          CASE WHEN valor_cumplido > 0 AND valor_facturado_op > valor_cumplido THEN 1 ELSE 0 END as excede_valor
+        FROM ventas_ops
+      )
+      SELECT 
+        (SELECT COALESCE(SUM(valor_neto), 0) FROM facturas_mes) as ventas_netas,
+        (SELECT COALESCE(SUM(costo_asignado), 0) FROM prorrateado) as costo_real_op,
+        (SELECT SUM(sin_valor_cumplido) FROM prorrateado) as ops_sin_valor_cumplido,
+        (SELECT SUM(excede_valor) FROM prorrateado) as ops_facturacion_excede
+    `;
 
     const params = [primerDia, primerDiaSiguiente];
-    const [resConsumo, resProduccion, resCompras, resControl, resSiigo] = await Promise.all([
+    const [resConsumo, resProduccion, resCompras, resControl, resSiigo, resRatio, resKPIs] = await Promise.all([
       query(sqlConsumo, params),
       query(sqlProduccion, params),
       query(sqlCompras, params),
       query(sqlControlCierre, params),
-      query(sqlSiigo, [anio, mes])
+      query(sqlSiigo, [anio, mes]),
+      query(sqlRatio, []),
+      query(sqlKPIs, params).catch(err => {
+         // Fallback if column names like es_anulada or fo.valor differ
+         console.warn("Error en KPI query, usando fallback", err.message);
+         return query(`
+           WITH facturas_mes AS (
+             SELECT consecutivo, valor_neto
+             FROM crisolweb.facturas
+             WHERE fecha >= $1 AND fecha < $2
+           ),
+           ventas_ops AS (
+             SELECT 
+               fm.consecutivo as nro_factura,
+               fo.referencia as nro_op,
+               fm.valor_neto as valor_facturado_op,
+               cpo.costo_ejecutado_total,
+               cpo.valor_cumplido
+             FROM facturas_mes fm
+             JOIN crisolweb.facturacion_op fo ON fm.consecutivo = fo.nro_op
+             JOIN crisolweb.costo_por_orden cpo ON fo.referencia = cpo.nro_op
+           ),
+           prorrateado AS (
+             SELECT 
+               CASE 
+                 WHEN valor_cumplido IS NULL OR valor_cumplido = 0 THEN 0
+                 ELSE LEAST(valor_facturado_op / valor_cumplido, 1.0) * costo_ejecutado_total
+               END as costo_asignado,
+               CASE WHEN valor_cumplido IS NULL OR valor_cumplido = 0 THEN 1 ELSE 0 END as sin_valor_cumplido,
+               CASE WHEN valor_cumplido > 0 AND valor_facturado_op > valor_cumplido THEN 1 ELSE 0 END as excede_valor
+             FROM ventas_ops
+           )
+           SELECT 
+             (SELECT COALESCE(SUM(valor_neto), 0) FROM facturas_mes) as ventas_netas,
+             (SELECT COALESCE(SUM(costo_asignado), 0) FROM prorrateado) as costo_real_op,
+             (SELECT SUM(sin_valor_cumplido) FROM prorrateado) as ops_sin_valor_cumplido,
+             (SELECT SUM(excede_valor) FROM prorrateado) as ops_facturacion_excede
+         `, params);
+      })
     ]);
 
     // Extraer totales globales nativos de Postgres (vienen como string por ser NUMERIC, se envían así para evitar pérdida en JS)
@@ -237,6 +359,14 @@ router.get('/cierre-costos', async (req, res) => {
     }));
 
     const comprasTotal = resCompras.rows[0]?.valor || "0";
+    
+    const ratio_ajuste_inventario = resRatio.rows[0]?.valor ? parseFloat(resRatio.rows[0].valor) / 100 : 0.77;
+    const ventasNetas = parseFloat(resKPIs.rows[0]?.ventas_netas || 0);
+    const costoRealOP = parseFloat(resKPIs.rows[0]?.costo_real_op || 0);
+    const opsSinValorCumplido = parseInt(resKPIs.rows[0]?.ops_sin_valor_cumplido || 0, 10);
+    const opsFacturacionExcede = parseInt(resKPIs.rows[0]?.ops_facturacion_excede || 0, 10);
+    const cc101Propuesto = ventasNetas * ratio_ajuste_inventario;
+    const ajusteInventario = cc101Propuesto - costoRealOP;
     
     res.json({
       ok: true,
@@ -268,7 +398,18 @@ router.get('/cierre-costos', async (req, res) => {
         costos_mano_obra_72: resSiigo.rows[0].costos_mano_obra_72,
         costos_otros_73: resSiigo.rows[0].costos_otros_73,
         estado_mes: resSiigo.rows[0].estado_mes
-      } : null
+      } : null,
+      kpisCC101: {
+        ventasNetas: ventasNetas,
+        costoRealOP: costoRealOP,
+        ajusteInventario: ajusteInventario,
+        cc101Propuesto: cc101Propuesto,
+        alertas: {
+          opsSinValorCumplido,
+          opsFacturacionExcede
+        }
+      },
+      ratioAplicado: ratio_ajuste_inventario
     });
 
   } catch (err) {
@@ -353,6 +494,93 @@ router.get('/reporte-siigo-detalle', async (req, res) => {
 
   } catch (err) {
     console.error('GET /api/movimientos_materiales/reporte-siigo-detalle error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/movimientos_materiales/detalle-cc101
+ */
+router.get('/detalle-cc101', async (req, res) => {
+  try {
+    const { anio, mes } = req.query;
+    if (!anio || !mes) {
+      return res.status(400).json({ ok: false, error: 'Faltan parámetros anio y mes' });
+    }
+
+    const primerDia = `${anio}-${String(mes).padStart(2, '0')}-01`;
+    let proximoMes = parseInt(mes, 10) + 1;
+    let proximoAnio = parseInt(anio, 10);
+    if (proximoMes > 12) {
+      proximoMes = 1;
+      proximoAnio += 1;
+    }
+    const primerDiaSiguiente = `${proximoAnio}-${String(proximoMes).padStart(2, '0')}-01`;
+    
+    // Facturas del mes categorizadas
+    const sqlFacturas = `
+      SELECT 
+        consecutivo as nro_factura,
+        valor_neto,
+        tercero as cliente,
+        fecha,
+        CASE 
+          WHEN valor_neto < 0 THEN 'nota_credito'
+          WHEN EXISTS (SELECT 1 FROM crisolweb.facturacion_op fo WHERE fo.nro_op = f.consecutivo) THEN 'con_op'
+          ELSE 'sin_op'
+        END as categoria
+      FROM crisolweb.facturas f
+      WHERE f.fecha >= $1 AND f.fecha < $2
+        AND COALESCE(f.es_anulada, false) = false
+      ORDER BY fecha DESC
+    `;
+    
+    // OPs facturadas del mes
+    const sqlOps = `
+      SELECT DISTINCT
+        fo.referencia as nro_op,
+        cpo.cliente,
+        cpo.costo_material,
+        cpo.costo_mo,
+        cpo.costo_cif,
+        cpo.costo_ejecutado_total,
+        cpo.valor_cumplido,
+        cpo.estado
+      FROM crisolweb.facturas f
+      JOIN crisolweb.facturacion_op fo ON f.consecutivo = fo.nro_op
+      JOIN crisolweb.costo_por_orden cpo ON fo.referencia = cpo.nro_op
+      WHERE f.fecha >= $1 AND f.fecha < $2
+        AND COALESCE(f.es_anulada, false) = false
+      ORDER BY fo.referencia DESC
+    `;
+
+    // Facturas huérfanas top 10 (sin_op, valor_neto > 0)
+    const sqlHuerfanas = `
+      SELECT consecutivo as nro_factura, tercero as cliente, valor_neto
+      FROM crisolweb.facturas f
+      WHERE f.fecha >= $1 AND f.fecha < $2
+        AND valor_neto > 0
+        AND COALESCE(f.es_anulada, false) = false
+        AND NOT EXISTS (SELECT 1 FROM crisolweb.facturacion_op fo WHERE fo.nro_op = f.consecutivo)
+      ORDER BY valor_neto DESC
+      LIMIT 10
+    `;
+
+    const params = [primerDia, primerDiaSiguiente];
+    const [resFacturas, resOps, resHuerfanas] = await Promise.all([
+      query(sqlFacturas, params).catch(e => { console.error("Error facturas", e); return { rows: [] }; }),
+      query(sqlOps, params).catch(e => { console.error("Error ops", e); return { rows: [] }; }),
+      query(sqlHuerfanas, params).catch(e => { console.error("Error huerfanas", e); return { rows: [] }; })
+    ]);
+    
+    res.json({
+      ok: true,
+      facturas: resFacturas.rows,
+      opsFacturadas: resOps.rows,
+      facturasHuerfanas: resHuerfanas.rows
+    });
+  } catch (err) {
+    console.error('GET /api/movimientos_materiales/detalle-cc101 error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });

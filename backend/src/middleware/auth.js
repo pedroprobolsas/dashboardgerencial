@@ -6,14 +6,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'probolsas_dev_secret_key_123';
  * Middleware para validar el token JWT desde la cookie httpOnly
  */
 function requireAuth(req, res, next) {
-  // Permitir token interno del Host Agent para webhooks/heartbeats
-  const authHeader = req.headers?.authorization;
-  const hostAgentToken = process.env.HOST_AGENT_TOKEN;
-  if (authHeader && hostAgentToken && authHeader === `Bearer ${hostAgentToken}`) {
-    req.user = { id: 0, nombre: 'Host Agent', rol: 'admin', is_agent: true };
-    return next();
-  }
-
   const token = req.cookies?.token;
   if (!token) {
     return res.status(401).json({ ok: false, error: 'No autenticado' });
