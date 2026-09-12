@@ -525,7 +525,7 @@ router.get('/detalle-cc101', async (req, res) => {
         END as categoria
       FROM crisolweb.facturas f
       WHERE EXTRACT(YEAR FROM f.fecha_creacion) = $1 AND EXTRACT(MONTH FROM f.fecha_creacion) = $2
-        AND COALESCE(f.es_anulada, false) = false
+        AND (f.estado IS NULL OR UPPER(TRIM(f.estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))
       ORDER BY f.fecha_creacion DESC
     `;
     
@@ -544,7 +544,7 @@ router.get('/detalle-cc101', async (req, res) => {
       JOIN crisolweb.facturacion_op fo ON f.consecutivo = fo.nro_op
       JOIN crisolweb.costo_por_orden cpo ON fo.referencia = cpo.nro_op
       WHERE EXTRACT(YEAR FROM f.fecha_creacion) = $1 AND EXTRACT(MONTH FROM f.fecha_creacion) = $2
-        AND COALESCE(f.es_anulada, false) = false
+        AND (f.estado IS NULL OR UPPER(TRIM(f.estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))
       ORDER BY fo.referencia DESC
     `;
 
@@ -554,7 +554,7 @@ router.get('/detalle-cc101', async (req, res) => {
       FROM crisolweb.facturas f
       WHERE EXTRACT(YEAR FROM f.fecha_creacion) = $1 AND EXTRACT(MONTH FROM f.fecha_creacion) = $2
         AND valor_neto > 0
-        AND COALESCE(f.es_anulada, false) = false
+        AND (f.estado IS NULL OR UPPER(TRIM(f.estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))
         AND NOT EXISTS (SELECT 1 FROM crisolweb.facturacion_op fo WHERE fo.nro_op = f.consecutivo)
       ORDER BY valor_neto DESC
       LIMIT 10
