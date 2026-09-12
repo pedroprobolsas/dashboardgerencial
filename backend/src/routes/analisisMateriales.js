@@ -35,38 +35,76 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
   // efecto_cantidad = (cant_cot - cant_ejec) * Pcot
   // efecto_precio = (Pcot - Preal) * cant_ejec
   
-  const sql = `
-    SELECT
-      d.nro_op,
-      d.referencia,
-      d.item AS material,
-      o.cantidad_cotizada AS op_cantidad_cotizada,
-      o.cantidad_ejecutada AS op_cantidad_ejecutada,
-      
-      ROUND(d.cant_cotizada, 4) AS cant_cotizada,
-      ROUND(d.cant_ejecutada, 4) AS cant_ejecutada,
-      ROUND(d.valor_cotizado, 2) AS valor_cotizado,
-      ROUND(d.valor_ejecutado, 2) AS valor_ejecutado,
-      ROUND(d.cumplimiento, 2) AS cumplimiento,
-      
-      CASE 
-        WHEN d.cant_cotizada > 0 THEN ROUND(((d.cant_ejecutada - d.cant_cotizada) / d.cant_cotizada) * 100, 2) 
-        ELSE NULL 
-      END AS diferencia_cant_pct,
-      
-      ROUND(d.valor_cotizado / NULLIF(d.cant_cotizada, 0), 2) AS precio_cotizado,
-      ROUND(d.valor_ejecutado / NULLIF(d.cant_ejecutada, 0), 2) AS precio_real,
-      o.fecha
-      
-    FROM crisolweb.costo_por_orden_detalle d
-    JOIN crisolweb.costo_por_orden o ON d.nro_op = o.nro_op AND d.referencia = o.referencia
-    WHERE o.fecha >= $1::date
-      AND o.fecha <= $2::date
-      AND d.categoria = 'material'
-    ORDER BY d.nro_op DESC
-  `;
-
-  const { rows } = await query(sql, [fecha_inicio, fecha_fin]);
+  // First try with all columns, fallback without o.cantidad_cotizada/ejecutada if they don't exist
+  let rows;
+  try {
+    const sql = `
+      SELECT
+        d.nro_op,
+        d.referencia,
+        d.item AS material,
+        o.cantidad_cotizada AS op_cantidad_cotizada,
+        o.cantidad_ejecutada AS op_cantidad_ejecutada,
+        
+        ROUND(d.cant_cotizada, 4) AS cant_cotizada,
+        ROUND(d.cant_ejecutada, 4) AS cant_ejecutada,
+        ROUND(d.valor_cotizado, 2) AS valor_cotizado,
+        ROUND(d.valor_ejecutado, 2) AS valor_ejecutado,
+        ROUND(d.cumplimiento, 2) AS cumplimiento,
+        
+        CASE 
+          WHEN d.cant_cotizada > 0 THEN ROUND(((d.cant_ejecutada - d.cant_cotizada) / d.cant_cotizada) * 100, 2) 
+          ELSE NULL 
+        END AS diferencia_cant_pct,
+        
+        ROUND(d.valor_cotizado / NULLIF(d.cant_cotizada, 0), 2) AS precio_cotizado,
+        ROUND(d.valor_ejecutado / NULLIF(d.cant_ejecutada, 0), 2) AS precio_real,
+        o.fecha
+        
+      FROM crisolweb.costo_por_orden_detalle d
+      JOIN crisolweb.costo_por_orden o ON d.nro_op = o.nro_op AND d.referencia = o.referencia
+      WHERE o.fecha >= $1::date
+        AND o.fecha <= $2::date
+        AND d.categoria = 'material'
+      ORDER BY d.nro_op DESC
+    `;
+    const result = await query(sql, [fecha_inicio, fecha_fin]);
+    rows = result.rows;
+  } catch (err1) {
+    logger.info(ENDPOINT, `Primary query failed (${err1.message}), trying fallback without cantidad_cotizada/ejecutada`);
+    const sqlFallback = `
+      SELECT
+        d.nro_op,
+        d.referencia,
+        d.item AS material,
+        NULL AS op_cantidad_cotizada,
+        NULL AS op_cantidad_ejecutada,
+        
+        ROUND(d.cant_cotizada, 4) AS cant_cotizada,
+        ROUND(d.cant_ejecutada, 4) AS cant_ejecutada,
+        ROUND(d.valor_cotizado, 2) AS valor_cotizado,
+        ROUND(d.valor_ejecutado, 2) AS valor_ejecutado,
+        ROUND(d.cumplimiento, 2) AS cumplimiento,
+        
+        CASE 
+          WHEN d.cant_cotizada > 0 THEN ROUND(((d.cant_ejecutada - d.cant_cotizada) / d.cant_cotizada) * 100, 2) 
+          ELSE NULL 
+        END AS diferencia_cant_pct,
+        
+        ROUND(d.valor_cotizado / NULLIF(d.cant_cotizada, 0), 2) AS precio_cotizado,
+        ROUND(d.valor_ejecutado / NULLIF(d.cant_ejecutada, 0), 2) AS precio_real,
+        o.fecha
+        
+      FROM crisolweb.costo_por_orden_detalle d
+      JOIN crisolweb.costo_por_orden o ON d.nro_op = o.nro_op AND d.referencia = o.referencia
+      WHERE o.fecha >= $1::date
+        AND o.fecha <= $2::date
+        AND d.categoria = 'material'
+      ORDER BY d.nro_op DESC
+    `;
+    const result = await query(sqlFallback, [fecha_inicio, fecha_fin]);
+    rows = result.rows;
+  }
 
   const { calcularEfectosMaterial } = require('../utils/materialesLogic');
   const procesado = rows.map(r => {

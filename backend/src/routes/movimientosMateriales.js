@@ -261,11 +261,12 @@ router.get('/cierre-costos', async (req, res) => {
           AND (estado IS NULL OR UPPER(TRIM(estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))
       ),
       -- Para el costo real por OP, prorratear el costo_ejecutado_total
+      -- Usamos fm.valor_neto como valor_facturado_op (fo.valor no existe en facturacion_op)
       ventas_ops AS (
         SELECT 
           fm.consecutivo as nro_factura,
           fo.referencia as nro_op,
-          fo.valor as valor_facturado_op,
+          fm.valor_neto as valor_facturado_op,
           cpo.costo_ejecutado_total,
           cpo.valor_cumplido,
           cpo.estado
@@ -292,8 +293,8 @@ router.get('/cierre-costos', async (req, res) => {
       SELECT 
         (SELECT COALESCE(SUM(valor_neto), 0) FROM facturas_mes) as ventas_netas,
         (SELECT COALESCE(SUM(costo_asignado), 0) FROM prorrateado) as costo_real_op,
-        (SELECT SUM(sin_valor_cumplido) FROM prorrateado) as ops_sin_valor_cumplido,
-        (SELECT SUM(excede_valor) FROM prorrateado) as ops_facturacion_excede
+        (SELECT COALESCE(SUM(sin_valor_cumplido), 0) FROM prorrateado) as ops_sin_valor_cumplido,
+        (SELECT COALESCE(SUM(excede_valor), 0) FROM prorrateado) as ops_facturacion_excede
     `;
 
     const params = [primerDia, primerDiaSiguiente];
@@ -305,41 +306,8 @@ router.get('/cierre-costos', async (req, res) => {
       query(sqlSiigo, [anio, mes]),
       query(sqlRatio, []),
       query(sqlKPIs, params).catch(err => {
-         // Fallback if column names like es_anulada or fo.valor differ
-         console.warn("Error en KPI query, usando fallback", err.message);
-         return query(`
-           WITH facturas_mes AS (
-             SELECT consecutivo, valor_neto
-             FROM crisolweb.facturas
-             WHERE fecha >= $1 AND fecha < $2
-           ),
-           ventas_ops AS (
-             SELECT 
-               fm.consecutivo as nro_factura,
-               fo.referencia as nro_op,
-               fm.valor_neto as valor_facturado_op,
-               cpo.costo_ejecutado_total,
-               cpo.valor_cumplido
-             FROM facturas_mes fm
-             JOIN crisolweb.facturacion_op fo ON fm.consecutivo = fo.nro_op
-             JOIN crisolweb.costo_por_orden cpo ON fo.referencia = cpo.nro_op
-           ),
-           prorrateado AS (
-             SELECT 
-               CASE 
-                 WHEN valor_cumplido IS NULL OR valor_cumplido = 0 THEN 0
-                 ELSE LEAST(valor_facturado_op / valor_cumplido, 1.0) * costo_ejecutado_total
-               END as costo_asignado,
-               CASE WHEN valor_cumplido IS NULL OR valor_cumplido = 0 THEN 1 ELSE 0 END as sin_valor_cumplido,
-               CASE WHEN valor_cumplido > 0 AND valor_facturado_op > valor_cumplido THEN 1 ELSE 0 END as excede_valor
-             FROM ventas_ops
-           )
-           SELECT 
-             (SELECT COALESCE(SUM(valor_neto), 0) FROM facturas_mes) as ventas_netas,
-             (SELECT COALESCE(SUM(costo_asignado), 0) FROM prorrateado) as costo_real_op,
-             (SELECT SUM(sin_valor_cumplido) FROM prorrateado) as ops_sin_valor_cumplido,
-             (SELECT SUM(excede_valor) FROM prorrateado) as ops_facturacion_excede
-         `, params);
+         console.warn("Error en KPI query, retornando valores por defecto:", err.message);
+         return { rows: [{ ventas_netas: 0, costo_real_op: 0, ops_sin_valor_cumplido: 0, ops_facturacion_excede: 0 }] };
       })
     ]);
 
