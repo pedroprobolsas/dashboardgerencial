@@ -68,6 +68,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
 
   const { rows } = await query(sql, [fecha_inicio, fecha_fin]);
 
+  const { calcularEfectosMaterial } = require('../utils/materialesLogic');
   const procesado = rows.map(r => {
     const pCot = parseFloat(r.precio_cotizado);
     const pReal = parseFloat(r.precio_real);
@@ -76,8 +77,6 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     const valCot = parseFloat(r.valor_cotizado) || 0;
     const valEjec = parseFloat(r.valor_ejecutado) || 0;
     const cump = parseFloat(r.cumplimiento) || 0;
-
-    const { calcularEfectosMaterial } = require('../utils/materialesLogic');
     
     const efectos = calcularEfectosMaterial({
       cantCot: cantCot,
