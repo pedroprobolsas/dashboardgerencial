@@ -268,8 +268,7 @@ router.get('/cierre-costos', async (req, res) => {
           fo.referencia as nro_op,
           fm.valor_neto as valor_facturado_op,
           cpo.costo_ejecutado_total,
-          cpo.valor_cumplido,
-          cpo.estado
+          cpo.valor_cumplido
         FROM facturas_mes fm
         JOIN crisolweb.facturacion_op fo ON fm.consecutivo = fo.nro_op
         JOIN crisolweb.costo_por_orden cpo ON fo.referencia = cpo.nro_op
@@ -502,12 +501,10 @@ router.get('/detalle-cc101', async (req, res) => {
       SELECT DISTINCT
         fo.referencia as nro_op,
         cpo.cliente,
-        cpo.costo_material,
-        cpo.costo_mo,
-        cpo.costo_cif,
+        cpo.costo_total_estimado,
         cpo.costo_ejecutado_total,
         cpo.valor_cumplido,
-        cpo.estado
+        cpo.margen_pct
       FROM crisolweb.facturas f
       JOIN crisolweb.facturacion_op fo ON f.consecutivo = fo.nro_op
       JOIN crisolweb.costo_por_orden cpo ON fo.referencia = cpo.nro_op

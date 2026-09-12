@@ -498,27 +498,22 @@ function DetalleCC101({ year, month }: { year: number, month: number }) {
               <tr>
                 <th className="px-4 py-2">OP</th>
                 <th className="px-4 py-2">Cliente</th>
-                <th className="px-4 py-2 text-right">Costo Material</th>
-                <th className="px-4 py-2 text-right">Costo MO</th>
-                <th className="px-4 py-2 text-right">Costo CIF</th>
+                <th className="px-4 py-2 text-right">Costo Estimado</th>
                 <th className="px-4 py-2 text-right">Costo Ejecutado Total</th>
                 <th className="px-4 py-2 text-right">Valor Cumplido</th>
-                <th className="px-4 py-2 text-right">% Avance</th>
+                <th className="px-4 py-2 text-right">Margen %</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {data.opsFacturadas.map((op: any, i: number) => {
-                const avance = op.costo_ejecutado_total > 0 ? (op.valor_cumplido / op.costo_ejecutado_total) * 100 : 0;
                 return (
                   <tr key={i} className="hover:bg-slate-50">
                     <td className="px-4 py-2 font-medium">{op.nro_op}</td>
                     <td className="px-4 py-2 truncate max-w-[150px]" title={op.cliente}>{op.cliente}</td>
-                    <td className="px-4 py-2 text-right">{fmtCOP.format(op.costo_material)}</td>
-                    <td className="px-4 py-2 text-right">{fmtCOP.format(op.costo_mo)}</td>
-                    <td className="px-4 py-2 text-right">{fmtCOP.format(op.costo_cif)}</td>
+                    <td className="px-4 py-2 text-right">{fmtCOP.format(op.costo_total_estimado)}</td>
                     <td className="px-4 py-2 text-right font-semibold">{fmtCOP.format(op.costo_ejecutado_total)}</td>
                     <td className="px-4 py-2 text-right font-semibold text-emerald-600">{fmtCOP.format(op.valor_cumplido)}</td>
-                    <td className="px-4 py-2 text-right">{avance.toFixed(1)}%</td>
+                    <td className="px-4 py-2 text-right">{op.margen_pct != null ? `${parseFloat(op.margen_pct).toFixed(1)}%` : '—'}</td>
                   </tr>
                 );
               })}
