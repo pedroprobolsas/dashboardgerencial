@@ -257,7 +257,7 @@ router.get('/cierre-costos', async (req, res) => {
       WITH facturas_mes AS (
         SELECT consecutivo, valor_neto
         FROM crisolweb.facturas
-        WHERE fecha >= $1 AND fecha < $2
+        WHERE fecha_creacion >= $1 AND fecha_creacion < $2
           AND COALESCE(es_anulada, false) = false
       ),
       -- Para el costo real por OP, prorratear el costo_ejecutado_total
@@ -508,14 +508,8 @@ router.get('/detalle-cc101', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Faltan parámetros anio y mes' });
     }
 
-    const primerDia = `${anio}-${String(mes).padStart(2, '0')}-01`;
-    let proximoMes = parseInt(mes, 10) + 1;
-    let proximoAnio = parseInt(anio, 10);
-    if (proximoMes > 12) {
-      proximoMes = 1;
-      proximoAnio += 1;
-    }
-    const primerDiaSiguiente = `${proximoAnio}-${String(proximoMes).padStart(2, '0')}-01`;
+    const anioNum = parseInt(anio, 10);
+    const mesNum = parseInt(mes, 10);
     
     // Facturas del mes categorizadas
     const sqlFacturas = `
@@ -523,16 +517,16 @@ router.get('/detalle-cc101', async (req, res) => {
         consecutivo as nro_factura,
         valor_neto,
         tercero as cliente,
-        fecha,
+        fecha_creacion as fecha,
         CASE 
           WHEN valor_neto < 0 THEN 'nota_credito'
           WHEN EXISTS (SELECT 1 FROM crisolweb.facturacion_op fo WHERE fo.nro_op = f.consecutivo) THEN 'con_op'
           ELSE 'sin_op'
         END as categoria
       FROM crisolweb.facturas f
-      WHERE f.fecha >= $1 AND f.fecha < $2
+      WHERE EXTRACT(YEAR FROM f.fecha_creacion) = $1 AND EXTRACT(MONTH FROM f.fecha_creacion) = $2
         AND COALESCE(f.es_anulada, false) = false
-      ORDER BY fecha DESC
+      ORDER BY f.fecha_creacion DESC
     `;
     
     // OPs facturadas del mes
@@ -549,7 +543,7 @@ router.get('/detalle-cc101', async (req, res) => {
       FROM crisolweb.facturas f
       JOIN crisolweb.facturacion_op fo ON f.consecutivo = fo.nro_op
       JOIN crisolweb.costo_por_orden cpo ON fo.referencia = cpo.nro_op
-      WHERE f.fecha >= $1 AND f.fecha < $2
+      WHERE EXTRACT(YEAR FROM f.fecha_creacion) = $1 AND EXTRACT(MONTH FROM f.fecha_creacion) = $2
         AND COALESCE(f.es_anulada, false) = false
       ORDER BY fo.referencia DESC
     `;
@@ -558,7 +552,7 @@ router.get('/detalle-cc101', async (req, res) => {
     const sqlHuerfanas = `
       SELECT consecutivo as nro_factura, tercero as cliente, valor_neto
       FROM crisolweb.facturas f
-      WHERE f.fecha >= $1 AND f.fecha < $2
+      WHERE EXTRACT(YEAR FROM f.fecha_creacion) = $1 AND EXTRACT(MONTH FROM f.fecha_creacion) = $2
         AND valor_neto > 0
         AND COALESCE(f.es_anulada, false) = false
         AND NOT EXISTS (SELECT 1 FROM crisolweb.facturacion_op fo WHERE fo.nro_op = f.consecutivo)
@@ -566,7 +560,7 @@ router.get('/detalle-cc101', async (req, res) => {
       LIMIT 10
     `;
 
-    const params = [primerDia, primerDiaSiguiente];
+    const params = [anioNum, mesNum];
     const [resFacturas, resOps, resHuerfanas] = await Promise.all([
       query(sqlFacturas, params).catch(e => { console.error("Error facturas", e); return { rows: [] }; }),
       query(sqlOps, params).catch(e => { console.error("Error ops", e); return { rows: [] }; }),
