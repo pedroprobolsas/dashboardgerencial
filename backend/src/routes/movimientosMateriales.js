@@ -185,8 +185,8 @@ router.get('/cierre-costos', async (req, res) => {
       WITH facturas_mes AS (
         SELECT f.consecutivo, f.valor_neto
         FROM crisolweb.facturas f
-        WHERE f.fecha >= $1 AND f.fecha < $2
-          AND f.anulada = false
+        WHERE f.fecha_creacion >= $1 AND f.fecha_creacion < $2
+          AND (f.estado IS NULL OR UPPER(TRIM(f.estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))
       ),
       prorrateo AS (
         SELECT 
@@ -258,7 +258,7 @@ router.get('/cierre-costos', async (req, res) => {
         SELECT consecutivo, valor_neto
         FROM crisolweb.facturas
         WHERE fecha_creacion >= $1 AND fecha_creacion < $2
-          AND COALESCE(es_anulada, false) = false
+          AND (estado IS NULL OR UPPER(TRIM(estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))
       ),
       -- Para el costo real por OP, prorratear el costo_ejecutado_total
       ventas_ops AS (
