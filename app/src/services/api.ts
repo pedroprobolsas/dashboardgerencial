@@ -242,8 +242,13 @@ export interface LineaMaterial {
   par_id?: string;
 }
 
-export async function fetchAnalisisMateriales(fechaInicio: string, fechaFin: string): Promise<{ detalle: LineaMaterial[], total: number }> {
-  const res = await fetch(`/api/analisis_materiales?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`);
+export interface AnalisisMaterialesRespuesta {
+  detalle: LineaMaterial[];
+  total: number;
+}
+
+export async function fetchAnalisisMateriales(fechaInicio: string, fechaFin: string): Promise<AnalisisMaterialesRespuesta> {
+  const res = await fetch(`/api/insumos_kpis?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`);
   checkAuthError(res);
   if (!res.ok) throw new Error(`Error ${res.status}`);
   const data = await res.json();
@@ -270,13 +275,16 @@ export interface Parametro {
 }
 
 export async function fetchParametros(fecha?: string): Promise<Record<string, Parametro>> {
-  const url = fecha ? `/api/parametros?fecha=${fecha}` : '/api/parametros';
+  const url = fecha ? `/api/config_vars?fecha=${fecha}` : '/api/config_vars';
   try {
     const res = await fetch(url);
     checkAuthError(res);
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `HTTP_Error_${res.status}`);
+      const text = await res.text();
+      console.error('RAW_RESPONSE_PARAMETROS:', text);
+      let errObj: any = {};
+      try { errObj = JSON.parse(text); } catch(e) {}
+      throw new Error(errObj.error || `HTTP_Error_${res.status}_Body_${text.substring(0, 20)}`);
     }
     const data = await res.json();
     return data.parametros || {};
@@ -287,7 +295,7 @@ export async function fetchParametros(fecha?: string): Promise<Record<string, Pa
 
 export async function fetchHistorialParametros(): Promise<Parametro[]> {
   try {
-    const res = await fetch('/api/parametros/historico');
+    const res = await fetch('/api/config_vars/historico');
     checkAuthError(res);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -301,7 +309,7 @@ export async function fetchHistorialParametros(): Promise<Parametro[]> {
 }
 
 export async function updateParametro(clave: string, valor: number, motivo?: string): Promise<void> {
-  const res = await fetch('/api/parametros', {
+  const res = await fetch('/api/config_vars', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ clave, valor, motivo }),
