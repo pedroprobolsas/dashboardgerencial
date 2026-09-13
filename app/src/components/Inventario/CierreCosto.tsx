@@ -1056,7 +1056,32 @@ export default function CierreCosto() {
           </div>
         ) : (
           <div className="flex flex-col gap-6">
-            {/* Tarjetas Principales */}
+            {/* Nuevos KPIs Cierre de Costos */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
+                <span className="text-sm font-semibold text-slate-600">Ventas Netas del Mes</span>
+                <p className="text-3xl font-bold text-slate-800 my-1">{fmtCOPCierre.format(cierreCostos.kpisCC101?.ventasNetas || 0)}</p>
+                <p className="text-[10px] text-slate-400 font-mono">Total facturado (sin anuladas)</p>
+              </div>
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
+                <span className="text-sm font-semibold text-slate-600">Costo Real (por OP)</span>
+                <p className="text-3xl font-bold text-slate-800 my-1">{fmtCOPCierre.format(cierreCostos.kpisCC101?.costoRealOP || 0)}</p>
+                <p className="text-[10px] text-slate-400 font-mono">Postcosteo asignado a OPs facturadas</p>
+              </div>
+              <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
+                <span className="text-sm font-semibold text-slate-600">Ajuste de Inventario</span>
+                <p className="text-3xl font-bold text-slate-800 my-1">{fmtCOPCierre.format(cierreCostos.kpisCC101?.ajusteInventario || 0)}</p>
+                <p className="text-[10px] text-slate-400 font-mono">Diferencia entre Propuesto y Real</p>
+              </div>
+              <div className="bg-amber-50 rounded-3xl shadow-sm border border-amber-200 p-5 flex flex-col gap-1 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-16 h-16 bg-amber-100 rounded-bl-full -mr-8 -mt-8"></div>
+                <span className="text-sm font-bold text-amber-900 z-10">CC-101 Propuesto</span>
+                <p className="text-3xl font-black text-amber-700 my-1 z-10">{fmtCOPCierre.format(cierreCostos.kpisCC101?.cc101Propuesto || 0)}</p>
+                <p className="text-[10px] text-amber-800 font-bold z-10">Ventas × {(cierreCostos.ratioAplicado * 100).toFixed(2)}% (Ratio Histórico)</p>
+              </div>
+            </div>
+
+            {/* Tarjetas Principales Anteriores */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1 relative group">
                 <div className="flex justify-between items-start">
