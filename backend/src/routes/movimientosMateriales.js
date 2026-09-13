@@ -388,6 +388,18 @@ router.get('/cierre-costos', async (req, res) => {
 });
 
 /**
+ * GET /api/movimientos_materiales/test-parametros
+ */
+router.get('/test-parametros', async (req, res) => {
+  try {
+    const { rows } = await query('SELECT * FROM app_ops.parametros');
+    res.json({ ok: true, rows });
+  } catch (err) {
+    res.json({ ok: false, error: err.message, stack: err.stack, name: err.name });
+  }
+});
+
+/**
  * GET /api/movimientos_materiales/sugerencia-ratio
  */
 router.get('/sugerencia-ratio', async (req, res) => {
