@@ -284,7 +284,7 @@ export async function fetchParametros(fecha?: string): Promise<Record<string, Pa
       console.error('RAW_RESPONSE_PARAMETROS:', text);
       let errObj: any = {};
       try { errObj = JSON.parse(text); } catch(e) {}
-      throw new Error(errObj.error || `HTTP_Error_${res.status}_Body_${text.substring(0, 20)}`);
+      throw new Error(errObj.detalle || errObj.error || `HTTP_Error_${res.status}_Body_${text.substring(0, 20)}`);
     }
     const data = await res.json();
     return data.parametros || {};
@@ -299,7 +299,7 @@ export async function fetchHistorialParametros(): Promise<Parametro[]> {
     checkAuthError(res);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `HTTP_Error_${res.status}`);
+      throw new Error(err.detalle || err.error || `HTTP_Error_${res.status}`);
     }
     const data = await res.json();
     return data.historico || [];
