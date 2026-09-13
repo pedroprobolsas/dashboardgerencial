@@ -122,22 +122,6 @@ router.post('/retry/:pipeline', requireRole('admin'), asyncHandler('/api/data-st
   `, [req.user.id, pipeline]);
   const actionLogId = logRes.rows[0].id;
 
-  // Hacer ping al Host Agent inicial para ver si está vivo con un timeout corto de 3s
-  const agentUrl = process.env.HOST_AGENT_URL;
-  if (agentUrl) {
-    try {
-      const controller = new AbortController();
-      const t = setTimeout(() => controller.abort(), 3000);
-      const hc = await fetch(`${agentUrl.replace(/\/$/, '')}/health`, { signal: controller.signal });
-      clearTimeout(t);
-      if (!hc.ok) throw new Error('Bad status');
-    } catch (e) {
-      await db.query(`UPDATE app_ops.pipeline_locks SET status = 'failed', last_error = 'Host Agent no disponible' WHERE pipeline_id = $1`, [pipeline]);
-      await db.query(`UPDATE app_ops.action_logs SET resultado = 'failed', detalle = $1 WHERE id = $2`, [JSON.stringify({ reason: 'host_agent_unreachable' }), actionLogId]);
-      return res.status(503).json({ error: 'Host Agent no disponible' });
-    }
-  }
-
   // Respuesta asíncrona rápida
   res.status(202).json({
     status: 'in_progress',
