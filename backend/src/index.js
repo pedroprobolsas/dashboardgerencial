@@ -32,6 +32,14 @@ const kpiIncentivosRouter  = require('./routes/kpiIncentivos');
 const saldosContablesRouter = require('./routes/saldosContables');
 const dataStatusRouter     = require('./routes/dataStatus');
 
+const { query } = require('./dbClient');
+// Seed initial ratio parameter if missing
+query(`
+  INSERT INTO app_ops.parametros (clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por, motivo)
+  SELECT 'ratio_ajuste_inventario', 77.00, '%', 'Ratio de costo sobre ventas para CC-101', 'Inventario', CURRENT_DATE, 'admin', 'Inicialización del sistema'
+  WHERE NOT EXISTS (SELECT 1 FROM app_ops.parametros WHERE clave = 'ratio_ajuste_inventario');
+`).then(() => console.log('Seed: ratio checked')).catch(console.error);
+
 const app  = express();
 const PORT = process.env.PORT || 3001;
 const START_TIME = Date.now();
