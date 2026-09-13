@@ -254,43 +254,37 @@ router.get('/cierre-costos', async (req, res) => {
     `;
 
     const sqlKPIs = `
-      WITH facturas_mes AS (
-        SELECT consecutivo, valor_neto
-        FROM crisolweb.facturas
+      WITH facturado_mes AS (
+        SELECT referencia AS op_prod,
+               SUM(valor_neto) AS valor_mes
+        FROM crisolweb.facturacion_op
         WHERE fecha_creacion >= $1 AND fecha_creacion < $2
-          AND (estado IS NULL OR UPPER(TRIM(estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))
+          AND referencia ~ '^[0-9]+$'
+        GROUP BY 1
       ),
-      -- Para el costo real por OP, prorratear el costo_ejecutado_total
-      -- Usamos fm.valor_neto como valor_facturado_op (fo.valor no existe en facturacion_op)
-      ventas_ops AS (
-        SELECT 
-          fm.consecutivo as nro_factura,
-          fo.referencia as nro_op,
-          fm.valor_neto as valor_facturado_op,
-          cpo.costo_ejecutado_total,
-          cpo.valor_cumplido
-        FROM facturas_mes fm
-        JOIN crisolweb.facturacion_op fo ON fm.consecutivo = fo.nro_op
-        JOIN crisolweb.costo_por_orden cpo ON fo.referencia = cpo.nro_op
+      costo_unico_op AS (
+        SELECT nro_op, MAX(costo_ejecutado_total) AS costo, MAX(valor_cumplido) AS vc
+        FROM crisolweb.costo_por_orden
+        WHERE nro_op ~ '^[0-9]+$'
+        GROUP BY nro_op
       ),
-      -- Calcular acumulado para detectar si supera valor_cumplido
       prorrateado AS (
         SELECT 
-          nro_factura,
-          nro_op,
-          valor_facturado_op,
-          costo_ejecutado_total,
-          valor_cumplido,
+          fm.op_prod,
+          fm.valor_mes as valor_facturado_op,
+          COALESCE(cop.costo, 0) as costo_ejecutado_total,
+          cop.vc as valor_cumplido,
           CASE 
-            WHEN valor_cumplido IS NULL OR valor_cumplido = 0 THEN 0
-            ELSE LEAST(valor_facturado_op / valor_cumplido, 1.0) * costo_ejecutado_total
+            WHEN cop.vc IS NULL OR cop.vc = 0 THEN 0
+            ELSE LEAST(fm.valor_mes / cop.vc, 1.0) * COALESCE(cop.costo, 0)
           END as costo_asignado,
-          CASE WHEN valor_cumplido IS NULL OR valor_cumplido = 0 THEN 1 ELSE 0 END as sin_valor_cumplido,
-          CASE WHEN valor_cumplido > 0 AND valor_facturado_op > valor_cumplido THEN 1 ELSE 0 END as excede_valor
-        FROM ventas_ops
+          CASE WHEN cop.vc IS NULL OR cop.vc = 0 THEN 1 ELSE 0 END as sin_valor_cumplido,
+          CASE WHEN cop.vc > 0 AND fm.valor_mes > cop.vc THEN 1 ELSE 0 END as excede_valor
+        FROM facturado_mes fm
+        LEFT JOIN costo_unico_op cop ON fm.op_prod = cop.nro_op
       )
       SELECT 
-        (SELECT COALESCE(SUM(valor_neto), 0) FROM facturas_mes) as ventas_netas,
+        (SELECT COALESCE(SUM(valor_mes), 0) FROM facturado_mes) as ventas_netas,
         (SELECT COALESCE(SUM(costo_asignado), 0) FROM prorrateado) as costo_real_op,
         (SELECT COALESCE(SUM(sin_valor_cumplido), 0) FROM prorrateado) as ops_sin_valor_cumplido,
         (SELECT COALESCE(SUM(excede_valor), 0) FROM prorrateado) as ops_facturacion_excede
