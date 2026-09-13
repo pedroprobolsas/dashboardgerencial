@@ -39,10 +39,22 @@ async function runPipeline(pipelineName) {
     if (err.name === 'AbortError') {
       throw new Error('Timeout esperando respuesta del Host Agent (25 min)');
     }
-    if (err.cause?.code === 'ECONNREFUSED' || err.message.includes('fetch failed')) {
+    
+    console.error('[HOST_AGENT] Fetch error crudo:', {
+      name: err.name,
+      message: err.message,
+      causeCode: err.cause?.code,
+      causeMessage: err.cause?.message,
+      stack: err.stack
+    });
+    
+    // Solo ECONNREFUSED es realmente "unreachable"
+    if (err.cause?.code === 'ECONNREFUSED') {
       throw new Error('host_agent_unreachable');
     }
-    throw err;
+    
+    // Todo lo demás (incluyendo "fetch failed") es un error de comunicación mid-flight
+    throw new Error(`Comunicación con Host Agent interrumpida: ${err.message}`);
   }
 }
 
