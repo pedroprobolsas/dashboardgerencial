@@ -15,7 +15,7 @@ const fmtCOPCierre = new Intl.NumberFormat('es-CO', { style: 'currency', currenc
 const fmtNum = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 4 });
 const fmtDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : '—';
 
-function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYears, cierreCostos }: { defaultYear: number, defaultMonth: number, mockMonths: any[], availableYears: number[], cierreCostos: any }) {
+function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, cierreCostos }: { defaultYear: number, defaultMonth: number, mockMonths: any[], cierreCostos: any }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<{ code: string; concept: string; valor: number }[]>([]);
   const [estado, setEstado] = useState('sin datos');
@@ -1255,7 +1255,7 @@ export default function CierreCosto() {
       <DetalleCC101 key={`cc101-${year}-${month}`} year={year} month={month} />
 
       {/* REPORTE CIERRE COSTOS SIIGO */}
-      <ReporteCierreSiigo defaultYear={year} defaultMonth={month} mockMonths={mockMonths} availableYears={years} cierreCostos={cierreCostos} />
+      <ReporteCierreSiigo defaultYear={year} defaultMonth={month} mockMonths={mockMonths} cierreCostos={cierreCostos} />
 
       {/* ÁREA DE RESULTADOS */}
       <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
