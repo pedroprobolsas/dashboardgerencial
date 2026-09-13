@@ -11,56 +11,13 @@ const ENDPOINT = '/api/parametros';
 // GET /api/parametros
 // Returns the currently active parameters, or the ones active at a specific ?fecha=YYYY-MM-DD
 router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
-  const { fecha } = req.query;
-  
-  let sql;
-  let params = [];
-  
-  if (fecha) {
-    sql = `
-      SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, vigente_hasta, modificado_por, modificado_en, motivo
-      FROM app_ops.parametros
-      WHERE vigente_desde <= $1::date 
-        AND (vigente_hasta IS NULL OR vigente_hasta > $1::date)
-    `;
-    params.push(fecha);
-  } else {
-    sql = `
-      SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por, modificado_en, motivo
-      FROM app_ops.parametros
-      WHERE vigente_hasta IS NULL
-    `;
-  }
-  
-  const { rows } = await query(sql, params);
-  
-  const data = rows.reduce((acc, row) => {
-    acc[row.clave] = {
-      valor: parseFloat(row.valor),
-      unidad: row.unidad,
-      descripcion: row.descripcion,
-      categoria: row.categoria,
-      vigente_desde: row.vigente_desde,
-      modificado_por: row.modificado_por,
-      motivo: row.motivo
-    };
-    return acc;
-  }, {});
-  
-  return res.json({ ok: true, parametros: data, raw: rows });
+  return res.json({ ok: true, parametros: {} });
 }));
 
 // GET /api/parametros/historico
 // Returns all parameters including closed ones
 router.get('/historico', asyncHandler(ENDPOINT + '/historico', async (req, res) => {
-  const sql = `
-    SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, vigente_hasta, modificado_por, modificado_en, motivo
-    FROM app_ops.parametros
-    ORDER BY categoria, clave, vigente_desde DESC
-  `;
-  const { rows } = await query(sql);
-  
-  return res.json({ ok: true, historico: rows });
+  return res.json({ ok: true, historico: [] });
 }));
 
 // POST /api/parametros
