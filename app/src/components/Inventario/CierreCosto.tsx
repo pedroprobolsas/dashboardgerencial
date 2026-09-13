@@ -336,6 +336,7 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
                 <th className="px-5 py-3 font-semibold text-right">Costo Vtas Real (por OP)</th>
                 <th className="px-5 py-3 font-semibold text-right text-indigo-600" title="Costo Real / Ventas Netas">Ratio Real</th>
                 <th className="px-5 py-3 font-semibold text-right">CC-101 Ajustado</th>
+                <th className="px-5 py-3 font-semibold text-center text-slate-500">Método</th>
                 <th className="px-5 py-3 font-semibold text-right">Producción Terminada</th>
                 <th className="px-5 py-3 font-semibold text-right">Otros costos Crisol</th>
                 <th className="px-5 py-3 font-semibold text-right">Otros costos SIIGO</th>
@@ -397,6 +398,9 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
                       {ratioReal !== null ? `${ratioReal.toFixed(1)}%` : '—'}
                     </td>
                     <td className={`px-5 py-3 text-right font-bold text-indigo-700`}>{fmtCOP.format(row.data.kpisCC101?.cc101Propuesto || 0)}</td>
+                    <td className={`px-5 py-3 text-center text-xs font-bold ${row.data.kpisCC101?.metodoCC101 === 'real' ? 'text-orange-600 bg-orange-50' : 'text-blue-600 bg-blue-50'}`}>
+                      {row.data.kpisCC101?.metodoCC101 === 'real' ? 'Real' : 'Ratio'}
+                    </td>
                     <td className={`px-5 py-3 text-right font-medium ${isAlert ? 'text-red-600' : 'text-emerald-700'}`}>{fmtCOP.format(produccion)}</td>
                     <td className={`px-5 py-3 text-right font-semibold text-amber-700`}>{fmtCOPCierre.format(otrosCostos)}</td>
                     
@@ -1079,14 +1083,19 @@ export default function CierreCosto() {
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
                 <span className="text-sm font-semibold text-slate-600">Ajuste de Inventario</span>
                 <p className="text-3xl font-bold text-slate-800 my-1">{fmtCOPCierre.format(cierreCostos.kpisCC101?.ajusteInventario || 0)}</p>
-                <p className="text-[10px] text-slate-400 font-mono">Diferencia entre Propuesto y Real</p>
+                <p className="text-[10px] text-slate-400 font-mono">Descarga adicional al costo real trazado (mermas, reprocesos, consumos no imputados)</p>
               </div>
-              <div className="bg-amber-50 rounded-3xl shadow-sm border border-amber-200 p-5 flex flex-col gap-1 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-16 h-16 bg-amber-100 rounded-bl-full -mr-8 -mt-8"></div>
-                <span className="text-sm font-bold text-amber-900 z-10">CC-101 Propuesto</span>
-                <p className="text-3xl font-black text-amber-700 my-1 z-10">{fmtCOPCierre.format(cierreCostos.kpisCC101?.cc101Propuesto || 0)}</p>
-                <p className="text-[10px] text-amber-800 font-bold z-10">
-                  Ratio aplicado: {(cierreCostos.ratioAplicado * 100).toFixed(2)}%
+              <div className={`rounded-3xl shadow-sm border p-5 flex flex-col gap-1 relative overflow-hidden ${cierreCostos.kpisCC101?.metodoCC101 === 'real' ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-200'}`}>
+                <div className={`absolute top-0 right-0 w-16 h-16 rounded-bl-full -mr-8 -mt-8 ${cierreCostos.kpisCC101?.metodoCC101 === 'real' ? 'bg-orange-100' : 'bg-blue-100'}`}></div>
+                <div className="flex justify-between items-start z-10">
+                  <span className={`text-sm font-bold ${cierreCostos.kpisCC101?.metodoCC101 === 'real' ? 'text-orange-900' : 'text-blue-900'}`}>CC-101 Propuesto</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cierreCostos.kpisCC101?.metodoCC101 === 'real' ? 'bg-orange-200 text-orange-800' : 'bg-blue-200 text-blue-800'}`}>
+                    {cierreCostos.kpisCC101?.metodoCC101 === 'real' ? 'Método: Real por OP (excede el ratio)' : `Método: Ratio ${(cierreCostos.ratioAplicado * 100).toFixed(0)}% (Real inferior)`}
+                  </span>
+                </div>
+                <p className={`text-3xl font-black my-1 z-10 ${cierreCostos.kpisCC101?.metodoCC101 === 'real' ? 'text-orange-700' : 'text-blue-700'}`}>{fmtCOPCierre.format(cierreCostos.kpisCC101?.cc101Propuesto || 0)}</p>
+                <p className={`text-[10px] font-bold z-10 ${cierreCostos.kpisCC101?.metodoCC101 === 'real' ? 'text-orange-800' : 'text-blue-800'}`}>
+                  Ratio de control: {(cierreCostos.ratioAplicado * 100).toFixed(2)}%
                   {cierreCostos.ratioVigenteDesde && ` (vigente desde ${new Date(cierreCostos.ratioVigenteDesde).toLocaleDateString('es-CO')})`}
                 </p>
               </div>

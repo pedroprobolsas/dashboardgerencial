@@ -333,8 +333,11 @@ router.get('/cierre-costos', async (req, res) => {
     const costoRealOP = parseFloat(resKPIs.rows[0]?.costo_real_op || 0);
     const opsSinValorCumplido = parseInt(resKPIs.rows[0]?.ops_sin_valor_cumplido || 0, 10);
     const opsFacturacionExcede = parseInt(resKPIs.rows[0]?.ops_facturacion_excede || 0, 10);
-    const cc101Propuesto = ventasNetas * ratio_ajuste_inventario;
-    const ajusteInventario = cc101Propuesto - costoRealOP;
+    
+    const cc101PorRatio = ventasNetas * ratio_ajuste_inventario;
+    const cc101Propuesto = Math.max(costoRealOP, cc101PorRatio);
+    const ajusteInventario = cc101Propuesto - costoRealOP; // siempre >= 0
+    const metodoCC101 = costoRealOP > cc101PorRatio ? 'real' : 'ratio';
     
     res.json({
       ok: true,
@@ -372,6 +375,7 @@ router.get('/cierre-costos', async (req, res) => {
         costoRealOP: costoRealOP,
         ajusteInventario: ajusteInventario,
         cc101Propuesto: cc101Propuesto,
+        metodoCC101: metodoCC101,
         alertas: {
           opsSinValorCumplido,
           opsFacturacionExcede
