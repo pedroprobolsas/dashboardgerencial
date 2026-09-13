@@ -255,7 +255,7 @@ router.get('/cierre-costos', async (req, res) => {
 
     const sqlKPIs = `
       WITH facturas_mes AS (
-        SELECT COALESCE(SUM(valor_neto), 0) as total_ventas
+        SELECT COALESCE(SUM(valor_bruto), 0) as total_ventas
         FROM crisolweb.facturas
         WHERE fecha_creacion >= $1 AND fecha_creacion < $2
       ),
@@ -573,17 +573,16 @@ router.get('/detalle-cc101', async (req, res) => {
     const sqlFacturas = `
       SELECT 
         consecutivo as nro_factura,
-        valor_neto,
+        valor_bruto as valor_neto, -- Mantenemos alias para el frontend
         nombre as cliente,
         fecha_creacion as fecha,
         CASE 
-          WHEN valor_neto < 0 THEN 'nota_credito'
+          WHEN valor_bruto < 0 THEN 'nota_credito'
           WHEN EXISTS (SELECT 1 FROM crisolweb.facturacion_op fo WHERE fo.nro_op = f.consecutivo) THEN 'con_op'
           ELSE 'sin_op'
         END as categoria
       FROM crisolweb.facturas f
       WHERE EXTRACT(YEAR FROM f.fecha_creacion) = $1 AND EXTRACT(MONTH FROM f.fecha_creacion) = $2
-        AND (f.estado IS NULL OR UPPER(TRIM(f.estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))
       ORDER BY f.fecha_creacion DESC
     `;
     
@@ -600,19 +599,17 @@ router.get('/detalle-cc101', async (req, res) => {
       JOIN crisolweb.facturacion_op fo ON f.consecutivo = fo.nro_op
       JOIN crisolweb.costo_por_orden cpo ON fo.referencia = cpo.nro_op
       WHERE EXTRACT(YEAR FROM f.fecha_creacion) = $1 AND EXTRACT(MONTH FROM f.fecha_creacion) = $2
-        AND (f.estado IS NULL OR UPPER(TRIM(f.estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))
       ORDER BY fo.referencia DESC
     `;
 
-    // Facturas huérfanas top 10 (sin_op, valor_neto > 0)
+    // Facturas huérfanas top 10 (sin_op, valor_bruto > 0)
     const sqlHuerfanas = `
-      SELECT consecutivo as nro_factura, nombre as cliente, valor_neto
+      SELECT consecutivo as nro_factura, nombre as cliente, valor_bruto as valor_neto
       FROM crisolweb.facturas f
       WHERE EXTRACT(YEAR FROM f.fecha_creacion) = $1 AND EXTRACT(MONTH FROM f.fecha_creacion) = $2
-        AND valor_neto > 0
-        AND (f.estado IS NULL OR UPPER(TRIM(f.estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))
+        AND valor_bruto > 0
         AND NOT EXISTS (SELECT 1 FROM crisolweb.facturacion_op fo WHERE fo.nro_op = f.consecutivo)
-      ORDER BY valor_neto DESC
+      ORDER BY valor_bruto DESC
       LIMIT 10
     `;
 

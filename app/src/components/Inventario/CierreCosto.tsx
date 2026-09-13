@@ -1071,9 +1071,9 @@ export default function CierreCosto() {
             {/* Nuevos KPIs Cierre de Costos */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
-                <span className="text-sm font-semibold text-slate-600">Ventas Netas del Mes</span>
+                <span className="text-sm font-semibold text-slate-600">Ventas del Mes (sin IVA)</span>
                 <p className="text-3xl font-bold text-slate-800 my-1">{fmtCOPCierre.format(cierreCostos.kpisCC101?.ventasNetas || 0)}</p>
-                <p className="text-[10px] text-slate-400 font-mono">Total facturado (sin anuladas)</p>
+                <p className="text-[10px] text-slate-400 font-mono">Total facturado (incluye compensación por notas crédito)</p>
               </div>
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
                 <span className="text-sm font-semibold text-slate-600">Costo Real (por OP)</span>
