@@ -32,12 +32,6 @@ const kpiIncentivosRouter  = require('./routes/kpiIncentivos');
 const saldosContablesRouter = require('./routes/saldosContables');
 const dataStatusRouter     = require('./routes/dataStatus');
 
-const { query } = require('./dbClient');
-// Auto-migrate schema changes
-query('ALTER TABLE app_ops.parametros ADD COLUMN IF NOT EXISTS motivo TEXT;')
-  .then(() => console.log('[DB] Columna motivo asegurada en app_ops.parametros'))
-  .catch(err => console.error('[DB] Error agregando columna motivo:', err.message));
-
 const app  = express();
 const PORT = process.env.PORT || 3001;
 const START_TIME = Date.now();

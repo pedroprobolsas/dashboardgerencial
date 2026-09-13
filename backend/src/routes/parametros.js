@@ -9,19 +9,13 @@ const router = Router();
 const ENDPOINT = '/api/parametros';
 
 router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
-  try {
-    await require('../dbClient').query('ALTER TABLE app_ops.parametros ADD COLUMN IF NOT EXISTS motivo TEXT;');
-  } catch (e) {
-    return res.status(500).json({ ok: false, error: 'Migración Falló', detalle: e.message });
-  }
-
   const { fecha } = req.query;
   let sql;
   let params = [];
   
   if (fecha) {
     sql = `
-      SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, vigente_hasta, modificado_por, modificado_en, motivo
+      SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, vigente_hasta, modificado_por, modificado_en
       FROM app_ops.parametros
       WHERE vigente_desde <= $1::date 
         AND (vigente_hasta IS NULL OR vigente_hasta > $1::date)
@@ -29,7 +23,7 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
     params.push(fecha);
   } else {
     sql = `
-      SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por, modificado_en, motivo
+      SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por, modificado_en
       FROM app_ops.parametros
       WHERE vigente_hasta IS NULL
     `;
@@ -44,8 +38,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
       descripcion: row.descripcion,
       categoria: row.categoria,
       vigente_desde: row.vigente_desde,
-      modificado_por: row.modificado_por,
-      motivo: row.motivo
+      modificado_por: row.modificado_por
+      // motivo omitido hasta que se cree la columna
     };
     return acc;
   }, {});
@@ -54,13 +48,8 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
 }));
 
 router.get('/historico', asyncHandler(ENDPOINT + '/historico', async (req, res) => {
-  try {
-    await require('../dbClient').query('ALTER TABLE app_ops.parametros ADD COLUMN IF NOT EXISTS motivo TEXT;');
-  } catch (e) {
-    // ignore here since root route catches it
-  }
   const sql = `
-    SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, vigente_hasta, modificado_por, modificado_en, motivo
+    SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, vigente_hasta, modificado_por, modificado_en
     FROM app_ops.parametros
     ORDER BY categoria, clave, vigente_desde DESC
   `;
@@ -75,13 +64,12 @@ router.post('/', requireRole('admin'), asyncHandler(ENDPOINT, async (req, res) =
   const { clave, valor, motivo } = req.body;
   const modificado_por = req.user.email;
   
-  if (!clave || valor === undefined || valor === null) {
-    return res.status(400).json({ ok: false, error: 'Faltan campos requeridos (clave, valor)' });
+  if (!clave || valor === undefined) {
+    return res.status(400).json({ ok: false, error: 'clave y valor son requeridos' });
   }
   
-  // 1. Get the current active record
-  const currentSql = `SELECT * FROM app_ops.parametros WHERE clave = $1 AND vigente_hasta IS NULL`;
-  const { rows } = await query(currentSql, [clave]);
+  // Verify existence
+  const { rows } = await query(`SELECT id, valor, unidad, descripcion, categoria FROM app_ops.parametros WHERE clave = $1 AND vigente_hasta IS NULL`, [clave]);
   
   if (rows.length === 0) {
     return res.status(404).json({ ok: false, error: 'Parámetro no encontrado o sin versión vigente' });
@@ -105,15 +93,16 @@ router.post('/', requireRole('admin'), asyncHandler(ENDPOINT, async (req, res) =
     );
     
     // Insert new
+    // We cannot insert `motivo` until the column is created by the DB Admin
     await client.query(
-      `INSERT INTO app_ops.parametros (clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por, motivo)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6, $7)`,
-      [current.clave, valor, current.unidad, current.descripcion, current.categoria, modificado_por, motivo || null]
+      `INSERT INTO app_ops.parametros (clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6)`,
+      [current.clave, valor, current.unidad, current.descripcion, current.categoria, modificado_por]
     );
     
     await client.query('COMMIT');
     logger.info(ENDPOINT, `Parámetro actualizado: ${clave} -> ${valor}`, { modificado_por });
-    return res.json({ ok: true, message: 'Parámetro actualizado exitosamente' });
+    return res.json({ ok: true, message: 'Parámetro actualizado exitosamente (Motivo omitido temporalmente)' });
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
