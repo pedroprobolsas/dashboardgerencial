@@ -8,11 +8,14 @@ const logger        = require('../logger');
 const router = Router();
 const ENDPOINT = '/api/parametros';
 
-// GET /api/parametros
-// Returns the currently active parameters, or the ones active at a specific ?fecha=YYYY-MM-DD
 router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
+  try {
+    await require('../dbClient').query('ALTER TABLE app_ops.parametros ADD COLUMN IF NOT EXISTS motivo TEXT;');
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: 'Migración Falló', detalle: e.message });
+  }
+
   const { fecha } = req.query;
-  
   let sql;
   let params = [];
   
@@ -50,9 +53,12 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
   return res.json({ ok: true, parametros: data, raw: rows });
 }));
 
-// GET /api/parametros/historico
-// Returns all parameters including closed ones
 router.get('/historico', asyncHandler(ENDPOINT + '/historico', async (req, res) => {
+  try {
+    await require('../dbClient').query('ALTER TABLE app_ops.parametros ADD COLUMN IF NOT EXISTS motivo TEXT;');
+  } catch (e) {
+    // ignore here since root route catches it
+  }
   const sql = `
     SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, vigente_hasta, modificado_por, modificado_en, motivo
     FROM app_ops.parametros
