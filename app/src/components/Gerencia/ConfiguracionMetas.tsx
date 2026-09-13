@@ -42,7 +42,8 @@ export default function ConfiguracionMetas() {
         setSugerenciaRatio(sugRes.sugerencia);
       }
     } catch (err: any) {
-      setError(err.message || 'Error al cargar los parámetros');
+      console.error(err);
+      setError(err.stack || err.message || 'Error al cargar los parámetros');
     } finally {
       setLoading(false);
     }

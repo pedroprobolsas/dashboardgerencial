@@ -273,7 +273,10 @@ export async function fetchParametros(fecha?: string): Promise<Record<string, Pa
   const url = fecha ? `/api/parametros?fecha=${fecha}` : '/api/parametros';
   const res = await fetch(url);
   checkAuthError(res);
-  if (!res.ok) throw new Error(`Error ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Error ${res.status}`);
+  }
   const data = await res.json();
   return data.parametros || {};
 }
@@ -281,7 +284,10 @@ export async function fetchParametros(fecha?: string): Promise<Record<string, Pa
 export async function fetchHistorialParametros(): Promise<Parametro[]> {
   const res = await fetch('/api/parametros/historico');
   checkAuthError(res);
-  if (!res.ok) throw new Error(`Error ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Error ${res.status}`);
+  }
   const data = await res.json();
   return data.historico || [];
 }
