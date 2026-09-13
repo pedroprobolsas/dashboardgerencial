@@ -334,6 +334,7 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
                 <th className="px-5 py-3 font-semibold">Mes</th>
                 <th className="px-5 py-3 font-semibold text-right">Consumo Real MP (Depurado)</th>
                 <th className="px-5 py-3 font-semibold text-right">Costo Vtas Real (por OP)</th>
+                <th className="px-5 py-3 font-semibold text-right text-indigo-600" title="Costo Real / Ventas Netas">Ratio Real</th>
                 <th className="px-5 py-3 font-semibold text-right">CC-101 Ajustado</th>
                 <th className="px-5 py-3 font-semibold text-right">Producción Terminada</th>
                 <th className="px-5 py-3 font-semibold text-right">Otros costos Crisol</th>
@@ -347,14 +348,14 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
             <tbody className="divide-y divide-slate-100 relative">
               {loading && (
                 <tr>
-                  <td colSpan={11} className="px-5 py-8 text-center text-slate-400">
+                  <td colSpan={12} className="px-5 py-8 text-center text-slate-400">
                     Calculando meses del año...
                   </td>
                 </tr>
               )}
               {!loading && dataPorMes.map((row, i) => {
                 if (!row.data || !row.data.controlCierre) return (
-                   <tr key={i}><td className="px-5 py-3 font-medium text-slate-700">{row.mes}</td><td colSpan={10} className="text-slate-400 px-5 py-3 text-center">Sin datos</td></tr>
+                   <tr key={i}><td className="px-5 py-3 font-medium text-slate-700">{row.mes}</td><td colSpan={11} className="text-slate-400 px-5 py-3 text-center">Sin datos</td></tr>
                 );
 
                 const c = row.data;
@@ -381,13 +382,20 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
                 else if (estadoSiigo === 'parcial') estadoIcon = <span className="inline-block w-2 h-2 rounded-full bg-amber-400 ml-1.5" title="Estado Parcial (puede cambiar)"></span>;
                 else if (estadoSiigo === 'cerrado') estadoIcon = <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 ml-1.5" title="Estado Cerrado"></span>;
 
+                const ventasNetas = row.data.kpisCC101?.ventasNetas || 0;
+                const costoRealOP = row.data.kpisCC101?.costoRealOP || 0;
+                const ratioReal = ventasNetas > 0 ? (costoRealOP / ventasNetas) * 100 : null;
+
                 return (
                   <tr key={i} className={`hover:bg-slate-50 transition-colors ${isAlert ? 'bg-red-50' : ''}`}>
                     <td className={`px-5 py-3 font-medium flex items-center ${isAlert ? 'text-red-700' : 'text-slate-700'}`}>
                       {row.mes} {estadoIcon}
                     </td>
                     <td className={`px-5 py-3 text-right font-semibold ${isAlert ? 'text-red-700' : 'text-slate-800'}`}>{fmtCOP.format(depurado)}</td>
-                    <td className={`px-5 py-3 text-right font-medium text-slate-700`}>{fmtCOP.format(row.data.kpisCC101?.costoRealOP || 0)}</td>
+                    <td className={`px-5 py-3 text-right font-medium text-slate-700`}>{fmtCOP.format(costoRealOP)}</td>
+                    <td className={`px-5 py-3 text-right font-semibold text-indigo-700 bg-indigo-50/30`}>
+                      {ratioReal !== null ? `${ratioReal.toFixed(1)}%` : '—'}
+                    </td>
                     <td className={`px-5 py-3 text-right font-bold text-indigo-700`}>{fmtCOP.format(row.data.kpisCC101?.cc101Propuesto || 0)}</td>
                     <td className={`px-5 py-3 text-right font-medium ${isAlert ? 'text-red-600' : 'text-emerald-700'}`}>{fmtCOP.format(produccion)}</td>
                     <td className={`px-5 py-3 text-right font-semibold text-amber-700`}>{fmtCOPCierre.format(otrosCostos)}</td>
@@ -1077,7 +1085,10 @@ export default function CierreCosto() {
                 <div className="absolute top-0 right-0 w-16 h-16 bg-amber-100 rounded-bl-full -mr-8 -mt-8"></div>
                 <span className="text-sm font-bold text-amber-900 z-10">CC-101 Propuesto</span>
                 <p className="text-3xl font-black text-amber-700 my-1 z-10">{fmtCOPCierre.format(cierreCostos.kpisCC101?.cc101Propuesto || 0)}</p>
-                <p className="text-[10px] text-amber-800 font-bold z-10">Ventas × {(cierreCostos.ratioAplicado * 100).toFixed(2)}% (Ratio Histórico)</p>
+                <p className="text-[10px] text-amber-800 font-bold z-10">
+                  Ratio aplicado: {(cierreCostos.ratioAplicado * 100).toFixed(2)}%
+                  {cierreCostos.ratioVigenteDesde && ` (vigente desde ${new Date(cierreCostos.ratioVigenteDesde).toLocaleDateString('es-CO')})`}
+                </p>
               </div>
             </div>
 

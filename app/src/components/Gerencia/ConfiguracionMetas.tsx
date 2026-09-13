@@ -21,6 +21,8 @@ export default function ConfiguracionMetas() {
   
   const [claveHistorial, setClaveHistorial] = useState<string | null>(null);
 
+  const [sugerenciaRatio, setSugerenciaRatio] = useState<number | null>(null);
+
   useEffect(() => {
     cargarDatos();
   }, []);
@@ -29,12 +31,16 @@ export default function ConfiguracionMetas() {
     setLoading(true);
     setError(null);
     try {
-      const [params, hist] = await Promise.all([
+      const [params, hist, sugRes] = await Promise.all([
         fetchParametros(),
-        fetchHistorialParametros()
+        fetchHistorialParametros(),
+        fetch('/api/movimientos_materiales/sugerencia-ratio').then(r => r.json()).catch(() => null)
       ]);
       setParametros(params);
       setHistorico(hist);
+      if (sugRes && sugRes.ok && sugRes.sugerencia) {
+        setSugerenciaRatio(sugRes.sugerencia);
+      }
     } catch (err: any) {
       setError(err.message || 'Error al cargar los parámetros');
     } finally {
@@ -105,14 +111,27 @@ export default function ConfiguracionMetas() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-slate-700 font-mono text-sm">{param.clave}</span>
+                        <span className="font-semibold text-slate-700 font-mono text-sm">{param.clave === 'ratio_ajuste_inventario' ? 'Ratio de Costo de Ventas (CC-101)' : param.clave}</span>
                         {param.modificado_en && (
                           <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
                             Vigente desde: {new Date(param.vigente_desde).toLocaleDateString('es-CO')}
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-slate-500">{param.descripcion}</p>
+                      <p className="text-sm text-slate-500">
+                        {param.clave === 'ratio_ajuste_inventario' ? (
+                          <>
+                            El ratio se aplica a las ventas netas del mes para calcular el CC-101 propuesto. Debe revisarse al cierre de cada trimestre comparando el ratio real acumulado. <em>Ratio validado por Contabilidad en el semestre ene-jun 2026: 76.19%.</em>
+                            {sugerenciaRatio !== null && (
+                              <span className="block mt-2 text-indigo-700 font-medium bg-indigo-50 px-3 py-1.5 rounded-md text-xs border border-indigo-100 inline-block">
+                                Sugerencia según datos reales YTD {new Date().getFullYear()}: {sugerenciaRatio.toFixed(2)}%
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          param.descripcion
+                        )}
+                      </p>
                     </div>
 
                     <div className="flex items-center gap-4 shrink-0">

@@ -246,10 +246,10 @@ router.get('/cierre-costos', async (req, res) => {
     `;
     
     const sqlRatio = `
-      SELECT valor FROM app_ops.parametros 
+      SELECT valor, vigente_desde FROM app_ops.parametros 
       WHERE clave = 'ratio_ajuste_inventario' 
-        AND vigente_desde <= CURRENT_DATE 
-        AND (vigente_hasta IS NULL OR vigente_hasta > CURRENT_DATE)
+        AND vigente_desde < $1 
+        AND (vigente_hasta IS NULL OR vigente_hasta >= $1)
       ORDER BY vigente_desde DESC LIMIT 1
     `;
 
@@ -303,7 +303,7 @@ router.get('/cierre-costos', async (req, res) => {
       query(sqlCompras, params),
       query(sqlControlCierre, params),
       query(sqlSiigo, [anio, mes]),
-      query(sqlRatio, []),
+      query(sqlRatio, [primerDiaSiguiente]),
       query(sqlKPIs, params).catch(err => {
          console.warn("Error en KPI query, retornando valores por defecto:", err.message);
          return { rows: [{ ventas_netas: 0, costo_real_op: 0, ops_sin_valor_cumplido: 0, ops_facturacion_excede: 0 }] };
@@ -328,6 +328,7 @@ router.get('/cierre-costos', async (req, res) => {
     const comprasTotal = resCompras.rows[0]?.valor || "0";
     
     const ratio_ajuste_inventario = resRatio.rows[0]?.valor ? parseFloat(resRatio.rows[0].valor) / 100 : 0.77;
+    const ratio_vigente_desde = resRatio.rows[0]?.vigente_desde || null;
     const ventasNetas = parseFloat(resKPIs.rows[0]?.ventas_netas || 0);
     const costoRealOP = parseFloat(resKPIs.rows[0]?.costo_real_op || 0);
     const opsSinValorCumplido = parseInt(resKPIs.rows[0]?.ops_sin_valor_cumplido || 0, 10);
@@ -376,11 +377,59 @@ router.get('/cierre-costos', async (req, res) => {
           opsFacturacionExcede
         }
       },
-      ratioAplicado: ratio_ajuste_inventario
+      ratioAplicado: ratio_ajuste_inventario,
+      ratioVigenteDesde: ratio_vigente_desde
     });
 
   } catch (err) {
     console.error('GET /api/movimientos_materiales/cierre-costos error:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/movimientos_materiales/sugerencia-ratio
+ */
+router.get('/sugerencia-ratio', async (req, res) => {
+  try {
+    const sqlSugerencia = `
+      WITH facturas_ytd AS (
+        SELECT consecutivo, valor_neto, fecha_creacion
+        FROM crisolweb.facturas
+        WHERE EXTRACT(YEAR FROM fecha_creacion) = EXTRACT(YEAR FROM CURRENT_DATE)
+          AND (estado IS NULL OR UPPER(TRIM(estado)) NOT IN ('ANULADO', 'SIN CONFIRMAR', 'ANULADA'))
+      ),
+      ventas_ops AS (
+        SELECT 
+          fm.consecutivo as nro_factura,
+          fm.valor_neto as valor_facturado_op,
+          cpo.costo_ejecutado_total,
+          cpo.valor_cumplido
+        FROM facturas_ytd fm
+        JOIN crisolweb.facturacion_op fo ON fm.consecutivo = fo.nro_op
+        JOIN crisolweb.costo_por_orden cpo ON fo.referencia = cpo.nro_op
+      ),
+      prorrateado AS (
+        SELECT 
+          valor_facturado_op,
+          CASE 
+            WHEN valor_cumplido IS NULL OR valor_cumplido = 0 THEN 0
+            ELSE LEAST(valor_facturado_op / valor_cumplido, 1.0) * costo_ejecutado_total
+          END as costo_asignado
+        FROM ventas_ops
+      )
+      SELECT 
+        (SELECT COALESCE(SUM(valor_neto), 0) FROM facturas_ytd) as ventas_netas_ytd,
+        (SELECT COALESCE(SUM(costo_asignado), 0) FROM prorrateado) as costo_real_ytd
+    `;
+    const { rows } = await query(sqlSugerencia);
+    const ventas = parseFloat(rows[0]?.ventas_netas_ytd || 0);
+    const costo = parseFloat(rows[0]?.costo_real_ytd || 0);
+    const sugerencia = ventas > 0 ? (costo / ventas) * 100 : null;
+    
+    res.json({ ok: true, sugerencia, ventas, costo });
+  } catch (err) {
+    console.error('GET /api/movimientos_materiales/sugerencia-ratio error:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
