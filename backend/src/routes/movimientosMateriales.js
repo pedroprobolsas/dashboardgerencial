@@ -399,6 +399,21 @@ router.get('/test-parametros', async (req, res) => {
   }
 });
 
+// A temporary public endpoint to bypass auth for debugging
+router.get('/debug-parametros-public', async (req, res) => {
+  try {
+    const sql = `
+      SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, modificado_por, modificado_en, motivo
+      FROM app_ops.parametros
+      WHERE vigente_hasta IS NULL
+    `;
+    const { rows } = await query(sql);
+    res.json({ ok: true, rows });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, stack: err.stack });
+  }
+});
+
 /**
  * GET /api/movimientos_materiales/sugerencia-ratio
  */
