@@ -271,14 +271,18 @@ export interface Parametro {
 
 export async function fetchParametros(fecha?: string): Promise<Record<string, Parametro>> {
   const url = fecha ? `/api/parametros?fecha=${fecha}` : '/api/parametros';
-  const res = await fetch(url);
-  checkAuthError(res);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Error ${res.status}`);
+  try {
+    const res = await fetch(url);
+    checkAuthError(res);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP_Error_${res.status}`);
+    }
+    const data = await res.json();
+    return data.parametros || {};
+  } catch (e: any) {
+    throw new Error(`DEBUG_PARAM_FETCH: ${e.name} - ${e.message}`);
   }
-  const data = await res.json();
-  return data.parametros || {};
 }
 
 export async function fetchHistorialParametros(): Promise<Parametro[]> {
