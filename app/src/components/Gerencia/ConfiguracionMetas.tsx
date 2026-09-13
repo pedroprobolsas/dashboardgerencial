@@ -31,15 +31,20 @@ export default function ConfiguracionMetas() {
     setLoading(true);
     setError(null);
     try {
-      const [params, hist, sugRes] = await Promise.all([
+      const [params, hist] = await Promise.all([
         fetchParametros(),
-        fetchHistorialParametros(),
-        fetch('/api/movimientos_materiales/sugerencia-ratio').then(r => r.json()).catch(() => null)
+        fetchHistorialParametros()
       ]);
       setParametros(params);
       setHistorico(hist);
-      if (sugRes && sugRes.ok && sugRes.sugerencia) {
-        setSugerenciaRatio(sugRes.sugerencia);
+      
+      try {
+        const sugRes = await fetch('/api/movimientos_materiales/sugerencia-ratio').then(r => r.json());
+        if (sugRes && sugRes.ok && sugRes.sugerencia) {
+          setSugerenciaRatio(sugRes.sugerencia);
+        }
+      } catch(e) {
+        console.warn('Sugerencia fetch failed', e);
       }
     } catch (err: any) {
       console.error(err);
