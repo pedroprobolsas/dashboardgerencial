@@ -254,7 +254,12 @@ router.get('/cierre-costos', async (req, res) => {
     `;
 
     const sqlKPIs = `
-      WITH facturado_mes AS (
+      WITH facturas_mes AS (
+        SELECT COALESCE(SUM(valor_neto), 0) as total_ventas
+        FROM crisolweb.facturas
+        WHERE fecha_creacion >= $1 AND fecha_creacion < $2
+      ),
+      facturado_op_mes AS (
         SELECT referencia AS op_prod,
                SUM(valor_neto) AS valor_mes
         FROM crisolweb.facturacion_op
@@ -263,7 +268,11 @@ router.get('/cierre-costos', async (req, res) => {
         GROUP BY 1
       ),
       costo_unico_op AS (
-        SELECT nro_op, MAX(costo_ejecutado_total) AS costo, MAX(valor_cumplido) AS vc
+        SELECT 
+          nro_op, 
+          MAX(costo_ejecutado_total) AS costo, 
+          MAX(valor_cumplido) AS vc,
+          MAX(costo_total_estimado) AS costo_estimado
         FROM crisolweb.costo_por_orden
         WHERE nro_op ~ '^[0-9]+$'
         GROUP BY nro_op
@@ -275,19 +284,23 @@ router.get('/cierre-costos', async (req, res) => {
           COALESCE(cop.costo, 0) as costo_ejecutado_total,
           cop.vc as valor_cumplido,
           CASE 
-            WHEN cop.vc IS NULL OR cop.vc = 0 THEN 0
-            ELSE LEAST(fm.valor_mes / cop.vc, 1.0) * COALESCE(cop.costo, 0)
+            WHEN cop.vc IS NOT NULL AND cop.vc > 0 THEN
+              LEAST(fm.valor_mes / cop.vc, 1.0) * COALESCE(cop.costo, 0)
+            WHEN cop.costo_estimado IS NOT NULL AND cop.costo_estimado > 0 THEN
+              LEAST(fm.valor_mes / cop.costo_estimado, 1.0) * COALESCE(cop.costo, 0)
+            ELSE 0
           END as costo_asignado,
           CASE WHEN cop.vc IS NULL OR cop.vc = 0 THEN 1 ELSE 0 END as sin_valor_cumplido,
           CASE WHEN cop.vc > 0 AND fm.valor_mes > cop.vc THEN 1 ELSE 0 END as excede_valor
-        FROM facturado_mes fm
+        FROM facturado_op_mes fm
         LEFT JOIN costo_unico_op cop ON fm.op_prod = cop.nro_op
       )
       SELECT 
-        (SELECT COALESCE(SUM(valor_mes), 0) FROM facturado_mes) as ventas_netas,
+        (SELECT total_ventas FROM facturas_mes) as ventas_netas,
         (SELECT COALESCE(SUM(costo_asignado), 0) FROM prorrateado) as costo_real_op,
         (SELECT COALESCE(SUM(sin_valor_cumplido), 0) FROM prorrateado) as ops_sin_valor_cumplido,
-        (SELECT COALESCE(SUM(excede_valor), 0) FROM prorrateado) as ops_facturacion_excede
+        (SELECT COALESCE(SUM(excede_valor), 0) FROM prorrateado) as ops_facturacion_excede,
+        (SELECT COUNT(*) FROM prorrateado) as total_ops_prorrateadas
     `;
 
     const params = [primerDia, primerDiaSiguiente];
@@ -327,6 +340,8 @@ router.get('/cierre-costos', async (req, res) => {
     const costoRealOP = parseFloat(resKPIs.rows[0]?.costo_real_op || 0);
     const opsSinValorCumplido = parseInt(resKPIs.rows[0]?.ops_sin_valor_cumplido || 0, 10);
     const opsFacturacionExcede = parseInt(resKPIs.rows[0]?.ops_facturacion_excede || 0, 10);
+    const totalOpsProrrateadas = parseInt(resKPIs.rows[0]?.total_ops_prorrateadas || 0, 10);
+    const opsConCosteoCompleto = totalOpsProrrateadas - opsSinValorCumplido;
     
     const cc101PorRatio = ventasNetas * ratio_ajuste_inventario;
     const cc101Propuesto = Math.max(costoRealOP, cc101PorRatio);
@@ -370,6 +385,8 @@ router.get('/cierre-costos', async (req, res) => {
         ajusteInventario: ajusteInventario,
         cc101Propuesto: cc101Propuesto,
         metodoCC101: metodoCC101,
+        opsConCosteoCompleto: opsConCosteoCompleto,
+        totalOpsProrrateadas: totalOpsProrrateadas,
         alertas: {
           opsSinValorCumplido,
           opsFacturacionExcede

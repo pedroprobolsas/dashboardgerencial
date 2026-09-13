@@ -1078,7 +1078,12 @@ export default function CierreCosto() {
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
                 <span className="text-sm font-semibold text-slate-600">Costo Real (por OP)</span>
                 <p className="text-3xl font-bold text-slate-800 my-1">{fmtCOPCierre.format(cierreCostos.kpisCC101?.costoRealOP || 0)}</p>
-                <p className="text-[10px] text-slate-400 font-mono">Postcosteo asignado a OPs facturadas</p>
+                <div className="flex justify-between items-center">
+                  <p className="text-[10px] text-slate-400 font-mono">Postcosteo asignado a OPs facturadas</p>
+                  <p className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-full" title="Ops con valor cumplido válido">
+                    {cierreCostos.kpisCC101?.opsConCosteoCompleto || 0} de {cierreCostos.kpisCC101?.totalOpsProrrateadas || 0} OPs costeadas
+                  </p>
+                </div>
               </div>
               <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 flex flex-col gap-1">
                 <span className="text-sm font-semibold text-slate-600">Ajuste de Inventario</span>
