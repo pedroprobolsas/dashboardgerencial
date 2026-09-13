@@ -483,7 +483,7 @@ router.get('/detalle-cc101', async (req, res) => {
       SELECT 
         consecutivo as nro_factura,
         valor_neto,
-        tercero as cliente,
+        nombre as cliente,
         fecha_creacion as fecha,
         CASE 
           WHEN valor_neto < 0 THEN 'nota_credito'
@@ -515,7 +515,7 @@ router.get('/detalle-cc101', async (req, res) => {
 
     // Facturas huérfanas top 10 (sin_op, valor_neto > 0)
     const sqlHuerfanas = `
-      SELECT consecutivo as nro_factura, tercero as cliente, valor_neto
+      SELECT consecutivo as nro_factura, nombre as cliente, valor_neto
       FROM crisolweb.facturas f
       WHERE EXTRACT(YEAR FROM f.fecha_creacion) = $1 AND EXTRACT(MONTH FROM f.fecha_creacion) = $2
         AND valor_neto > 0
@@ -527,9 +527,9 @@ router.get('/detalle-cc101', async (req, res) => {
 
     const params = [anioNum, mesNum];
     const [resFacturas, resOps, resHuerfanas] = await Promise.all([
-      query(sqlFacturas, params).catch(e => { console.error("Error facturas", e); return { rows: [] }; }),
-      query(sqlOps, params).catch(e => { console.error("Error ops", e); return { rows: [] }; }),
-      query(sqlHuerfanas, params).catch(e => { console.error("Error huerfanas", e); return { rows: [] }; })
+      query(sqlFacturas, params),
+      query(sqlOps, params),
+      query(sqlHuerfanas, params)
     ]);
     
     res.json({
