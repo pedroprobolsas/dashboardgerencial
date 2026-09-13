@@ -38,6 +38,15 @@ export default function ConfiguracionMetas() {
       setParametros(params);
       setHistorico(hist);
 
+      try {
+        const sugRes = await fetch('/api/movimientos_materiales/sugerencia-ratio').then(r => r.json());
+        if (sugRes && sugRes.ok && sugRes.sugerencia) {
+          setSugerenciaRatio(sugRes.sugerencia);
+        }
+      } catch (e) {
+        console.warn('Sugerencia fetch failed', e);
+      }
+
     } catch (err: any) {
       console.error(err);
       setError(err.stack || err.message || 'Error al cargar los parámetros');
