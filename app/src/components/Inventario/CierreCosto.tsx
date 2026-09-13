@@ -1218,7 +1218,7 @@ export default function CierreCosto() {
 
       {/* COHERENCIA DE COSTOS (ANUAL) */}
       <CoherenciaCostos defaultYear={year} mockMonths={mockMonths} availableYears={years} />
-      <DetalleCC101 year={year} month={month} />
+      <DetalleCC101 key={`cc101-${year}-${month}`} year={year} month={month} />
 
       {/* REPORTE CIERRE COSTOS SIIGO */}
       <ReporteCierreSiigo defaultYear={year} defaultMonth={month} mockMonths={mockMonths} availableYears={years} cierreCostos={cierreCostos} />
