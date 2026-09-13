@@ -16,8 +16,6 @@ const fmtNum = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 4 });
 const fmtDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : '—';
 
 function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYears, cierreCostos }: { defaultYear: number, defaultMonth: number, mockMonths: any[], availableYears: number[], cierreCostos: any }) {
-  const [year, setYear] = useState(defaultYear);
-  const [month, setMonth] = useState(defaultMonth);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<{ code: string; concept: string; valor: number }[]>([]);
   const [estado, setEstado] = useState('sin datos');
@@ -27,7 +25,7 @@ function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYe
     const fetchReport = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/movimientos_materiales/reporte-siigo-detalle?anio=${year}&mes=${month}`);
+        const res = await fetch(`/api/movimientos_materiales/reporte-siigo-detalle?anio=${defaultYear}&mes=${defaultMonth}`);
         if (!res.ok) throw new Error('Network response was not ok');
         const json = await res.json();
         if (active && json.ok) {
@@ -42,7 +40,7 @@ function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYe
     };
     fetchReport();
     return () => { active = false; };
-  }, [year, month]);
+  }, [defaultYear, defaultMonth]);
 
   const total72 = data.filter(d => d.code.startsWith('72')).reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
   const total73 = data.filter(d => d.code.startsWith('73')).reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
@@ -186,20 +184,6 @@ function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, availableYe
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <select
-            className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500 bg-slate-50"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-          >
-            {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-          <select
-            className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500 bg-slate-50"
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-          >
-            {mockMonths.map(m => <option key={m.val} value={m.val}>{m.label}</option>)}
-          </select>
           <button
             onClick={handlePrint}
             disabled={loading || data.length === 0}
