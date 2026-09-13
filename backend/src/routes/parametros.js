@@ -9,12 +9,6 @@ const router = Router();
 const ENDPOINT = '/api/parametros';
 
 router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
-  try {
-    await require('../dbClient').query('ALTER TABLE app_ops.parametros ADD COLUMN IF NOT EXISTS motivo TEXT;');
-  } catch (e) {
-    return res.status(500).json({ ok: false, error: 'Migración Falló', detalle: e.message });
-  }
-
   const { fecha } = req.query;
   let sql;
   let params = [];
@@ -54,11 +48,6 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
 }));
 
 router.get('/historico', asyncHandler(ENDPOINT + '/historico', async (req, res) => {
-  try {
-    await require('../dbClient').query('ALTER TABLE app_ops.parametros ADD COLUMN IF NOT EXISTS motivo TEXT;');
-  } catch (e) {
-    // ignore here since root route catches it
-  }
   const sql = `
     SELECT id, clave, valor, unidad, descripcion, categoria, vigente_desde, vigente_hasta, modificado_por, modificado_en, motivo
     FROM app_ops.parametros
