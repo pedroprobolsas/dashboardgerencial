@@ -27,6 +27,7 @@ interface LockState {
   locked_by: string;
   locked_at: string;
   elapsed_seconds: number | null;
+  last_error?: string;
 }
 
 export default function EstadoDatos() {
@@ -130,6 +131,7 @@ export default function EstadoDatos() {
     const lock = locks[type];
     const isRunning = lock?.status === 'in_progress';
     const isRecentlyCompleted = lock?.status === 'completed' && lock?.elapsed_seconds !== null && lock.elapsed_seconds < 30;
+    const isRecentlyFailed = lock?.status === 'failed' && lock?.elapsed_seconds !== null && lock.elapsed_seconds < 60;
 
     if (isRunning) {
       const isMe = lock.locked_by === user.email;
@@ -146,6 +148,22 @@ export default function EstadoDatos() {
         <button disabled className="mt-4 w-full py-2 bg-emerald-500/20 text-emerald-500 rounded text-sm font-medium border border-emerald-500/30 flex justify-center items-center gap-2">
           <span>✅</span> Actualizado hace {lock.elapsed_seconds}s
         </button>
+      );
+    }
+
+    if (isRecentlyFailed) {
+      return (
+        <div className="mt-4 w-full flex flex-col gap-1">
+          <button 
+            onClick={() => openModal(type)}
+            className="w-full py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded text-sm font-medium border border-red-500/30 transition-colors flex justify-center items-center gap-2"
+          >
+            <span>❌</span> Falló, Reintentar
+          </button>
+          <span className="text-[10px] text-red-400/80 text-center truncate px-2" title={lock.last_error}>
+            {lock.last_error === 'host_agent_unreachable' ? 'El Agente está apagado' : lock.last_error || 'Error desconocido'}
+          </span>
+        </div>
       );
     }
 
@@ -244,7 +262,7 @@ export default function EstadoDatos() {
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">Última data:</span>
                     <span className="text-slate-200 font-medium">
-                      {p.ultima_fecha_datos ? new Date(p.ultima_fecha_datos + 'T00:00:00').toLocaleDateString('es-CO') : 'Desconocida'}
+                      {p.ultima_fecha_datos ? new Date(p.ultima_fecha_datos.split('T')[0] + 'T00:00:00').toLocaleDateString('es-CO') : 'Desconocida'}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">

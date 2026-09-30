@@ -67,11 +67,16 @@ router.get('/lock-state', asyncHandler('/api/data-status/lock-state', async (req
   
   const locks = {};
   result.rows.forEach(r => {
+    let refDate = r.locked_at;
+    if (r.status === 'completed' || r.status === 'failed') {
+      refDate = r.completed_at || r.locked_at;
+    }
     locks[r.pipeline_id] = {
       status: r.status,
       locked_by: r.locked_by_email,
       locked_at: r.locked_at,
-      elapsed_seconds: r.locked_at ? Math.round((new Date() - new Date(r.locked_at))/1000) : null
+      elapsed_seconds: refDate ? Math.round((new Date() - new Date(refDate))/1000) : null,
+      last_error: r.last_error
     };
   });
   
