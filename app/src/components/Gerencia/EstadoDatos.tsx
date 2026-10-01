@@ -131,7 +131,7 @@ export default function EstadoDatos() {
     const lock = locks[type];
     const isRunning = lock?.status === 'in_progress';
     const isRecentlyCompleted = lock?.status === 'completed' && lock?.elapsed_seconds !== null && lock.elapsed_seconds < 30;
-    const isRecentlyFailed = lock?.status === 'failed' && lock?.elapsed_seconds !== null && lock.elapsed_seconds < 60;
+    const isRecentlyFailed = lock?.status === 'failed';
 
     if (isRunning) {
       const isMe = lock.locked_by === user.email;
