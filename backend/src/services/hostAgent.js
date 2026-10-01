@@ -73,4 +73,3 @@ async function runPipeline(pipelineName) {
 module.exports = {
   runPipeline
 };
-};
