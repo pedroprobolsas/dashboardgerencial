@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('yaml');
 const { exec } = require('child_process');
-require('dotenv').config();
+
 
 const app = express();
 app.use(express.json());

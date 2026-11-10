@@ -50,7 +50,7 @@ console.log(`📅 Modo: ${modoHistorico ? 'HISTÓRICO COMPLETO' : `DIARIO (${FI_
 
 const REPORTES = [
   { tabla: 'costo_por_orden',       menuId: 'postcosteodetalladoop', url: 'https://crisolweb.net/ControlPiso', dates: true,  upsertKey: ['nro_op','referencia'] },
-  { tabla: 'ordenes_cumplidas',         menuId: 'ctlpisounidadescumplidasop', url: 'https://crisolweb.net/ControlPiso', dates: true,  upsertKey: ['nro_orden','referencia'] },
+// SACADO 20261109 (lo hace cron-ordenes-cumplidas.mjs)   { tabla: 'ordenes_cumplidas',         menuId: 'ctlpisounidadescumplidasop', url: 'https://crisolweb.net/ControlPiso', dates: true,  upsertKey: ['nro_orden','referencia'] },
   { tabla: 'facturas',              menuId: 'listadoFacturas',       url: 'https://crisolweb.net/Facturacion', dates: true,  upsertKey: ['consecutivo'] },
   { tabla: 'ingresos',              menuId: 'listadoingresos',       url: 'https://crisolweb.net/Facturacion', dates: true,  upsertKey: ['nro_recibo'] },
   { tabla: 'facturacion_op',        menuId: 'facturacionop',         url: 'https://crisolweb.net/Facturacion', dates: true,  upsertKey: ['nro_op','referencia'] },
@@ -368,7 +368,16 @@ async function descargarCSV(page, context, reporte, fi, ff) {
   }
 
   await frame.evaluate(()=>{document.getElementById('ReportViewer1_ctl05_ctl04_ctl00_ButtonLink')?.click();});
-  await frame.waitForTimeout(500);
+  let linkReady=false;
+  for(let i=0;i<15;i++){
+    linkReady = await frame.evaluate(()=>{
+      const link=[...document.querySelectorAll('a')].find(a=>(a.getAttribute('onclick')||'').includes("exportReport('CSV')"));
+      return !!(link && link.offsetParent !== null);
+    }).catch(()=>false);
+    if(linkReady) break;
+    await page.waitForTimeout(1000);
+  }
+  if(!linkReady) console.log('  [WARN] enlace de exportar CSV no visible tras 15s de espera');
   await frame.evaluate(()=>{
     const link=[...document.querySelectorAll('a')].find(a=>(a.getAttribute('onclick')||'').includes("exportReport('CSV')"));
     if(link) link.click();
