@@ -347,7 +347,7 @@ export function buildComprobantePdfBytes(data: ComprobantePdfData): Uint8Array {
   const docCol1W = 112;
   const docCol2W = docTableW - docCol1W;
   const docTableX = innerX + innerW - docTableW;
-  const row1H = 26;
+  const row1H = 30;
   const row2H = 18;
   const row1Y = headerTopY - row1H;
   const row2Y = row1Y - row2H;
@@ -366,18 +366,23 @@ export function buildComprobantePdfBytes(data: ComprobantePdfData): Uint8Array {
   );
 
   curOps.push(
-    drawTextCmd(data.docCode, docTableX + 5, row1Y + 15, 'F2', 7.5, PDF_COLORS.black)
+    drawTextCmd(data.docCode, docTableX + 5, row1Y + 20, 'F2', 7.5, PDF_COLORS.black)
   );
-  const wrappedDocLabel = wrapText(data.docLabel, docCol1W - 8, 7, true);
+  const wrappedDocLabel = wrapText(data.docLabel, docCol1W - 8, 6.8, true);
   curOps.push(
-    drawTextCmd(wrappedDocLabel[0] || '', docTableX + 5, row1Y + 6, 'F2', 7, PDF_COLORS.black)
+    drawTextCmd(wrappedDocLabel[0] || '', docTableX + 5, row1Y + 11.5, 'F2', 6.8, PDF_COLORS.black)
   );
+  if (wrappedDocLabel[1]) {
+    curOps.push(
+      drawTextCmd(wrappedDocLabel[1], docTableX + 5, row1Y + 3.5, 'F2', 6.8, PDF_COLORS.black)
+    );
+  }
   curOps.push(
     drawAlignedTextCmd(
       `${data.docCode}-___`,
       docTableX + docCol1W,
       docCol2W,
-      row1Y + 10,
+      row1Y + 12,
       'center',
       'F2',
       8.5,

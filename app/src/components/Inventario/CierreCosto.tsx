@@ -58,8 +58,8 @@ function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, cierreCosto
 
     const terceroNombre = 'INDUSTRIAS PLASTICAS PROBOLSAS SAS';
 
-    // CC-99
-    const valor99 = cierreCostos?.controlCierre?.depurado || 0;
+    // CC-99 (convertir explícitamente a Number porque Postgres devuelve NUMERIC como string)
+    const valor99 = Number(cierreCostos?.controlCierre?.depurado) || 0;
     const valor99Fmt = fmtNumOnly.format(valor99);
     const rows99: ComprobanteItemRow[] = [
       {
@@ -101,7 +101,8 @@ function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, cierreCosto
     );
 
     // CC-100
-    const totalDebito100 = valor99 + total;
+    const totalCostos100 = data.reduce((acc, d) => acc + (Number(d.valor) || 0), 0);
+    const totalDebito100 = valor99 + totalCostos100;
     const totalDebito100Fmt = fmtNumOnly.format(totalDebito100);
     const rows100: ComprobanteItemRow[] = [
       {
@@ -151,7 +152,7 @@ function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, cierreCosto
     );
 
     // CC-101
-    const valor101 = cierreCostos.kpisCC101?.cc101Propuesto || 0;
+    const valor101 = Number(cierreCostos.kpisCC101?.cc101Propuesto) || 0;
     const valor101Fmt = fmtNumOnly.format(valor101);
     const rows101: ComprobanteItemRow[] = [
       {
@@ -192,7 +193,7 @@ function ReporteCierreSiigo({ defaultYear, defaultMonth, mockMonths, cierreCosto
     );
 
     // CC-102
-    const valor102 = cierreCostos?.produccionTerminada?.total || 0;
+    const valor102 = Number(cierreCostos?.produccionTerminada?.total) || 0;
     const valor102Fmt = fmtNumOnly.format(valor102);
     const rows102: ComprobanteItemRow[] = [
       {
