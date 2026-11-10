@@ -4,6 +4,8 @@ name: 🚀 Build y Deploy — Dashboard Probolsas
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'ops/**'
   workflow_dispatch:
 
 jobs:

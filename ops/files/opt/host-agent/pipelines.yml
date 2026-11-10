@@ -1,0 +1,22 @@
+# Definición de pipelines para el Host Agent
+# crisolweb: un solo paso que llama al orquestador, el mismo que usa el cron.
+# Sin pre_hook: el candado del orquestador evita corridas simultáneas.
+crisolweb:
+  display_name: "Pipeline Crisolweb"
+  timeout_minutes: 30
+  steps:
+    - name: "Pipeline completo (orquestador)"
+      command: "/root/pipeline-crisolweb.sh"
+      timeout_minutes: 30
+
+# siigo_saldos: todo SIIGO por la API oficial (sin navegador ni código SMS).
+siigo_saldos:
+  display_name: "SIIGO (saldos, finanzas y costos)"
+  timeout_minutes: 10
+  steps:
+    - name: "Saldos bancarios"
+      command: "python3 /root/siigo-saldos-api.py"
+      timeout_minutes: 3
+    - name: "Finanzas y costos de producción"
+      command: "python3 /root/siigo-contable-api.py"
+      timeout_minutes: 6

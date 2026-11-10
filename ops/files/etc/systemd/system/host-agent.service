@@ -1,0 +1,18 @@
+[Unit]
+Description=Probolsas Host Agent
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/host-agent
+EnvironmentFile=/opt/host-agent/.env
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/host-agent/agent.log
+StandardError=append:/var/log/host-agent/agent-error.log
+
+[Install]
+WantedBy=multi-user.target

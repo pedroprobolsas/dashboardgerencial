@@ -1,0 +1,13 @@
+# Nunca versionar secretos, respaldos ni artefactos temporales en ops/
+.env
+.env.*
+*.env
+.telegram-env
+*.bak
+*.bak-*
+__pycache__/
+*.py[cod]
+crisolweb-cron.sh
+crisolweb-sync.js
+crisolweb-sync-r5r8.js
+send-telegram.sh

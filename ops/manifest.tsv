@@ -1,0 +1,26 @@
+# Manifiesto de archivos gestionados en el VPS (Tarea T1)
+# Formato separado por tabuladores (TSV):
+# ruta_relativa_desde_raiz	permisos_octal	usuario:grupo
+# Permisos y dueños verificados con `stat -c '%a %U:%G'` en el VPS (2026-11-09).
+
+etc/cron.d/probolsas-pipeline	0644	root:root
+root/pipeline-crisolweb.sh	0700	root:root
+root/sync-postgres-from-host.sh	0755	root:root
+root/run-sync-movimientos-materiales.sh	0755	root:root
+root/sync-movimientos-materiales.sh	0755	root:root
+root/trigger-detalle-op.sh	0700	root:root
+root/relleno-detalle-op.sh	0700	root:root
+root/check-frescura.sh	0700	root:root
+root/siigo_api.py	0644	root:root
+root/siigo-saldos-api.py	0700	root:root
+root/siigo-contable-api.py	0700	root:root
+opt/host-agent/pipelines.yml	0644	root:root
+opt/host-agent/server.js	0644	root:root
+opt/host-agent/package.json	0644	root:root
+opt/host-agent/package-lock.json	0644	root:root
+etc/systemd/system/host-agent.service	0644	root:root
+root/.openclaw/workspace/gen-upsert-sql.mjs	0644	root:root
+root/.openclaw/workspace/cron-ordenes-cumplidas.mjs	0644	root:root
+root/.openclaw/workspace/gen-detalle-op.mjs	0644	root:root
+root/.openclaw/workspace/fetch-movimientos-v2.mjs	0644	ubuntu:ubuntu
+root/.openclaw/workspace/gen-sql-ordenes-cumplidas.mjs	0644	root:root

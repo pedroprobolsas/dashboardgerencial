@@ -1,61 +1,38 @@
 # Probolsas Host Agent
 
-Agente ligero en Node.js que se ejecuta en el host del VPS para orquestar los pipelines de datos desde fuera del clúster de Docker.
+> ⚠️ **Fuente de verdad en este repositorio:**
+> Los archivos reales e instalados en producción del Host Agent viven en `ops/files/` y se gestionan exclusivamente mediante `ops/install.sh`:
+> - `ops/files/opt/host-agent/server.js` → `/opt/host-agent/server.js`
+> - `ops/files/opt/host-agent/package.json` → `/opt/host-agent/package.json`
+> - `ops/files/opt/host-agent/package-lock.json` → `/opt/host-agent/package-lock.json`
+> - `ops/files/opt/host-agent/pipelines.yml` → `/opt/host-agent/pipelines.yml`
+> - `ops/files/etc/systemd/system/host-agent.service` → `/etc/systemd/system/host-agent.service`
 
-## Prerrequisitos
-- Node.js 20+
-- UFW activo (opcional pero muy recomendado)
+---
 
-## Instalación
+## Cómo instalar o actualizar el Host Agent en el VPS
 
-1. Copiar este directorio a `/opt/host-agent`.
-2. Ejecutar `npm install` dentro del directorio.
-3. Crear un archivo `/opt/host-agent/.env` y añadir el token compartido:
-   ```env
-   HOST_AGENT_TOKEN=tu_token_seguro_aqui
-   ```
-4. Crear el servicio de systemd `/etc/systemd/system/host-agent.service`:
-   ```ini
-   [Unit]
-   Description=Probolsas Host Agent
-   After=network.target
-
-   [Service]
-   Type=simple
-   User=root
-   WorkingDirectory=/opt/host-agent
-   ExecStart=/usr/bin/node server.js
-   Restart=always
-   RestartSec=5
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
-5. Iniciar y habilitar el servicio:
+1. Verificar qué cambiaría sin tocar el sistema:
    ```bash
-   systemctl daemon-reload
-   systemctl enable --now host-agent
+   bash ops/install.sh --dry-run
+   ```
+2. Aplicar los archivos validados desde `ops/` (fuera del horario de cargas de 10:30 a 13:30 hora Colombia):
+   ```bash
+   sudo bash ops/install.sh
+   ```
+3. Si cambió `/etc/systemd/system/host-agent.service`, recargar systemd:
+   ```bash
+   sudo systemctl daemon-reload
+   ```
+4. Si cambió `server.js` o `pipelines.yml`, **antes de reiniciar el servicio** confirmar que no haya una corrida en curso revisando `app_ops.pipeline_locks` o `/var/log/pipeline-crisolweb.log`, y luego reiniciar:
+   ```bash
+   sudo systemctl restart host-agent
    ```
 
-## Seguridad de Red (IMPORTANTE)
+## Variables de entorno (`/opt/host-agent/.env` — fuera de Git)
 
-El servidor Express escucha nativamente en `0.0.0.0:3999`. Dado que la IP pública y la IP LAN de tu VPS son la misma (`147.93.44.250`), el puerto **3999 queda expuesto a internet** a menos que configures UFW para bloquear el tráfico externo y solo permitir el puente local de Docker.
-
-**Configurar UFW:**
-```bash
-# Denegar tráfico desde el exterior al puerto 3999
-sudo ufw deny 3999/tcp
-
-# Permitir explícitamente a las subredes de Docker acceder al puerto (ej. red bridge o redes de Swarm)
-# Reemplaza '172.17.0.0/16' por el rango de tu red docker si es distinto
-sudo ufw allow from 172.17.0.0/16 to any port 3999
-sudo ufw allow from 10.0.0.0/8 to any port 3999
+El servicio carga `/opt/host-agent/.env` mediante `EnvironmentFile=/opt/host-agent/.env` en systemd:
+```env
+HOST_AGENT_TOKEN=tu_token_seguro_aqui
 ```
-
-## URL para el Dashboard
-
-En la configuración del Swarm para el dashboard, carga la variable así:
-```
-HOST_AGENT_URL=http://147.93.44.250:3999
-```
-Asegúrate de haber denegado el puerto públicamente en el firewall del VPS.
+*(Nunca versionar `/opt/host-agent/.env` ni `/opt/host-agent/node_modules`)*.

@@ -1,0 +1,3 @@
+# Preservar bytes exactos (LF y permisos) en todos los archivos de ops/
+# Anula core.autocrlf=true en Windows para no romper scripts ni el diff con el VPS.
+* -text

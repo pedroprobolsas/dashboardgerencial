@@ -1,0 +1,7 @@
+# Pipeline Crisolweb -> Postgres (orquestador único). Hora del servidor (-03): 14:00 = 12:00 Colombia.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 14 * * 1-5 root /root/pipeline-crisolweb.sh >/dev/null 2>&1
+0 15 * * 1-5 root /root/check-frescura.sh >/dev/null 2>&1
+35 12 * * 1-5 root /usr/bin/python3 /root/siigo-saldos-api.py >> /var/log/siigo-saldos-api.log 2>&1
+40 12 * * 1-5 root /usr/bin/python3 /root/siigo-contable-api.py >> /var/log/siigo-contable-api.log 2>&1
