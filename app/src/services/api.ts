@@ -759,3 +759,28 @@ export async function fetchSaldosContablesDetalle(clase: number | string, fecha:
   const data = await res.json();
   return data.data || [];
 }
+
+export interface RecargarMesSiigoResultado {
+  periodo: string;
+  fecha_registro: string;
+  estado_mes: string;
+  total_cuentas: number;
+  cuentas_por_clase: Record<string, number>;
+  costos_72: number;
+  costos_73: number;
+  cuentas_costos_detalle: number;
+}
+
+export async function recargarMesSaldosSiigo(anio: number, mes: number): Promise<RecargarMesSiigoResultado> {
+  const res = await fetch('/api/saldos-contables/recargar-mes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ anio, mes }),
+  });
+  checkAuthError(res);
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok || !payload.ok) {
+    throw new Error(payload.error || `Error ${res.status} al recargar mes desde SIIGO`);
+  }
+  return payload.data as RecargarMesSiigoResultado;
+}

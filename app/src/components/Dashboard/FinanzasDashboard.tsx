@@ -3,6 +3,7 @@ import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import { fetchSaldosContables, fetchSaldosContablesDetalle, type SaldoContable, type SaldoContableDetalle } from '../../services/api';
 import { obtenerUltimoMesCompleto } from '../../utils/periodo';
 import ExportarBalanceExcelButton from './ExportarBalanceExcelButton';
+import RecargarMesSiigoButton from './RecargarMesSiigoButton';
 
 const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
@@ -18,6 +19,7 @@ const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', '
 
 export default function FinanzasDashboard() {
   const [fecha, setFecha] = useState(obtenerUltimoMesCompleto);
+  const [recargaTick, setRecargaTick] = useState(0);
 
   const [saldos, setSaldos] = useState<SaldoContable[]>([]);
   const [ultimaActualizacion, setUltimaActualizacion] = useState<string | null>(null);
@@ -52,7 +54,7 @@ export default function FinanzasDashboard() {
     }
     load();
     return () => { ignore = true; };
-  }, [fecha]);
+  }, [fecha, recargaTick]);
 
   // Efecto para cargar los detalles de todas las tablas cuando cambia la fecha
   useEffect(() => {
@@ -83,7 +85,7 @@ export default function FinanzasDashboard() {
     }
     loadDetalles();
     return () => { ignore = true; };
-  }, [fecha]);
+  }, [fecha, recargaTick]);
 
   const dataActual = useMemo(() => {
     const [y, m] = fecha.split('-');
@@ -205,7 +207,11 @@ export default function FinanzasDashboard() {
           <p className="text-sm text-dashboard-textMuted mt-1 capitalize">{labelMes} {fecha.split('-')[0]}</p>
         </div>
         
-        <div className="flex items-end gap-3">
+        <div className="flex items-end gap-3 flex-wrap">
+          <RecargarMesSiigoButton
+            periodo={fecha}
+            onRecargaExitosa={() => setRecargaTick(t => t + 1)}
+          />
           <ExportarBalanceExcelButton periodo={fecha} />
           <div className="flex flex-col">
             <label className="text-[10px] font-semibold text-dashboard-textMuted mb-1 uppercase tracking-wider">Período</label>

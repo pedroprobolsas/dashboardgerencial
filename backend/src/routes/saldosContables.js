@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const asyncHandler = require('../asyncHandler');
 const { query } = require('../dbClient');
+const { requireRole } = require('../middleware/auth');
+const { recargarMesContableSiigo } = require('../services/siigoContableSync');
+
+const LOCK_ID_SIIGO_CONTABLE = 'siigo_contable';
 
 router.get('/', asyncHandler('/api/saldos-contables', async (req, res) => {
   const anio = parseInt(req.query.anio, 10);
@@ -145,6 +149,93 @@ router.get('/export', asyncHandler('/api/saldos-contables/export', async (req, r
   const { rows } = await query(SQL_EXPORT_BALANCE_MES, [primerDiaMes]);
 
   res.json({ ok: true, data: rows });
+}));
+
+router.post('/recargar-mes', requireRole('admin'), asyncHandler('/api/saldos-contables/recargar-mes', async (req, res) => {
+  const anio = parseInt(req.body?.anio, 10);
+  const mes = parseInt(req.body?.mes, 10);
+
+  const esAnioValido = Number.isInteger(anio) && anio >= 2000 && anio <= 2100;
+  const esMesValido = Number.isInteger(mes) && mes >= 1 && mes <= 12;
+  if (!esAnioValido || !esMesValido) {
+    return res.status(400).json({ ok: false, error: 'Parámetros requeridos: anio (YYYY) y mes (1-12)' });
+  }
+
+  const periodo = `${anio}-${String(mes).padStart(2, '0')}`;
+
+  // Adquisición atómica de lock en app_ops.pipeline_locks (expira en 10 min si quedara huérfano)
+  const lockRes = await query(
+    `INSERT INTO app_ops.pipeline_locks (
+      pipeline_id, status, locked_by_user_id, locked_at, last_heartbeat_at, last_error
+    ) VALUES ($1, 'in_progress', $2, NOW(), NOW(), NULL)
+    ON CONFLICT (pipeline_id) DO UPDATE SET
+      status = 'in_progress',
+      locked_by_user_id = EXCLUDED.locked_by_user_id,
+      locked_at = NOW(),
+      last_heartbeat_at = NOW(),
+      last_error = NULL
+    WHERE app_ops.pipeline_locks.status != 'in_progress'
+       OR COALESCE(app_ops.pipeline_locks.last_heartbeat_at, app_ops.pipeline_locks.locked_at) < NOW() - INTERVAL '10 minutes'
+    RETURNING pipeline_id`,
+    [LOCK_ID_SIIGO_CONTABLE, req.user.id]
+  );
+
+  if (lockRes.rowCount === 0) {
+    return res.status(409).json({
+      ok: false,
+      error: 'Ya hay una recarga desde SIIGO en ejecución. Espera a que termine e intenta de nuevo.',
+    });
+  }
+
+  const logRes = await query(
+    `INSERT INTO app_ops.action_logs (usuario_id, accion, recurso, origen, resultado)
+     VALUES ($1, 'RECARGAR_MES_SIIGO', $2, 'dashboard_web', 'in_progress')
+     RETURNING id`,
+    [req.user.id, periodo]
+  );
+  const actionLogId = logRes.rows[0]?.id;
+
+  try {
+    const resultado = await recargarMesContableSiigo(anio, mes);
+
+    await query(
+      `UPDATE app_ops.pipeline_locks
+       SET status = 'completed', completed_at = NOW(), last_error = NULL
+       WHERE pipeline_id = $1`,
+      [LOCK_ID_SIIGO_CONTABLE]
+    );
+
+    if (actionLogId) {
+      await query(
+        `UPDATE app_ops.action_logs
+         SET resultado = 'completed', detalle = $1
+         WHERE id = $2`,
+        [JSON.stringify(resultado), actionLogId]
+      );
+    }
+
+    return res.json({ ok: true, data: resultado });
+  } catch (err) {
+    const mensajeError = err.message || 'Error desconocido al recargar desde SIIGO';
+
+    await query(
+      `UPDATE app_ops.pipeline_locks
+       SET status = 'failed', completed_at = NOW(), last_error = $1
+       WHERE pipeline_id = $2`,
+      [mensajeError, LOCK_ID_SIIGO_CONTABLE]
+    );
+
+    if (actionLogId) {
+      await query(
+        `UPDATE app_ops.action_logs
+         SET resultado = 'failed', detalle = $1
+         WHERE id = $2`,
+        [JSON.stringify({ periodo, error: mensajeError }), actionLogId]
+      );
+    }
+
+    return res.status(500).json({ ok: false, error: mensajeError });
+  }
 }));
 
 module.exports = router;
