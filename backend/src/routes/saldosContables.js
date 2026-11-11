@@ -103,4 +103,44 @@ router.get('/detalle', asyncHandler('/api/saldos-contables/detalle', async (req,
   res.json({ ok: true, data: rows });
 }));
 
+// Exportación del balance de un mes: una fila por cuenta, todas las clases cargadas.
+// Los valores salen crudos de la tabla; solo "movimiento_mes" se deriva:
+//   - Clases 5 y 6: movimiento_debito (mismo valor que muestra la pantalla).
+//   - Resto de clases: movimiento_debito - movimiento_credito (neto crudo, sin invertir signo).
+// La fecha sale como texto para que no haya corrimiento por zona horaria.
+const SQL_EXPORT_BALANCE_MES = `
+  SELECT
+    to_char(fecha, 'YYYY-MM') AS periodo,
+    clase,
+    codigo_cuenta,
+    nombre_cuenta,
+    saldo_inicial,
+    movimiento_debito,
+    movimiento_credito,
+    CASE
+      WHEN clase IN (5, 6) THEN movimiento_debito
+      ELSE movimiento_debito - movimiento_credito
+    END AS movimiento_mes,
+    saldo_final
+  FROM app_ops.saldos_contables_siigo
+  WHERE fecha >= $1::date AND fecha < ($1::date + INTERVAL '1 month')
+  ORDER BY clase ASC, codigo_cuenta ASC
+`;
+
+router.get('/export', asyncHandler('/api/saldos-contables/export', async (req, res) => {
+  const anio = parseInt(req.query.anio, 10);
+  const mes = parseInt(req.query.mes, 10);
+
+  const esAnioValido = Number.isInteger(anio) && anio >= 2000 && anio <= 2100;
+  const esMesValido = Number.isInteger(mes) && mes >= 1 && mes <= 12;
+  if (!esAnioValido || !esMesValido) {
+    return res.status(400).json({ ok: false, error: 'Parámetros requeridos: anio (YYYY) y mes (1-12)' });
+  }
+
+  const primerDiaMes = `${anio}-${String(mes).padStart(2, '0')}-01`;
+  const { rows } = await query(SQL_EXPORT_BALANCE_MES, [primerDiaMes]);
+
+  res.json({ ok: true, data: rows });
+}));
+
 module.exports = router;

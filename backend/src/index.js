@@ -83,6 +83,7 @@ const ENDPOINTS_REGISTRADOS = [
   'GET  /api/auth/me',
   'GET  /api/usuarios',
   'GET  /api/saldos-contables',
+  'GET  /api/saldos-contables/export',
 ];
 
 app.get('/api/health', async (_req, res) => {

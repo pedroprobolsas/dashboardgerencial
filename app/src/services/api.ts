@@ -729,6 +729,29 @@ export interface SaldoContableDetalle {
   valor: string;
 }
 
+export interface SaldoContableExportFila {
+  periodo: string;
+  clase: number | string;
+  codigo_cuenta: string;
+  nombre_cuenta: string | null;
+  saldo_inicial: string;
+  movimiento_debito: string;
+  movimiento_credito: string;
+  movimiento_mes: string;
+  saldo_final: string;
+}
+
+export async function fetchSaldosContablesExport(anio: number, mes: number): Promise<SaldoContableExportFila[]> {
+  const res = await fetch(`/api/saldos-contables/export?anio=${anio}&mes=${mes}`);
+  checkAuthError(res);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Error ${res.status} al exportar saldos contables`);
+  }
+  const data = await res.json();
+  return data.data || [];
+}
+
 export async function fetchSaldosContablesDetalle(clase: number | string, fecha: string): Promise<SaldoContableDetalle[]> {
   const res = await fetch(`/api/saldos-contables/detalle?clase=${clase}&fecha=${fecha}`);
   checkAuthError(res);

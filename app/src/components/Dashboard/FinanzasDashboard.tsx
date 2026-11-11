@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import { fetchSaldosContables, fetchSaldosContablesDetalle, type SaldoContable, type SaldoContableDetalle } from '../../services/api';
+import { obtenerUltimoMesCompleto } from '../../utils/periodo';
+import ExportarBalanceExcelButton from './ExportarBalanceExcelButton';
 
 const fmtCOP = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
 
@@ -15,9 +17,7 @@ const CLASES = {
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 export default function FinanzasDashboard() {
-  const [fecha, setFecha] = useState(() => {
-    return '2026-03';
-  });
+  const [fecha, setFecha] = useState(obtenerUltimoMesCompleto);
 
   const [saldos, setSaldos] = useState<SaldoContable[]>([]);
   const [ultimaActualizacion, setUltimaActualizacion] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export default function FinanzasDashboard() {
     }
     load();
     return () => { ignore = true; };
-  }, []);
+  }, [fecha]);
 
   // Efecto para cargar los detalles de todas las tablas cuando cambia la fecha
   useEffect(() => {
@@ -205,14 +205,17 @@ export default function FinanzasDashboard() {
           <p className="text-sm text-dashboard-textMuted mt-1 capitalize">{labelMes} {fecha.split('-')[0]}</p>
         </div>
         
-        <div className="flex flex-col">
-          <label className="text-[10px] font-semibold text-dashboard-textMuted mb-1 uppercase tracking-wider">Período</label>
-          <input 
-            type="month" 
-            value={fecha} 
-            onChange={e => setFecha(e.target.value)}
-            className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-dashboard-textMain bg-slate-50 focus:outline-none focus:ring-2 focus:ring-probolsas-cyan"
-          />
+        <div className="flex items-end gap-3">
+          <ExportarBalanceExcelButton periodo={fecha} />
+          <div className="flex flex-col">
+            <label className="text-[10px] font-semibold text-dashboard-textMuted mb-1 uppercase tracking-wider">Período</label>
+            <input 
+              type="month" 
+              value={fecha} 
+              onChange={e => setFecha(e.target.value)}
+              className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-dashboard-textMain bg-slate-50 focus:outline-none focus:ring-2 focus:ring-probolsas-cyan"
+            />
+          </div>
         </div>
       </header>
 
