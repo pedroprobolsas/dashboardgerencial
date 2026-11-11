@@ -83,8 +83,12 @@ router.get('/detalle', asyncHandler('/api/saldos-contables/detalle', async (req,
   }
 
   const claseNum = parseInt(clase, 10);
-  const usaMovimiento = [5, 6].includes(claseNum);
-  const valorCol = usaMovimiento ? 'movimiento_debito' : 'saldo_final';
+  let valorCol = 'saldo_final';
+  if ([5, 6].includes(claseNum)) {
+    valorCol = 'movimiento_debito';
+  } else if (claseNum === 4) {
+    valorCol = '(movimiento_credito - movimiento_debito)';
+  }
   const primerDiaMes = `${fecha.substring(0, 7)}-01`;
 
   const sql = `
