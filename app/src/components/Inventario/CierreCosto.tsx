@@ -385,10 +385,6 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
                 <th className="px-5 py-3 font-semibold text-right">CC-101 Ajustado</th>
                 <th className="px-5 py-3 font-semibold text-center text-slate-500">Método</th>
                 <th className="px-5 py-3 font-semibold text-right">Producción Terminada</th>
-                <th className="px-5 py-3 font-semibold text-right">Otros costos Crisol</th>
-                <th className="px-5 py-3 font-semibold text-right">Otros costos SIIGO</th>
-                <th className="px-5 py-3 font-semibold text-right" title="Diferencia por analizar">Dif. Crisol vs SIIGO</th>
-                <th className="px-5 py-3 font-semibold text-right">% Dif.</th>
                 <th className="px-5 py-3 font-semibold text-right">Compras MP</th>
                 <th className="px-5 py-3 font-semibold text-right">% Ajustes</th>
               </tr>
@@ -396,14 +392,14 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
             <tbody className="divide-y divide-slate-100 relative">
               {loading && (
                 <tr>
-                  <td colSpan={12} className="px-5 py-8 text-center text-slate-400">
+                  <td colSpan={9} className="px-5 py-8 text-center text-slate-400">
                     Calculando meses del año...
                   </td>
                 </tr>
               )}
               {!loading && dataPorMes.map((row, i) => {
                 if (!row.data || !row.data.controlCierre) return (
-                   <tr key={i}><td className="px-5 py-3 font-medium text-slate-700">{row.mes}</td><td colSpan={11} className="text-slate-400 px-5 py-3 text-center">Sin datos</td></tr>
+                   <tr key={i}><td className="px-5 py-3 font-medium text-slate-700">{row.mes}</td><td colSpan={8} className="text-slate-400 px-5 py-3 text-center">Sin datos</td></tr>
                 );
 
                 const c = row.data;
@@ -411,18 +407,12 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
                 const produccion = Number(c.produccionTerminada.total) || 0;
                 const compras = Number(c.comprasMateriaPrima.total) || 0;
                 const ajustes = Number(c.controlCierre.ajustesDepurado) || 0;
-                
-                const otrosCostos = produccion - depurado;
+
                 const pctAjustes = depurado > 0 ? (ajustes / depurado) * 100 : 0;
                 const isAlert = Math.abs(pctAjustes) > 30;
 
-                // SIIGO
+                // SIIGO (para indicador de estado mensual)
                 const siigo = c.siigo;
-                const siigoManoObra = Number(siigo?.costos_mano_obra_72) || 0;
-                const siigoOtros = Number(siigo?.costos_otros_73) || 0;
-                const otrosCostosSiigo = siigoManoObra + siigoOtros;
-                const diffSiigo = otrosCostos - otrosCostosSiigo;
-                const pctDiffSiigo = otrosCostosSiigo !== 0 ? (diffSiigo / otrosCostosSiigo) * 100 : 0;
                 const estadoSiigo = siigo?.estado_mes || '';
 
                 let estadoIcon = null;
@@ -449,17 +439,6 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
                       {row.data.kpisCC101?.metodoCC101 === 'real' ? 'Real' : 'Ratio'}
                     </td>
                     <td className={`px-5 py-3 text-right font-medium ${isAlert ? 'text-red-600' : 'text-emerald-700'}`}>{fmtCOP.format(produccion)}</td>
-                    <td className={`px-5 py-3 text-right font-semibold text-amber-700`}>{fmtCOPCierre.format(otrosCostos)}</td>
-                    
-                    <td className="px-5 py-3 text-right font-semibold text-blue-700" title={`Mano de obra (72): ${fmtCOPCierre.format(siigoManoObra)}\nOtros fábrica (73): ${fmtCOPCierre.format(siigoOtros)}`}>
-                      {fmtCOPCierre.format(otrosCostosSiigo)}
-                    </td>
-                    <td className="px-5 py-3 text-right font-semibold text-slate-600" title="Diferencia por analizar">
-                      {fmtCOPCierre.format(diffSiigo)}
-                    </td>
-                    <td className="px-5 py-3 text-right font-medium text-slate-500">
-                      {siigo ? `${pctDiffSiigo.toFixed(2)}%` : '—'}
-                    </td>
 
                     <td className={`px-5 py-3 text-right font-medium ${isAlert ? 'text-red-600' : 'text-indigo-700'}`}>{fmtCOP.format(compras)}</td>
                     <td className={`px-5 py-3 text-right font-bold ${isAlert ? 'text-red-700' : 'text-slate-600'}`}>
@@ -470,6 +449,9 @@ function CoherenciaCostos({ defaultYear, mockMonths, availableYears }: { default
               })}
             </tbody>
           </table>
+        </div>
+        <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 text-xs text-slate-500">
+          Para comparar costos de planta entre Crisol y contabilidad, ver la sección &apos;Auditoría de Tarifas y Costos de Planta&apos; arriba.
         </div>
       </div>
     </div>
