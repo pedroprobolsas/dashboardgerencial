@@ -635,8 +635,9 @@ router.get('/detalle-cc101', async (req, res) => {
 
 /**
  * GET /api/movimientos_materiales/auditoria-tarifas-planta
- * Agrupa la mano de obra directa (categoria = 'mano_obra') de crisolweb.costo_por_orden_detalle
- * por actividad (separando operario vs máquina CW) y la contrasta con SIIGO Cuentas 72 y 73.
+ * Agrupa la mano de obra directa (categoria = 'mano_obra', donde Crisolweb combina
+ * operario + máquina CW) de crisolweb.costo_por_orden_detalle por actividad y la
+ * contrasta con el total SIIGO Cuentas 72 + 73.
  */
 router.get('/auditoria-tarifas-planta', asyncHandler('/api/movimientos_materiales/auditoria-tarifas-planta', async (req, res) => {
   const { anio, mes } = req.query;
@@ -661,13 +662,12 @@ router.get('/auditoria-tarifas-planta', asyncHandler('/api/movimientos_materiale
 
   const sqlActividades = `
     WITH ops_mes AS (
-      SELECT DISTINCT nro_op, referencia
+      SELECT DISTINCT nro_op
       FROM crisolweb.costo_por_orden
       WHERE fecha >= $1::date AND fecha < $2::date
     )
     SELECT
       TRIM(d.item) AS actividad,
-      CASE WHEN d.item ILIKE '%CW%' THEN 'maquina_cw' ELSE 'operario' END AS tipo,
       COUNT(DISTINCT d.nro_op)::int AS ops_count,
       ROUND(COALESCE(SUM(d.cant_cotizada), 0), 2) AS horas_cotizadas,
       ROUND(COALESCE(SUM(d.valor_cotizado), 0), 2) AS valor_cotizado,
@@ -676,21 +676,21 @@ router.get('/auditoria-tarifas-planta', asyncHandler('/api/movimientos_materiale
       ROUND(COALESCE(SUM(d.valor_ejecutado), 0), 2) AS valor_ejecutado,
       ROUND(SUM(d.valor_ejecutado) / NULLIF(SUM(d.cant_ejecutada), 0), 2) AS tarifa_ejecutada_hr
     FROM crisolweb.costo_por_orden_detalle d
-    JOIN ops_mes o ON d.nro_op = o.nro_op AND d.referencia = o.referencia
+    JOIN ops_mes o ON d.nro_op = o.nro_op
     WHERE d.categoria = 'mano_obra'
-    GROUP BY TRIM(d.item), CASE WHEN d.item ILIKE '%CW%' THEN 'maquina_cw' ELSE 'operario' END
+    GROUP BY TRIM(d.item)
     ORDER BY COALESCE(SUM(d.valor_ejecutado), 0) DESC, TRIM(d.item) ASC
   `;
 
   const sqlOpsTotales = `
     WITH ops_mes AS (
-      SELECT DISTINCT nro_op, referencia
+      SELECT DISTINCT nro_op
       FROM crisolweb.costo_por_orden
       WHERE fecha >= $1::date AND fecha < $2::date
     )
     SELECT COUNT(DISTINCT d.nro_op)::int AS total_ops
     FROM crisolweb.costo_por_orden_detalle d
-    JOIN ops_mes o ON d.nro_op = o.nro_op AND d.referencia = o.referencia
+    JOIN ops_mes o ON d.nro_op = o.nro_op
     WHERE d.categoria = 'mano_obra'
   `;
 
@@ -706,15 +706,10 @@ router.get('/auditoria-tarifas-planta', asyncHandler('/api/movimientos_materiale
     query(sqlSiigo, [anioNum, mesNum])
   ]);
 
-  let horasCotOperario = 0;
-  let valorCotOperario = 0;
-  let horasEjecOperario = 0;
-  let valorEjecOperario = 0;
-
-  let horasCotMaquina = 0;
-  let valorCotMaquina = 0;
-  let horasEjecMaquina = 0;
-  let valorEjecMaquina = 0;
+  let horasCotTotal = 0;
+  let valorCotTotal = 0;
+  let horasEjecTotal = 0;
+  let valorEjecTotal = 0;
 
   const rawRows = resActividades.rows.map((r) => {
     const horasCot = parseFloat(r.horas_cotizadas) || 0;
@@ -724,21 +719,13 @@ router.get('/auditoria-tarifas-planta', asyncHandler('/api/movimientos_materiale
     const valorEjec = parseFloat(r.valor_ejecutado) || 0;
     const tarifaEjec = r.tarifa_ejecutada_hr !== null ? parseFloat(r.tarifa_ejecutada_hr) : null;
 
-    if (r.tipo === 'maquina_cw') {
-      horasCotMaquina += horasCot;
-      valorCotMaquina += valorCot;
-      horasEjecMaquina += horasEjec;
-      valorEjecMaquina += valorEjec;
-    } else {
-      horasCotOperario += horasCot;
-      valorCotOperario += valorCot;
-      horasEjecOperario += horasEjec;
-      valorEjecOperario += valorEjec;
-    }
+    horasCotTotal += horasCot;
+    valorCotTotal += valorCot;
+    horasEjecTotal += horasEjec;
+    valorEjecTotal += valorEjec;
 
     return {
       actividad: r.actividad || 'SIN NOMBRE',
-      tipo: r.tipo,
       ops_count: Number(r.ops_count) || 0,
       horas_cotizadas: horasCot,
       valor_cotizado: valorCot,
@@ -748,11 +735,6 @@ router.get('/auditoria-tarifas-planta', asyncHandler('/api/movimientos_materiale
       tarifa_ejecutada_hr: tarifaEjec
     };
   });
-
-  const horasCotTotal = horasCotOperario + horasCotMaquina;
-  const valorCotTotal = valorCotOperario + valorCotMaquina;
-  const horasEjecTotal = horasEjecOperario + horasEjecMaquina;
-  const valorEjecTotal = valorEjecOperario + valorEjecMaquina;
 
   const actividades = rawRows.map((row) => ({
     ...row,
@@ -765,17 +747,8 @@ router.get('/auditoria-tarifas-planta', asyncHandler('/api/movimientos_materiale
   const siigoTotal = siigo72 + siigo73;
   const estadoMesSiigo = siigoRow ? siigoRow.estado_mes : 'sin datos';
 
-  const calcDiff = (crisolVal, siigoVal) => {
-    const diffPesos = crisolVal - siigoVal;
-    const diffPct = siigoVal > 0 ? ((crisolVal - siigoVal) / siigoVal) * 100 : null;
-    return {
-      crisol: crisolVal,
-      siigo: siigoVal,
-      diferencia_pesos: diffPesos,
-      diferencia_pct: diffPct
-    };
-  };
-
+  const diffPesos = valorEjecTotal - siigoTotal;
+  const diffPct = siigoTotal > 0 ? ((valorEjecTotal - siigoTotal) / siigoTotal) * 100 : null;
   const totalOpsMes = resOpsTotales.rows[0] ? Number(resOpsTotales.rows[0].total_ops) || 0 : 0;
 
   res.json({
@@ -783,30 +756,17 @@ router.get('/auditoria-tarifas-planta', asyncHandler('/api/movimientos_materiale
     resumen: {
       estado_mes_siigo: estadoMesSiigo,
       total_ops: totalOpsMes,
-      operario: {
-        ...calcDiff(valorEjecOperario, siigo72),
-        horas_cotizadas: horasCotOperario,
-        valor_cotizado: valorCotOperario,
-        horas_ejecutadas: horasEjecOperario,
-        tarifa_cotizada_hr: horasCotOperario > 0 ? valorCotOperario / horasCotOperario : null,
-        tarifa_ejecutada_hr: horasEjecOperario > 0 ? valorEjecOperario / horasEjecOperario : null
-      },
-      maquina_cw: {
-        ...calcDiff(valorEjecMaquina, siigo73),
-        horas_cotizadas: horasCotMaquina,
-        valor_cotizado: valorCotMaquina,
-        horas_ejecutadas: horasEjecMaquina,
-        tarifa_cotizada_hr: horasCotMaquina > 0 ? valorCotMaquina / horasCotMaquina : null,
-        tarifa_ejecutada_hr: horasEjecMaquina > 0 ? valorEjecMaquina / horasEjecMaquina : null
-      },
-      total: {
-        ...calcDiff(valorEjecTotal, siigoTotal),
-        horas_cotizadas: horasCotTotal,
-        valor_cotizado: valorCotTotal,
-        horas_ejecutadas: horasEjecTotal,
-        tarifa_cotizada_hr: horasCotTotal > 0 ? valorCotTotal / horasCotTotal : null,
-        tarifa_ejecutada_hr: horasEjecTotal > 0 ? valorEjecTotal / horasEjecTotal : null
-      }
+      crisol: Number(valorEjecTotal.toFixed(2)),
+      siigo: Number(siigoTotal.toFixed(2)),
+      siigo_72: Number(siigo72.toFixed(2)),
+      siigo_73: Number(siigo73.toFixed(2)),
+      diferencia_pesos: Number(diffPesos.toFixed(2)),
+      diferencia_pct: diffPct !== null ? Number(diffPct.toFixed(2)) : null,
+      horas_cotizadas: Number(horasCotTotal.toFixed(2)),
+      valor_cotizado: Number(valorCotTotal.toFixed(2)),
+      horas_ejecutadas: Number(horasEjecTotal.toFixed(2)),
+      tarifa_cotizada_hr: horasCotTotal > 0 ? Number((valorCotTotal / horasCotTotal).toFixed(2)) : null,
+      tarifa_ejecutada_hr: horasEjecTotal > 0 ? Number((valorEjecTotal / horasEjecTotal).toFixed(2)) : null
     },
     actividades
   });

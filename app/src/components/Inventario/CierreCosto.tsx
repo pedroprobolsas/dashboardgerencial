@@ -616,7 +616,6 @@ function DetalleCC101({ year, month }: { year: number, month: number }) {
 
 interface ActividadPlantaRow {
   actividad: string;
-  tipo: 'operario' | 'maquina_cw';
   ops_count: number;
   horas_cotizadas: number;
   valor_cotizado: number;
@@ -627,9 +626,13 @@ interface ActividadPlantaRow {
   participacion_pct: number;
 }
 
-interface ResumenComparativoRubro {
+interface ResumenPlantaComparativo {
+  estado_mes_siigo: string;
+  total_ops: number;
   crisol: number;
   siigo: number;
+  siigo_72: number;
+  siigo_73: number;
   diferencia_pesos: number;
   diferencia_pct: number | null;
   horas_cotizadas: number;
@@ -641,13 +644,7 @@ interface ResumenComparativoRubro {
 
 interface AuditoriaPlantaResponse {
   ok: boolean;
-  resumen: {
-    estado_mes_siigo: string;
-    total_ops: number;
-    operario: ResumenComparativoRubro;
-    maquina_cw: ResumenComparativoRubro;
-    total: ResumenComparativoRubro;
-  };
+  resumen: ResumenPlantaComparativo;
   actividades: ActividadPlantaRow[];
 }
 
@@ -661,8 +658,7 @@ function getSemaforoDiferencia(pct: number | null) {
     return {
       badgeBg: 'bg-slate-100 text-slate-600 border-slate-200',
       textColor: 'text-slate-600',
-      borderAccent: 'border-l-slate-300',
-      label: 'Sin base SIIGO'
+      borderAccent: 'border-l-slate-300'
     };
   }
   const absPct = Math.abs(pct);
@@ -670,83 +666,68 @@ function getSemaforoDiferencia(pct: number | null) {
     return {
       badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
       textColor: 'text-emerald-600',
-      borderAccent: 'border-l-emerald-500',
-      label: 'Desviación < 15%'
+      borderAccent: 'border-l-emerald-500'
     };
   }
   if (absPct <= 30) {
     return {
       badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
       textColor: 'text-amber-600',
-      borderAccent: 'border-l-amber-500',
-      label: 'Desviación 15% - 30%'
+      borderAccent: 'border-l-amber-500'
     };
   }
   return {
     badgeBg: 'bg-red-50 text-red-700 border-red-200',
     textColor: 'text-red-600',
-    borderAccent: 'border-l-red-500',
-    label: 'Desviación > 30%'
+    borderAccent: 'border-l-red-500'
   };
 }
 
-function TarjetaComparativaPlanta({
-  titulo,
-  subtituloCrisol,
-  subtituloSiigo,
-  rubro
-}: {
-  titulo: string;
-  subtituloCrisol: string;
-  subtituloSiigo: string;
-  rubro: ResumenComparativoRubro;
-}) {
-  const semaforo = getSemaforoDiferencia(rubro.diferencia_pct);
-  const diffSign = rubro.diferencia_pesos > 0 ? '+' : '';
-  const pctSign = rubro.diferencia_pct !== null && rubro.diferencia_pct > 0 ? '+' : '';
+function TarjetaResumenPlanta({ resumen }: { resumen: ResumenPlantaComparativo }) {
+  const semaforo = getSemaforoDiferencia(resumen.diferencia_pct);
+  const diffSign = resumen.diferencia_pesos > 0 ? '+' : '';
+  const pctSign = resumen.diferencia_pct !== null && resumen.diferencia_pct > 0 ? '+' : '';
 
   return (
-    <div className={`bg-white rounded-xl border border-slate-200 border-l-4 ${semaforo.borderAccent} p-4 shadow-sm flex flex-col justify-between gap-3`}>
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">{titulo}</h3>
-        <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap ${semaforo.badgeBg}`}>
-          {rubro.diferencia_pct !== null ? `${pctSign}${rubro.diferencia_pct.toFixed(1)}%` : 'N/A'}
+    <div className={`bg-white rounded-xl border border-slate-200 border-l-4 ${semaforo.borderAccent} p-5 shadow-sm flex flex-col gap-4`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-bold text-slate-800">
+          Costo de Planta: Crisol (MO + CW combinado) vs SIIGO (Cuentas 72+73)
+        </h3>
+        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${semaforo.badgeBg}`}>
+          {resumen.diferencia_pct !== null ? `${pctSign}${resumen.diferencia_pct.toFixed(1)}%` : 'Sin base SIIGO'}
         </span>
       </div>
 
-      <div className="space-y-1.5 text-xs">
-        <div className="flex justify-between items-center">
-          <span className="text-slate-500 truncate pr-2" title={subtituloCrisol}>{subtituloCrisol}:</span>
-          <span className="font-semibold text-slate-800">{fmtCOPCierre.format(rubro.crisol)}</span>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+          <div className="text-xs text-slate-500">Crisol (MO + CW combinado)</div>
+          <div className="text-lg font-bold text-slate-900 mt-0.5">{fmtCOPCierre.format(resumen.crisol)}</div>
+          <div className="text-[11px] text-slate-500 mt-1">
+            {resumen.total_ops} OPs &middot; {fmtHorasPlanta.format(resumen.horas_ejecutadas)} h reales &middot;{' '}
+            {resumen.tarifa_ejecutada_hr !== null ? `${fmtCOP.format(resumen.tarifa_ejecutada_hr)}/h` : '—'}
+          </div>
         </div>
-        <div className="flex justify-between items-center">
-          <span className="text-slate-500 truncate pr-2" title={subtituloSiigo}>{subtituloSiigo}:</span>
-          <span className="font-semibold text-slate-800">{fmtCOPCierre.format(rubro.siigo)}</span>
-        </div>
-      </div>
 
-      <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-        <span className="font-medium text-slate-500">Diferencia (Crisol - SIIGO):</span>
-        <div className="text-right">
-          <span className={`font-bold ${semaforo.textColor}`}>
-            {diffSign}{fmtCOPCierre.format(rubro.diferencia_pesos)}
-          </span>
-          {rubro.diferencia_pct !== null && (
-            <span className={`ml-1.5 font-semibold ${semaforo.textColor}`}>
-              ({pctSign}{rubro.diferencia_pct.toFixed(1)}%)
-            </span>
-          )}
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+          <div className="text-xs text-slate-500">SIIGO (Cuentas 72 + 73)</div>
+          <div className="text-lg font-bold text-slate-900 mt-0.5">{fmtCOPCierre.format(resumen.siigo)}</div>
+          <div className="text-[11px] text-slate-500 mt-1">
+            Cta 72: {fmtCOP.format(resumen.siigo_72)} &middot; Cta 73: {fmtCOP.format(resumen.siigo_73)}
+          </div>
         </div>
-      </div>
 
-      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
-        <span>Horas Reales: <strong className="text-slate-600">{fmtHorasPlanta.format(rubro.horas_ejecutadas)} h</strong></span>
-        <span>
-          Tarifa Prom.:{' '}
-          <strong className="text-slate-600">
-            {rubro.tarifa_ejecutada_hr !== null ? `${fmtCOP.format(rubro.tarifa_ejecutada_hr)}/h` : '—'}
-          </strong>
-        </span>
+        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+          <div className="text-xs text-slate-500">Diferencia (Crisol - SIIGO)</div>
+          <div className={`text-lg font-bold mt-0.5 ${semaforo.textColor}`}>
+            {diffSign}{fmtCOPCierre.format(resumen.diferencia_pesos)}
+          </div>
+          <div className={`text-[11px] font-semibold mt-1 ${semaforo.textColor}`}>
+            {resumen.diferencia_pct !== null
+              ? `Desviación: ${pctSign}${resumen.diferencia_pct.toFixed(1)}%`
+              : 'Sin datos SIIGO para comparar'}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -805,7 +786,7 @@ function AuditoriaTarifasPlanta({
             Auditoría de Tarifas y Costos de Planta Crisol vs SIIGO — {monthLabel} {year}
           </h2>
           <p className="text-xs text-dashboard-textMuted mt-0.5">
-            Exclusivo transformación de planta (<code>categoria = &apos;mano_obra&apos;</code>: Operarios y Máquina CW). Material y Terceros se consultan en Margen por OP.
+            Nota: Crisolweb reporta mano de obra y costo de máquina combinados.
           </p>
         </div>
         <div className="flex items-center gap-3 text-xs">
@@ -831,27 +812,8 @@ function AuditoriaTarifasPlanta({
         <div className="p-8 text-center text-slate-400 text-sm">Sin información disponible.</div>
       ) : (
         <div className="p-6 flex flex-col gap-6">
-          {/* 3 MINI-TARJETAS COMPARATIVAS CRISOL VS SIIGO */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <TarjetaComparativaPlanta
-              titulo="1. Mano de Obra Operario (Sin CW)"
-              subtituloCrisol="Operario Crisol (sin CW)"
-              subtituloSiigo="SIIGO Cuenta 72 (MO Directa)"
-              rubro={data.resumen.operario}
-            />
-            <TarjetaComparativaPlanta
-              titulo="2. Costo Máquina / CIF (Con CW)"
-              subtituloCrisol="Máquina Crisol (CW)"
-              subtituloSiigo="SIIGO Cuenta 73 (CIF / Otros)"
-              rubro={data.resumen.maquina_cw}
-            />
-            <TarjetaComparativaPlanta
-              titulo="3. Total Transformación Planta"
-              subtituloCrisol="Total Crisol (MO + CW)"
-              subtituloSiigo="Total SIIGO (Cuentas 72 + 73)"
-              rubro={data.resumen.total}
-            />
-          </div>
+          {/* TARJETA RESUMEN ÚNICA CRISOL VS SIIGO */}
+          <TarjetaResumenPlanta resumen={data.resumen} />
 
           {/* TABLA POR ACTIVIDAD AGRUPADA */}
           <div className="border border-slate-200 rounded-xl overflow-hidden">
@@ -860,7 +822,6 @@ function AuditoriaTarifasPlanta({
                 <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 uppercase">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Actividad</th>
-                    <th className="px-4 py-3 font-semibold text-center">Tipo</th>
                     <th className="px-4 py-3 font-semibold text-right">OPs</th>
                     <th className="px-4 py-3 font-semibold text-right">Horas Cot.</th>
                     <th className="px-4 py-3 font-semibold text-right">Tarifa Cot. ($/h)</th>
@@ -873,77 +834,62 @@ function AuditoriaTarifasPlanta({
                 <tbody className="divide-y divide-slate-100">
                   {data.actividades.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                      <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
                         No se encontraron registros de mano de obra directa en Crisol para {monthLabel} {year}.
                       </td>
                     </tr>
                   ) : (
-                    data.actividades.map((row) => {
-                      const isMaquina = row.tipo === 'maquina_cw';
-                      return (
-                        <tr key={`${row.tipo}-${row.actividad}`} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-2.5 font-medium text-slate-800 max-w-[260px] truncate" title={row.actividad}>
-                            {row.actividad}
-                          </td>
-                          <td className="px-4 py-2.5 text-center">
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                                isMaquina
-                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                  : 'bg-sky-50 text-sky-700 border border-sky-200'
-                              }`}
-                            >
-                              {isMaquina ? 'Máquina (CW)' : 'Operario'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-right text-slate-600">{row.ops_count}</td>
-                          <td className="px-4 py-2.5 text-right text-slate-600">
-                            {fmtHorasPlanta.format(row.horas_cotizadas)}
-                          </td>
-                          <td className="px-4 py-2.5 text-right text-slate-500">
-                            {row.tarifa_cotizada_hr !== null ? fmtCOP.format(row.tarifa_cotizada_hr) : '—'}
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-medium text-slate-700">
-                            {fmtHorasPlanta.format(row.horas_ejecutadas)}
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-semibold text-slate-800">
-                            {row.tarifa_ejecutada_hr !== null ? fmtCOP.format(row.tarifa_ejecutada_hr) : '—'}
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-bold text-slate-900">
-                            {fmtCOPCierre.format(row.valor_ejecutado)}
-                          </td>
-                          <td className="px-4 py-2.5 text-right text-slate-600 font-medium">
-                            {row.participacion_pct.toFixed(1)}%
-                          </td>
-                        </tr>
-                      );
-                    })
+                    data.actividades.map((row) => (
+                      <tr key={row.actividad} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-2.5 font-medium text-slate-800 max-w-[280px] truncate" title={row.actividad}>
+                          {row.actividad}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-slate-600">{row.ops_count}</td>
+                        <td className="px-4 py-2.5 text-right text-slate-600">
+                          {fmtHorasPlanta.format(row.horas_cotizadas)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-slate-500">
+                          {row.tarifa_cotizada_hr !== null ? fmtCOP.format(row.tarifa_cotizada_hr) : '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-medium text-slate-700">
+                          {fmtHorasPlanta.format(row.horas_ejecutadas)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-slate-800">
+                          {row.tarifa_ejecutada_hr !== null ? fmtCOP.format(row.tarifa_ejecutada_hr) : '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-bold text-slate-900">
+                          {fmtCOPCierre.format(row.valor_ejecutado)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-slate-600 font-medium">
+                          {row.participacion_pct.toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
                 {data.actividades.length > 0 && (
                   <tfoot className="bg-slate-800 text-white font-bold text-xs">
                     <tr>
                       <td className="px-4 py-3">TOTAL MES</td>
-                      <td className="px-4 py-3 text-center text-slate-300">MO + CW</td>
                       <td className="px-4 py-3 text-right">{data.resumen.total_ops}</td>
                       <td className="px-4 py-3 text-right">
-                        {fmtHorasPlanta.format(data.resumen.total.horas_cotizadas)}
+                        {fmtHorasPlanta.format(data.resumen.horas_cotizadas)}
                       </td>
                       <td className="px-4 py-3 text-right text-slate-200">
-                        {data.resumen.total.tarifa_cotizada_hr !== null
-                          ? fmtCOP.format(data.resumen.total.tarifa_cotizada_hr)
+                        {data.resumen.tarifa_cotizada_hr !== null
+                          ? fmtCOP.format(data.resumen.tarifa_cotizada_hr)
                           : '—'}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {fmtHorasPlanta.format(data.resumen.total.horas_ejecutadas)}
+                        {fmtHorasPlanta.format(data.resumen.horas_ejecutadas)}
                       </td>
                       <td className="px-4 py-3 text-right text-amber-300">
-                        {data.resumen.total.tarifa_ejecutada_hr !== null
-                          ? fmtCOP.format(data.resumen.total.tarifa_ejecutada_hr)
+                        {data.resumen.tarifa_ejecutada_hr !== null
+                          ? fmtCOP.format(data.resumen.tarifa_ejecutada_hr)
                           : '—'}
                       </td>
                       <td className="px-4 py-3 text-right text-emerald-300">
-                        {fmtCOPCierre.format(data.resumen.total.crisol)}
+                        {fmtCOPCierre.format(data.resumen.crisol)}
                       </td>
                       <td className="px-4 py-3 text-right">100.0%</td>
                     </tr>
