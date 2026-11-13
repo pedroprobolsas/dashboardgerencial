@@ -614,6 +614,350 @@ function DetalleCC101({ year, month }: { year: number, month: number }) {
   );
 }
 
+interface ActividadPlantaRow {
+  actividad: string;
+  tipo: 'operario' | 'maquina_cw';
+  ops_count: number;
+  horas_cotizadas: number;
+  valor_cotizado: number;
+  tarifa_cotizada_hr: number | null;
+  horas_ejecutadas: number;
+  valor_ejecutado: number;
+  tarifa_ejecutada_hr: number | null;
+  participacion_pct: number;
+}
+
+interface ResumenComparativoRubro {
+  crisol: number;
+  siigo: number;
+  diferencia_pesos: number;
+  diferencia_pct: number | null;
+  horas_cotizadas: number;
+  valor_cotizado: number;
+  horas_ejecutadas: number;
+  tarifa_cotizada_hr: number | null;
+  tarifa_ejecutada_hr: number | null;
+}
+
+interface AuditoriaPlantaResponse {
+  ok: boolean;
+  resumen: {
+    estado_mes_siigo: string;
+    total_ops: number;
+    operario: ResumenComparativoRubro;
+    maquina_cw: ResumenComparativoRubro;
+    total: ResumenComparativoRubro;
+  };
+  actividades: ActividadPlantaRow[];
+}
+
+const fmtHorasPlanta = new Intl.NumberFormat('es-CO', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+});
+
+function getSemaforoDiferencia(pct: number | null) {
+  if (pct === null || Number.isNaN(pct)) {
+    return {
+      badgeBg: 'bg-slate-100 text-slate-600 border-slate-200',
+      textColor: 'text-slate-600',
+      borderAccent: 'border-l-slate-300',
+      label: 'Sin base SIIGO'
+    };
+  }
+  const absPct = Math.abs(pct);
+  if (absPct < 15) {
+    return {
+      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      textColor: 'text-emerald-600',
+      borderAccent: 'border-l-emerald-500',
+      label: 'Desviación < 15%'
+    };
+  }
+  if (absPct <= 30) {
+    return {
+      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
+      textColor: 'text-amber-600',
+      borderAccent: 'border-l-amber-500',
+      label: 'Desviación 15% - 30%'
+    };
+  }
+  return {
+    badgeBg: 'bg-red-50 text-red-700 border-red-200',
+    textColor: 'text-red-600',
+    borderAccent: 'border-l-red-500',
+    label: 'Desviación > 30%'
+  };
+}
+
+function TarjetaComparativaPlanta({
+  titulo,
+  subtituloCrisol,
+  subtituloSiigo,
+  rubro
+}: {
+  titulo: string;
+  subtituloCrisol: string;
+  subtituloSiigo: string;
+  rubro: ResumenComparativoRubro;
+}) {
+  const semaforo = getSemaforoDiferencia(rubro.diferencia_pct);
+  const diffSign = rubro.diferencia_pesos > 0 ? '+' : '';
+  const pctSign = rubro.diferencia_pct !== null && rubro.diferencia_pct > 0 ? '+' : '';
+
+  return (
+    <div className={`bg-white rounded-xl border border-slate-200 border-l-4 ${semaforo.borderAccent} p-4 shadow-sm flex flex-col justify-between gap-3`}>
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">{titulo}</h3>
+        <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap ${semaforo.badgeBg}`}>
+          {rubro.diferencia_pct !== null ? `${pctSign}${rubro.diferencia_pct.toFixed(1)}%` : 'N/A'}
+        </span>
+      </div>
+
+      <div className="space-y-1.5 text-xs">
+        <div className="flex justify-between items-center">
+          <span className="text-slate-500 truncate pr-2" title={subtituloCrisol}>{subtituloCrisol}:</span>
+          <span className="font-semibold text-slate-800">{fmtCOPCierre.format(rubro.crisol)}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-slate-500 truncate pr-2" title={subtituloSiigo}>{subtituloSiigo}:</span>
+          <span className="font-semibold text-slate-800">{fmtCOPCierre.format(rubro.siigo)}</span>
+        </div>
+      </div>
+
+      <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+        <span className="font-medium text-slate-500">Diferencia (Crisol - SIIGO):</span>
+        <div className="text-right">
+          <span className={`font-bold ${semaforo.textColor}`}>
+            {diffSign}{fmtCOPCierre.format(rubro.diferencia_pesos)}
+          </span>
+          {rubro.diferencia_pct !== null && (
+            <span className={`ml-1.5 font-semibold ${semaforo.textColor}`}>
+              ({pctSign}{rubro.diferencia_pct.toFixed(1)}%)
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+        <span>Horas Reales: <strong className="text-slate-600">{fmtHorasPlanta.format(rubro.horas_ejecutadas)} h</strong></span>
+        <span>
+          Tarifa Prom.:{' '}
+          <strong className="text-slate-600">
+            {rubro.tarifa_ejecutada_hr !== null ? `${fmtCOP.format(rubro.tarifa_ejecutada_hr)}/h` : '—'}
+          </strong>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function AuditoriaTarifasPlanta({
+  year,
+  month,
+  mockMonths
+}: {
+  year: number;
+  month: number;
+  mockMonths: { val: number; label: string }[];
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<AuditoriaPlantaResponse | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const fetchAuditoria = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/movimientos_materiales/auditoria-tarifas-planta?anio=${year}&mes=${month}`);
+        if (!res.ok) throw new Error('No fue posible cargar la auditoría de tarifas de planta');
+        const json: AuditoriaPlantaResponse = await res.json();
+        if (active) {
+          if (json.ok) {
+            setData(json);
+          } else {
+            setError('Respuesta inválida del servidor');
+          }
+        }
+      } catch (err: any) {
+        if (active) {
+          setError(err.message || 'Error cargando auditoría de tarifas de planta');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchAuditoria();
+    return () => {
+      active = false;
+    };
+  }, [year, month]);
+
+  const monthLabel = mockMonths.find((m) => m.val === month)?.label || String(month);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+      <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <h2 className="text-lg font-bold text-dashboard-textMain">
+            Auditoría de Tarifas y Costos de Planta Crisol vs SIIGO — {monthLabel} {year}
+          </h2>
+          <p className="text-xs text-dashboard-textMuted mt-0.5">
+            Exclusivo transformación de planta (<code>categoria = &apos;mano_obra&apos;</code>: Operarios y Máquina CW). Material y Terceros se consultan en Margen por OP.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+            &lt; 15% OK
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200 font-medium">
+            15% - 30% Alerta
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 text-red-700 border border-red-200 font-medium">
+            &gt; 30% Crítico
+          </span>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="p-8 text-center text-slate-400 text-sm">
+          Cargando auditoría de tarifas y costos de planta para {monthLabel} {year}...
+        </div>
+      ) : error ? (
+        <div className="p-8 text-center text-red-500 text-sm font-medium">{error}</div>
+      ) : !data ? (
+        <div className="p-8 text-center text-slate-400 text-sm">Sin información disponible.</div>
+      ) : (
+        <div className="p-6 flex flex-col gap-6">
+          {/* 3 MINI-TARJETAS COMPARATIVAS CRISOL VS SIIGO */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <TarjetaComparativaPlanta
+              titulo="1. Mano de Obra Operario (Sin CW)"
+              subtituloCrisol="Operario Crisol (sin CW)"
+              subtituloSiigo="SIIGO Cuenta 72 (MO Directa)"
+              rubro={data.resumen.operario}
+            />
+            <TarjetaComparativaPlanta
+              titulo="2. Costo Máquina / CIF (Con CW)"
+              subtituloCrisol="Máquina Crisol (CW)"
+              subtituloSiigo="SIIGO Cuenta 73 (CIF / Otros)"
+              rubro={data.resumen.maquina_cw}
+            />
+            <TarjetaComparativaPlanta
+              titulo="3. Total Transformación Planta"
+              subtituloCrisol="Total Crisol (MO + CW)"
+              subtituloSiigo="Total SIIGO (Cuentas 72 + 73)"
+              rubro={data.resumen.total}
+            />
+          </div>
+
+          {/* TABLA POR ACTIVIDAD AGRUPADA */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap">
+                <thead className="text-xs text-slate-500 bg-slate-50 border-b border-slate-200 uppercase">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Actividad</th>
+                    <th className="px-4 py-3 font-semibold text-center">Tipo</th>
+                    <th className="px-4 py-3 font-semibold text-right">OPs</th>
+                    <th className="px-4 py-3 font-semibold text-right">Horas Cot.</th>
+                    <th className="px-4 py-3 font-semibold text-right">Tarifa Cot. ($/h)</th>
+                    <th className="px-4 py-3 font-semibold text-right">Horas Reales</th>
+                    <th className="px-4 py-3 font-semibold text-right">Tarifa Real Prom. ($/h)</th>
+                    <th className="px-4 py-3 font-semibold text-right">Costo Total Ejecutado ($)</th>
+                    <th className="px-4 py-3 font-semibold text-right">% del Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {data.actividades.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="px-4 py-8 text-center text-slate-400">
+                        No se encontraron registros de mano de obra directa en Crisol para {monthLabel} {year}.
+                      </td>
+                    </tr>
+                  ) : (
+                    data.actividades.map((row) => {
+                      const isMaquina = row.tipo === 'maquina_cw';
+                      return (
+                        <tr key={`${row.tipo}-${row.actividad}`} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-2.5 font-medium text-slate-800 max-w-[260px] truncate" title={row.actividad}>
+                            {row.actividad}
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                                isMaquina
+                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                  : 'bg-sky-50 text-sky-700 border border-sky-200'
+                              }`}
+                            >
+                              {isMaquina ? 'Máquina (CW)' : 'Operario'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-slate-600">{row.ops_count}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-600">
+                            {fmtHorasPlanta.format(row.horas_cotizadas)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-slate-500">
+                            {row.tarifa_cotizada_hr !== null ? fmtCOP.format(row.tarifa_cotizada_hr) : '—'}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-medium text-slate-700">
+                            {fmtHorasPlanta.format(row.horas_ejecutadas)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-slate-800">
+                            {row.tarifa_ejecutada_hr !== null ? fmtCOP.format(row.tarifa_ejecutada_hr) : '—'}
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-bold text-slate-900">
+                            {fmtCOPCierre.format(row.valor_ejecutado)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-slate-600 font-medium">
+                            {row.participacion_pct.toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+                {data.actividades.length > 0 && (
+                  <tfoot className="bg-slate-800 text-white font-bold text-xs">
+                    <tr>
+                      <td className="px-4 py-3">TOTAL MES</td>
+                      <td className="px-4 py-3 text-center text-slate-300">MO + CW</td>
+                      <td className="px-4 py-3 text-right">{data.resumen.total_ops}</td>
+                      <td className="px-4 py-3 text-right">
+                        {fmtHorasPlanta.format(data.resumen.total.horas_cotizadas)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-slate-200">
+                        {data.resumen.total.tarifa_cotizada_hr !== null
+                          ? fmtCOP.format(data.resumen.total.tarifa_cotizada_hr)
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {fmtHorasPlanta.format(data.resumen.total.horas_ejecutadas)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-amber-300">
+                        {data.resumen.total.tarifa_ejecutada_hr !== null
+                          ? fmtCOP.format(data.resumen.total.tarifa_ejecutada_hr)
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right text-emerald-300">
+                        {fmtCOPCierre.format(data.resumen.total.crisol)}
+                      </td>
+                      <td className="px-4 py-3 text-right">100.0%</td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CierreCosto() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1315,6 +1659,10 @@ export default function CierreCosto() {
 
       {/* COHERENCIA DE COSTOS (ANUAL) */}
       <CoherenciaCostos defaultYear={year} mockMonths={mockMonths} availableYears={years} />
+
+      {/* AUDITORÍA DE TARIFAS Y COSTOS DE PLANTA CRISOL VS SIIGO */}
+      <AuditoriaTarifasPlanta year={year} month={month} mockMonths={mockMonths} />
+
       <DetalleCC101 key={`cc101-${year}-${month}`} year={year} month={month} />
 
       {/* REPORTE CIERRE COSTOS SIIGO */}
