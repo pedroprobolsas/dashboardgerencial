@@ -1,5 +1,6 @@
 const express = require('express');
 const { query } = require('../dbClient');
+const asyncHandler = require('../asyncHandler');
 const router = express.Router();
 
 /**
@@ -631,5 +632,144 @@ router.get('/detalle-cc101', async (req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+/**
+ * GET /api/movimientos_materiales/auditoria-tarifas-planta
+ * Agrupa la mano de obra directa (categoria = 'mano_obra', donde Crisolweb combina
+ * operario + máquina CW) de crisolweb.costo_por_orden_detalle por actividad y la
+ * contrasta con el total SIIGO Cuentas 72 + 73.
+ */
+router.get('/auditoria-tarifas-planta', asyncHandler('/api/movimientos_materiales/auditoria-tarifas-planta', async (req, res) => {
+  const { anio, mes } = req.query;
+  if (!anio || !mes) {
+    return res.status(400).json({ ok: false, error: 'Faltan parámetros anio y mes' });
+  }
+
+  const anioNum = parseInt(anio, 10);
+  const mesNum = parseInt(mes, 10);
+  if (isNaN(anioNum) || isNaN(mesNum) || mesNum < 1 || mesNum > 12) {
+    return res.status(400).json({ ok: false, error: 'Parámetros anio o mes inválidos' });
+  }
+
+  const primerDia = `${anioNum}-${String(mesNum).padStart(2, '0')}-01`;
+  let proximoMes = mesNum + 1;
+  let proximoAnio = anioNum;
+  if (proximoMes > 12) {
+    proximoMes = 1;
+    proximoAnio += 1;
+  }
+  const primerDiaSiguiente = `${proximoAnio}-${String(proximoMes).padStart(2, '0')}-01`;
+
+  const sqlActividades = `
+    WITH ops_mes AS (
+      SELECT DISTINCT nro_op
+      FROM crisolweb.costo_por_orden
+      WHERE fecha >= $1::date AND fecha < $2::date
+    )
+    SELECT
+      TRIM(d.item) AS actividad,
+      COUNT(DISTINCT d.nro_op)::int AS ops_count,
+      ROUND(COALESCE(SUM(d.cant_cotizada), 0), 2) AS horas_cotizadas,
+      ROUND(COALESCE(SUM(d.valor_cotizado), 0), 2) AS valor_cotizado,
+      ROUND(SUM(d.valor_cotizado) / NULLIF(SUM(d.cant_cotizada), 0), 2) AS tarifa_cotizada_hr,
+      ROUND(COALESCE(SUM(d.cant_ejecutada), 0), 2) AS horas_ejecutadas,
+      ROUND(COALESCE(SUM(d.valor_ejecutado), 0), 2) AS valor_ejecutado,
+      ROUND(SUM(d.valor_ejecutado) / NULLIF(SUM(d.cant_ejecutada), 0), 2) AS tarifa_ejecutada_hr
+    FROM crisolweb.costo_por_orden_detalle d
+    JOIN ops_mes o ON d.nro_op = o.nro_op
+    WHERE d.categoria = 'mano_obra'
+    GROUP BY TRIM(d.item)
+    ORDER BY COALESCE(SUM(d.valor_ejecutado), 0) DESC, TRIM(d.item) ASC
+  `;
+
+  const sqlOpsTotales = `
+    WITH ops_mes AS (
+      SELECT DISTINCT nro_op
+      FROM crisolweb.costo_por_orden
+      WHERE fecha >= $1::date AND fecha < $2::date
+    )
+    SELECT COUNT(DISTINCT d.nro_op)::int AS total_ops
+    FROM crisolweb.costo_por_orden_detalle d
+    JOIN ops_mes o ON d.nro_op = o.nro_op
+    WHERE d.categoria = 'mano_obra'
+  `;
+
+  const sqlSiigo = `
+    SELECT costos_mano_obra_72, costos_otros_73, estado_mes
+    FROM app_ops.siigo_costos_produccion_resumen
+    WHERE anio = $1 AND mes = $2
+  `;
+
+  const [resActividades, resOpsTotales, resSiigo] = await Promise.all([
+    query(sqlActividades, [primerDia, primerDiaSiguiente]),
+    query(sqlOpsTotales, [primerDia, primerDiaSiguiente]),
+    query(sqlSiigo, [anioNum, mesNum])
+  ]);
+
+  let horasCotTotal = 0;
+  let valorCotTotal = 0;
+  let horasEjecTotal = 0;
+  let valorEjecTotal = 0;
+
+  const rawRows = resActividades.rows.map((r) => {
+    const horasCot = parseFloat(r.horas_cotizadas) || 0;
+    const valorCot = parseFloat(r.valor_cotizado) || 0;
+    const tarifaCot = r.tarifa_cotizada_hr !== null ? parseFloat(r.tarifa_cotizada_hr) : null;
+    const horasEjec = parseFloat(r.horas_ejecutadas) || 0;
+    const valorEjec = parseFloat(r.valor_ejecutado) || 0;
+    const tarifaEjec = r.tarifa_ejecutada_hr !== null ? parseFloat(r.tarifa_ejecutada_hr) : null;
+
+    horasCotTotal += horasCot;
+    valorCotTotal += valorCot;
+    horasEjecTotal += horasEjec;
+    valorEjecTotal += valorEjec;
+
+    return {
+      actividad: r.actividad || 'SIN NOMBRE',
+      ops_count: Number(r.ops_count) || 0,
+      horas_cotizadas: horasCot,
+      valor_cotizado: valorCot,
+      tarifa_cotizada_hr: tarifaCot,
+      horas_ejecutadas: horasEjec,
+      valor_ejecutado: valorEjec,
+      tarifa_ejecutada_hr: tarifaEjec
+    };
+  });
+
+  const actividades = rawRows.map((row) => ({
+    ...row,
+    participacion_pct: valorEjecTotal > 0 ? Number(((row.valor_ejecutado / valorEjecTotal) * 100).toFixed(2)) : 0
+  }));
+
+  const siigoRow = resSiigo.rows[0] || null;
+  const siigo72 = siigoRow ? parseFloat(siigoRow.costos_mano_obra_72) || 0 : 0;
+  const siigo73 = siigoRow ? parseFloat(siigoRow.costos_otros_73) || 0 : 0;
+  const siigoTotal = siigo72 + siigo73;
+  const estadoMesSiigo = siigoRow ? siigoRow.estado_mes : 'sin datos';
+
+  const diffPesos = valorEjecTotal - siigoTotal;
+  const diffPct = siigoTotal > 0 ? ((valorEjecTotal - siigoTotal) / siigoTotal) * 100 : null;
+  const totalOpsMes = resOpsTotales.rows[0] ? Number(resOpsTotales.rows[0].total_ops) || 0 : 0;
+
+  res.json({
+    ok: true,
+    resumen: {
+      estado_mes_siigo: estadoMesSiigo,
+      total_ops: totalOpsMes,
+      crisol: Number(valorEjecTotal.toFixed(2)),
+      siigo: Number(siigoTotal.toFixed(2)),
+      siigo_72: Number(siigo72.toFixed(2)),
+      siigo_73: Number(siigo73.toFixed(2)),
+      diferencia_pesos: Number(diffPesos.toFixed(2)),
+      diferencia_pct: diffPct !== null ? Number(diffPct.toFixed(2)) : null,
+      horas_cotizadas: Number(horasCotTotal.toFixed(2)),
+      valor_cotizado: Number(valorCotTotal.toFixed(2)),
+      horas_ejecutadas: Number(horasEjecTotal.toFixed(2)),
+      tarifa_cotizada_hr: horasCotTotal > 0 ? Number((valorCotTotal / horasCotTotal).toFixed(2)) : null,
+      tarifa_ejecutada_hr: horasEjecTotal > 0 ? Number((valorEjecTotal / horasEjecTotal).toFixed(2)) : null
+    },
+    actividades
+  });
+}));
 
 module.exports = router;
