@@ -8,7 +8,7 @@ const {
   cumpleReglaCierreCostos,
 } = require('../utils/xlsxBalanceParser');
 
-const CLASES_FINANZAS = ['1', '2', '4', '5', '6'];
+const CLASES_FINANZAS = ['1', '2', '4', '5', '6', '7'];
 const FUENTE_REPORTE_BALANCE = 'api_balance';
 const SCRIPT_VERSION_COSTOS = 'api-3.0';
 const VOUCHER_COSTOS_API = 'BALANCE-API';
