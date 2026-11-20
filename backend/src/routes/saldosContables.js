@@ -112,9 +112,8 @@ router.get('/detalle', asyncHandler('/api/saldos-contables/detalle', async (req,
 }));
 
 // Exportación del balance de un mes: una fila por cuenta, todas las clases cargadas.
-// Los valores salen crudos de la tabla; solo "movimiento_mes" se deriva:
-//   - Clases 5, 6 y 7: movimiento_debito (mismo valor que muestra la pantalla y costos de producción).
-//   - Resto de clases: movimiento_debito - movimiento_credito (neto crudo, sin invertir signo).
+// Todos los valores salen crudos de la tabla y "movimiento_mes" es siempre
+// movimiento_debito - movimiento_credito para que se cumpla saldo_inicial + movimiento_mes = saldo_final.
 // La fecha sale como texto para que no haya corrimiento por zona horaria.
 const SQL_EXPORT_BALANCE_MES = `
   SELECT
@@ -125,10 +124,7 @@ const SQL_EXPORT_BALANCE_MES = `
     saldo_inicial,
     movimiento_debito,
     movimiento_credito,
-    CASE
-      WHEN clase IN (5, 6, 7) THEN movimiento_debito
-      ELSE movimiento_debito - movimiento_credito
-    END AS movimiento_mes,
+    (movimiento_debito - movimiento_credito) AS movimiento_mes,
     saldo_final
   FROM app_ops.saldos_contables_siigo
   WHERE fecha >= $1::date AND fecha < ($1::date + INTERVAL '1 month')
