@@ -3,7 +3,7 @@ import { RefreshCw } from 'lucide-react';
 import { useAuth } from '../Auth/AuthContext';
 import { recargarMesSaldosSiigo, type RecargarMesSiigoResultado } from '../../services/api';
 
-const ORDEN_CLASES = ['1', '2', '4', '5', '6'] as const;
+const ORDEN_CLASES = ['1', '2', '4', '5', '6', '7'] as const;
 
 function formatearResumenClases(resumen: RecargarMesSiigoResultado): string {
   const desglose = ORDEN_CLASES

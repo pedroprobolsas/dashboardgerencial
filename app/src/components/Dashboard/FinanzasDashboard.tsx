@@ -195,7 +195,7 @@ export default function FinanzasDashboard() {
             {ultimaActualizacion ? (
               <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wide border border-emerald-200 flex items-center gap-1.5">
                 <CheckCircle2 size={12} className="text-emerald-500" />
-                Actualizado {new Date(ultimaActualizacion).toLocaleDateString('es-CO', { timeZone: 'UTC' })}
+                Actualizado {new Date(ultimaActualizacion).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })}
               </span>
             ) : (
               <span className="px-2.5 py-1 rounded-full bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-wide border border-slate-200 flex items-center gap-1.5">
