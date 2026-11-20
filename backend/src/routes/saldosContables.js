@@ -33,15 +33,25 @@ router.get('/', asyncHandler('/api/saldos-contables', async (req, res) => {
 
   sql += ` ORDER BY fecha ASC, clase ASC`;
 
+  const primerDiaMeta = anioMeta && mesMeta
+    ? `${anioMeta}-${String(mesMeta).padStart(2, '0')}-01`
+    : null;
+
   // Promesas base
   const promesas = [
     query(sql, params),
-    query(`SELECT MAX(creado_en) as max_fecha FROM app_ops.saldos_contables_siigo`)
+    primerDiaMeta
+      ? query(
+          `SELECT MIN(creado_en) as max_fecha
+           FROM app_ops.saldos_contables_siigo
+           WHERE fecha >= $1::date AND fecha < ($1::date + INTERVAL '1 month')`,
+          [primerDiaMeta]
+        )
+      : query(`SELECT MAX(creado_en) as max_fecha FROM app_ops.saldos_contables_siigo`)
   ];
 
   // Si nos piden metadata de un mes (via anio_meta/mes_meta, o anio/mes normal), agregamos las consultas
-  if (anioMeta && mesMeta) {
-    const primerDiaMeta = `${anioMeta}-${String(mesMeta).padStart(2, '0')}-01`;
+  if (primerDiaMeta) {
     promesas.push(
       query(`
         SELECT COALESCE(SUM(valor_bruto), 0) AS total_bruto
