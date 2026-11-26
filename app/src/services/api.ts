@@ -888,6 +888,13 @@ export interface CarteraCambioDoc {
   saldo: number;
 }
 
+export interface CarteraCambioCampo {
+  campo: 'saldo' | 'nit_cliente' | 'nombre_cliente' | 'vendedor' | 'fecha_vencimiento';
+  etiqueta: string;
+  antes: string | number;
+  despues: string | number;
+}
+
 export interface CarteraCambioSaldoDoc {
   tipo: 'factura' | 'anticipo';
   nro_factura: string;
@@ -896,6 +903,20 @@ export interface CarteraCambioSaldoDoc {
   fecha_factura: string | null;
   fecha_vencimiento: string | null;
   vendedor: string | null;
+  saldo_antes: number;
+  saldo_despues: number;
+  diferencia: number;
+  cambios: CarteraCambioCampo[];
+}
+
+export interface CarteraCambioListaTotales {
+  cantidad: number;
+  facturas: { cantidad: number; saldo: number };
+  anticipos: { cantidad: number; saldo: number };
+}
+
+export interface CarteraCambioGrupoTotales {
+  cantidad: number;
   saldo_antes: number;
   saldo_despues: number;
   diferencia: number;
@@ -910,13 +931,12 @@ export interface CarteraCambiosResponse {
   entraron: CarteraCambioDoc[];
   cambiaron_saldo: CarteraCambioSaldoDoc[];
   totales: {
-    salieron: { cantidad: number; saldo: number };
-    entraron: { cantidad: number; saldo: number };
+    salieron: CarteraCambioListaTotales;
+    entraron: CarteraCambioListaTotales;
     cambiaron_saldo: {
       cantidad: number;
-      saldo_antes: number;
-      saldo_despues: number;
-      diferencia: number;
+      facturas: CarteraCambioGrupoTotales;
+      anticipos: CarteraCambioGrupoTotales;
     };
   };
 }

@@ -540,6 +540,84 @@ router.get('/tendencia', asyncHandler(`${ENDPOINT}/tendencia`, async (req, res) 
   return res.json(resultado);
 }));
 
+function buildTotalesPorTipoLista(docs) {
+  const facturas = docs.filter((d) => d.tipo === 'factura');
+  const anticipos = docs.filter((d) => d.tipo === 'anticipo');
+  return {
+    cantidad: docs.length,
+    facturas: {
+      cantidad: facturas.length,
+      saldo: facturas.reduce((acc, d) => acc + d.saldo, 0),
+    },
+    anticipos: {
+      cantidad: anticipos.length,
+      saldo: anticipos.reduce((acc, d) => acc + d.saldo, 0),
+    },
+  };
+}
+
+function buildTotalesCambiaron(docs) {
+  const sumarGrupo = (grupo) => ({
+    cantidad: grupo.length,
+    saldo_antes: grupo.reduce((acc, d) => acc + d.saldo_antes, 0),
+    saldo_despues: grupo.reduce((acc, d) => acc + d.saldo_despues, 0),
+    diferencia: grupo.reduce((acc, d) => acc + d.diferencia, 0),
+  });
+  return {
+    cantidad: docs.length,
+    facturas: sumarGrupo(docs.filter((d) => d.tipo === 'factura')),
+    anticipos: sumarGrupo(docs.filter((d) => d.tipo === 'anticipo')),
+  };
+}
+
+function buildEmptyCambiosResponse(desde, hasta, mensaje) {
+  return {
+    ok: true,
+    desde,
+    hasta,
+    mensaje,
+    salieron: [],
+    entraron: [],
+    cambiaron_saldo: [],
+    totales: {
+      salieron: buildTotalesPorTipoLista([]),
+      entraron: buildTotalesPorTipoLista([]),
+      cambiaron_saldo: buildTotalesCambiaron([]),
+    },
+  };
+}
+
+function extractCambiosCampos(r, saldoAntes, saldoDespues) {
+  const cambios = [];
+  if (saldoAntes !== saldoDespues) {
+    cambios.push({
+      campo: 'saldo',
+      etiqueta: 'Saldo',
+      antes: saldoAntes,
+      despues: saldoDespues,
+    });
+  }
+  const camposTexto = [
+    { campo: 'nit_cliente', etiqueta: 'NIT', antes: r.nit_antes, despues: r.nit_despues, fallback: '—' },
+    { campo: 'nombre_cliente', etiqueta: 'Cliente', antes: r.nombre_antes, despues: r.nombre_despues, fallback: '—' },
+    { campo: 'vendedor', etiqueta: 'Asesor', antes: r.vendedor_antes, despues: r.vendedor_despues, fallback: 'SIN ASESOR' },
+    { campo: 'fecha_vencimiento', etiqueta: 'Vence', antes: r.fecha_vencimiento_antes, despues: r.fecha_vencimiento_despues, fallback: '—' },
+  ];
+  for (const cfg of camposTexto) {
+    const vAntes = cfg.antes ?? null;
+    const vDespues = cfg.despues ?? null;
+    if (vAntes !== vDespues) {
+      cambios.push({
+        campo: cfg.campo,
+        etiqueta: cfg.etiqueta,
+        antes: vAntes || cfg.fallback,
+        despues: vDespues || cfg.fallback,
+      });
+    }
+  }
+  return cambios;
+}
+
 /**
  * GET /api/cartera-clientes/cambios?desde=&hasta=
  * Compara dos fotos del histórico por (tipo, nro_factura).
@@ -574,20 +652,7 @@ router.get('/cambios', asyncHandler(`${ENDPOINT}/cambios`, async (req, res) => {
     const fechas = fechasRows.map((r) => r.fecha);
 
     if (fechas.length < 2) {
-      const vacio = {
-        ok: true,
-        desde: null,
-        hasta: fechas[0] || null,
-        mensaje: 'Se necesita al menos dos fechas para comparar',
-        salieron: [],
-        entraron: [],
-        cambiaron_saldo: [],
-        totales: {
-          salieron: { cantidad: 0, saldo: 0 },
-          entraron: { cantidad: 0, saldo: 0 },
-          cambiaron_saldo: { cantidad: 0, saldo_antes: 0, saldo_despues: 0, diferencia: 0 },
-        },
-      };
+      const vacio = buildEmptyCambiosResponse(null, fechas[0] || null, 'Se necesita al menos dos fechas para comparar');
       cache.set(cacheKey, vacio, CACHE_TTL);
       return res.json(vacio);
     }
@@ -596,20 +661,7 @@ router.get('/cambios', asyncHandler(`${ENDPOINT}/cambios`, async (req, res) => {
     if (!desde) {
       const anterior = fechas.find((f) => f < hasta);
       if (!anterior) {
-        const vacio = {
-          ok: true,
-          desde: null,
-          hasta,
-          mensaje: 'Se necesita al menos dos fechas para comparar',
-          salieron: [],
-          entraron: [],
-          cambiaron_saldo: [],
-          totales: {
-            salieron: { cantidad: 0, saldo: 0 },
-            entraron: { cantidad: 0, saldo: 0 },
-            cambiaron_saldo: { cantidad: 0, saldo_antes: 0, saldo_despues: 0, diferencia: 0 },
-          },
-        };
+        const vacio = buildEmptyCambiosResponse(null, hasta, 'Se necesita al menos dos fechas para comparar');
         cache.set(cacheKey, vacio, CACHE_TTL);
         return res.json(vacio);
       }
@@ -647,6 +699,14 @@ router.get('/cambios', asyncHandler(`${ENDPOINT}/cambios`, async (req, res) => {
       COALESCE(b.fecha_factura, a.fecha_factura) AS fecha_factura,
       COALESCE(b.fecha_vencimiento, a.fecha_vencimiento) AS fecha_vencimiento,
       COALESCE(b.vendedor, a.vendedor) AS vendedor,
+      a.nit_cliente AS nit_antes,
+      b.nit_cliente AS nit_despues,
+      a.nombre_cliente AS nombre_antes,
+      b.nombre_cliente AS nombre_despues,
+      a.vendedor AS vendedor_antes,
+      b.vendedor AS vendedor_despues,
+      a.fecha_vencimiento AS fecha_vencimiento_antes,
+      b.fecha_vencimiento AS fecha_vencimiento_despues,
       COALESCE(a.saldo, 0)::float8 AS saldo_antes,
       COALESCE(b.saldo, 0)::float8 AS saldo_despues,
       (COALESCE(b.saldo, 0) - COALESCE(a.saldo, 0))::float8 AS diferencia
@@ -655,8 +715,14 @@ router.get('/cambios', asyncHandler(`${ENDPOINT}/cambios`, async (req, res) => {
       ON a.tipo = b.tipo AND a.nro_factura = b.nro_factura
     WHERE a.nro_factura IS NULL
        OR b.nro_factura IS NULL
-       OR COALESCE(a.saldo, 0) <> COALESCE(b.saldo, 0)
-    ORDER BY ABS(COALESCE(b.saldo, 0) - COALESCE(a.saldo, 0)) DESC, nro_factura ASC
+       OR COALESCE(a.saldo, 0) IS DISTINCT FROM COALESCE(b.saldo, 0)
+       OR a.nit_cliente IS DISTINCT FROM b.nit_cliente
+       OR a.nombre_cliente IS DISTINCT FROM b.nombre_cliente
+       OR a.vendedor IS DISTINCT FROM b.vendedor
+       OR a.fecha_vencimiento IS DISTINCT FROM b.fecha_vencimiento
+    ORDER BY ABS(COALESCE(b.saldo, 0) - COALESCE(a.saldo, 0)) DESC,
+             COALESCE(b.tipo, a.tipo) ASC,
+             COALESCE(b.nro_factura, a.nro_factura) ASC
   `;
 
   const { rows } = await query(sql, [desde, hasta]);
@@ -680,11 +746,14 @@ router.get('/cambios', asyncHandler(`${ENDPOINT}/cambios`, async (req, res) => {
     } else if (r.estado_cambio === 'entro') {
       entraron.push({ ...base, saldo: Number(r.saldo_despues || 0) });
     } else {
+      const saldoAntes = Number(r.saldo_antes || 0);
+      const saldoDespues = Number(r.saldo_despues || 0);
       cambiaronSaldo.push({
         ...base,
-        saldo_antes: Number(r.saldo_antes || 0),
-        saldo_despues: Number(r.saldo_despues || 0),
+        saldo_antes: saldoAntes,
+        saldo_despues: saldoDespues,
         diferencia: Number(r.diferencia || 0),
+        cambios: extractCambiosCampos(r, saldoAntes, saldoDespues),
       });
     }
   }
@@ -698,20 +767,9 @@ router.get('/cambios', asyncHandler(`${ENDPOINT}/cambios`, async (req, res) => {
     entraron,
     cambiaron_saldo: cambiaronSaldo,
     totales: {
-      salieron: {
-        cantidad: salieron.length,
-        saldo: salieron.reduce((acc, d) => acc + d.saldo, 0),
-      },
-      entraron: {
-        cantidad: entraron.length,
-        saldo: entraron.reduce((acc, d) => acc + d.saldo, 0),
-      },
-      cambiaron_saldo: {
-        cantidad: cambiaronSaldo.length,
-        saldo_antes: cambiaronSaldo.reduce((acc, d) => acc + d.saldo_antes, 0),
-        saldo_despues: cambiaronSaldo.reduce((acc, d) => acc + d.saldo_despues, 0),
-        diferencia: cambiaronSaldo.reduce((acc, d) => acc + d.diferencia, 0),
-      },
+      salieron: buildTotalesPorTipoLista(salieron),
+      entraron: buildTotalesPorTipoLista(entraron),
+      cambiaron_saldo: buildTotalesCambiaron(cambiaronSaldo),
     },
   };
 

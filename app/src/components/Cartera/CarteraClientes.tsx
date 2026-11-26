@@ -1457,46 +1457,124 @@ export default function CarteraClientes() {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-2xl border border-emerald-200 p-5 shadow-sm">
-                    <div className="text-xs font-semibold text-emerald-700 uppercase">Documentos que salieron</div>
-                    <div className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">
-                      {fmtCOP.format(cambiosData.totales.salieron.saldo)}
+                  <div className="bg-white rounded-2xl border border-emerald-200 p-5 shadow-sm flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-emerald-700 uppercase">
+                        Documentos que salieron
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {fmtNum.format(cambiosData.totales.salieron.cantidad)} docs
+                      </span>
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">
-                      {fmtNum.format(cambiosData.totales.salieron.cantidad)} documentos
+                    <div className="flex items-center justify-between text-xs pt-1">
+                      <span className="text-slate-600">
+                        Facturas ({fmtNum.format(cambiosData.totales.salieron.facturas.cantidad)})
+                      </span>
+                      <span className="text-sm font-bold text-slate-900 tabular-nums">
+                        {fmtCOP.format(cambiosData.totales.salieron.facturas.saldo)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs border-t border-slate-100 pt-1.5">
+                      <span className="inline-flex items-center gap-1.5 text-slate-600">
+                        Anticipos ({fmtNum.format(cambiosData.totales.salieron.anticipos.cantidad)})
+                        <span className="px-1.5 py-0.2 rounded bg-teal-50 text-teal-700 border border-teal-200 text-[9px] font-semibold uppercase">
+                          anticipo
+                        </span>
+                      </span>
+                      <span className="text-sm font-bold text-teal-700 tabular-nums">
+                        {fmtCOP.format(Math.abs(cambiosData.totales.salieron.anticipos.saldo))}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl border border-indigo-200 p-5 shadow-sm">
-                    <div className="text-xs font-semibold text-indigo-700 uppercase">Documentos que entraron</div>
-                    <div className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">
-                      {fmtCOP.format(cambiosData.totales.entraron.saldo)}
+                  <div className="bg-white rounded-2xl border border-indigo-200 p-5 shadow-sm flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-indigo-700 uppercase">
+                        Documentos que entraron
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {fmtNum.format(cambiosData.totales.entraron.cantidad)} docs
+                      </span>
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">
-                      {fmtNum.format(cambiosData.totales.entraron.cantidad)} documentos
+                    <div className="flex items-center justify-between text-xs pt-1">
+                      <span className="text-slate-600">
+                        Facturas ({fmtNum.format(cambiosData.totales.entraron.facturas.cantidad)})
+                      </span>
+                      <span className="text-sm font-bold text-slate-900 tabular-nums">
+                        {fmtCOP.format(cambiosData.totales.entraron.facturas.saldo)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs border-t border-slate-100 pt-1.5">
+                      <span className="inline-flex items-center gap-1.5 text-slate-600">
+                        Anticipos ({fmtNum.format(cambiosData.totales.entraron.anticipos.cantidad)})
+                        <span className="px-1.5 py-0.2 rounded bg-teal-50 text-teal-700 border border-teal-200 text-[9px] font-semibold uppercase">
+                          anticipo
+                        </span>
+                      </span>
+                      <span className="text-sm font-bold text-teal-700 tabular-nums">
+                        {fmtCOP.format(Math.abs(cambiosData.totales.entraron.anticipos.saldo))}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl border border-amber-200 p-5 shadow-sm">
-                    <div className="text-xs font-semibold text-amber-700 uppercase">Cambiaron de saldo</div>
-                    <div className="text-2xl font-bold text-slate-900 mt-1 tabular-nums">
-                      {fmtCOP.format(cambiosData.totales.cambiaron_saldo.diferencia)}
+                  <div className="bg-white rounded-2xl border border-amber-200 p-5 shadow-sm flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-amber-700 uppercase">
+                        Cambiaron (saldo o datos)
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {fmtNum.format(cambiosData.totales.cambiaron_saldo.cantidad)} docs
+                      </span>
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">
-                      {fmtNum.format(cambiosData.totales.cambiaron_saldo.cantidad)} documentos
+                    <div className="flex items-center justify-between text-xs pt-1">
+                      <span className="text-slate-600">
+                        Facturas ({fmtNum.format(cambiosData.totales.cambiaron_saldo.facturas.cantidad)})
+                      </span>
+                      <span className="text-sm font-bold text-slate-900 tabular-nums">
+                        Dif: {fmtCOP.format(cambiosData.totales.cambiaron_saldo.facturas.diferencia)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs border-t border-slate-100 pt-1.5">
+                      <span className="inline-flex items-center gap-1.5 text-slate-600">
+                        Anticipos ({fmtNum.format(cambiosData.totales.cambiaron_saldo.anticipos.cantidad)})
+                        <span className="px-1.5 py-0.2 rounded bg-teal-50 text-teal-700 border border-teal-200 text-[9px] font-semibold uppercase">
+                          anticipo
+                        </span>
+                      </span>
+                      <span className="text-sm font-bold text-teal-700 tabular-nums">
+                        Dif:{' '}
+                        {fmtCOP.format(
+                          Math.abs(cambiosData.totales.cambiaron_saldo.anticipos.saldo_despues) -
+                            Math.abs(cambiosData.totales.cambiaron_saldo.anticipos.saldo_antes)
+                        )}
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Salieron */}
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="px-6 py-3.5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                  <div className="px-6 py-3.5 border-b border-slate-100 bg-slate-50 flex flex-wrap gap-3 justify-between items-center">
                     <h3 className="text-sm font-bold text-slate-800">
                       Salieron ({fmtNum.format(cambiosData.totales.salieron.cantidad)})
                     </h3>
-                    <span className="text-xs font-bold text-emerald-700 tabular-nums">
-                      Total: {fmtCOP.format(cambiosData.totales.salieron.saldo)}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-4 text-xs">
+                      <span className="font-semibold text-slate-700 tabular-nums">
+                        Facturas ({fmtNum.format(cambiosData.totales.salieron.facturas.cantidad)}):{' '}
+                        <strong className="text-emerald-700">
+                          {fmtCOP.format(cambiosData.totales.salieron.facturas.saldo)}
+                        </strong>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700 tabular-nums">
+                        Anticipos ({fmtNum.format(cambiosData.totales.salieron.anticipos.cantidad)}):{' '}
+                        <strong className="text-teal-700">
+                          {fmtCOP.format(Math.abs(cambiosData.totales.salieron.anticipos.saldo))}
+                        </strong>
+                        <span className="px-1.5 py-0.2 rounded bg-teal-50 text-teal-700 border border-teal-200 text-[9px] font-semibold uppercase">
+                          anticipo
+                        </span>
+                      </span>
+                    </div>
                   </div>
                   <div className="max-h-[320px] overflow-auto">
                     <table className="w-full text-left text-xs text-slate-600 whitespace-nowrap">
@@ -1538,13 +1616,27 @@ export default function CarteraClientes() {
 
                 {/* Entraron */}
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="px-6 py-3.5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                  <div className="px-6 py-3.5 border-b border-slate-100 bg-slate-50 flex flex-wrap gap-3 justify-between items-center">
                     <h3 className="text-sm font-bold text-slate-800">
                       Entraron ({fmtNum.format(cambiosData.totales.entraron.cantidad)})
                     </h3>
-                    <span className="text-xs font-bold text-indigo-700 tabular-nums">
-                      Total: {fmtCOP.format(cambiosData.totales.entraron.saldo)}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-4 text-xs">
+                      <span className="font-semibold text-slate-700 tabular-nums">
+                        Facturas ({fmtNum.format(cambiosData.totales.entraron.facturas.cantidad)}):{' '}
+                        <strong className="text-indigo-700">
+                          {fmtCOP.format(cambiosData.totales.entraron.facturas.saldo)}
+                        </strong>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700 tabular-nums">
+                        Anticipos ({fmtNum.format(cambiosData.totales.entraron.anticipos.cantidad)}):{' '}
+                        <strong className="text-teal-700">
+                          {fmtCOP.format(Math.abs(cambiosData.totales.entraron.anticipos.saldo))}
+                        </strong>
+                        <span className="px-1.5 py-0.2 rounded bg-teal-50 text-teal-700 border border-teal-200 text-[9px] font-semibold uppercase">
+                          anticipo
+                        </span>
+                      </span>
+                    </div>
                   </div>
                   <div className="max-h-[320px] overflow-auto">
                     <table className="w-full text-left text-xs text-slate-600 whitespace-nowrap">
@@ -1584,17 +1676,35 @@ export default function CarteraClientes() {
                   </div>
                 </div>
 
-                {/* Cambiaron de saldo */}
+                {/* Cambiaron (saldo o datos) */}
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="px-6 py-3.5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                  <div className="px-6 py-3.5 border-b border-slate-100 bg-slate-50 flex flex-wrap gap-3 justify-between items-center">
                     <h3 className="text-sm font-bold text-slate-800">
-                      Cambiaron de saldo ({fmtNum.format(cambiosData.totales.cambiaron_saldo.cantidad)})
+                      Cambiaron ({fmtNum.format(cambiosData.totales.cambiaron_saldo.cantidad)})
                     </h3>
-                    <span className="text-xs font-bold text-amber-700 tabular-nums">
-                      Diferencia neta: {fmtCOP.format(cambiosData.totales.cambiaron_saldo.diferencia)}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-4 text-xs">
+                      <span className="font-semibold text-slate-700 tabular-nums">
+                        Facturas ({fmtNum.format(cambiosData.totales.cambiaron_saldo.facturas.cantidad)}):{' '}
+                        <strong className="text-amber-700">
+                          Dif {fmtCOP.format(cambiosData.totales.cambiaron_saldo.facturas.diferencia)}
+                        </strong>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700 tabular-nums">
+                        Anticipos ({fmtNum.format(cambiosData.totales.cambiaron_saldo.anticipos.cantidad)}):{' '}
+                        <strong className="text-teal-700">
+                          Dif{' '}
+                          {fmtCOP.format(
+                            Math.abs(cambiosData.totales.cambiaron_saldo.anticipos.saldo_despues) -
+                              Math.abs(cambiosData.totales.cambiaron_saldo.anticipos.saldo_antes)
+                          )}
+                        </strong>
+                        <span className="px-1.5 py-0.2 rounded bg-teal-50 text-teal-700 border border-teal-200 text-[9px] font-semibold uppercase">
+                          anticipo
+                        </span>
+                      </span>
+                    </div>
                   </div>
-                  <div className="max-h-[320px] overflow-auto">
+                  <div className="max-h-[380px] overflow-auto">
                     <table className="w-full text-left text-xs text-slate-600 whitespace-nowrap">
                       <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 uppercase sticky top-0">
                         <tr>
@@ -1602,6 +1712,7 @@ export default function CarteraClientes() {
                           <th className="px-4 py-2.5">NIT</th>
                           <th className="px-4 py-2.5">Cliente</th>
                           <th className="px-4 py-2.5">Documento</th>
+                          <th className="px-4 py-2.5">Qué cambió</th>
                           <th className="px-4 py-2.5 text-right">Saldo antes</th>
                           <th className="px-4 py-2.5 text-right">Saldo después</th>
                           <th className="px-4 py-2.5 text-right">Diferencia</th>
@@ -1610,22 +1721,52 @@ export default function CarteraClientes() {
                       <tbody className="divide-y divide-slate-100">
                         {cambiosData.cambiaron_saldo.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
-                              Ningún documento cambió de saldo entre estas fechas.
+                            <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
+                              Ningún documento cambió entre estas fechas.
                             </td>
                           </tr>
                         ) : (
                           cambiosData.cambiaron_saldo.map((d) => (
-                            <tr key={`chg-${d.tipo}-${d.nro_factura}`} className="hover:bg-slate-50">
+                            <tr key={`chg-${d.tipo}-${d.nro_factura}`} className="hover:bg-slate-50 align-top">
                               <td className="px-4 py-2 uppercase font-semibold">{d.tipo}</td>
                               <td className="px-4 py-2 font-mono">{d.nit_cliente}</td>
                               <td className="px-4 py-2 font-medium text-slate-800">{d.nombre_cliente}</td>
                               <td className="px-4 py-2">{d.nro_factura}</td>
+                              <td className="px-4 py-2 whitespace-normal min-w-[240px]">
+                                <div className="flex flex-col gap-1">
+                                  {(d.cambios || []).map((c, idx) => {
+                                    const antesFmt =
+                                      c.campo === 'saldo'
+                                        ? d.tipo === 'anticipo'
+                                          ? `${fmtCOP.format(Math.abs(Number(c.antes)))} (anticipo)`
+                                          : fmtCOP.format(Number(c.antes))
+                                        : String(c.antes);
+                                    const despuesFmt =
+                                      c.campo === 'saldo'
+                                        ? d.tipo === 'anticipo'
+                                          ? `${fmtCOP.format(Math.abs(Number(c.despues)))} (anticipo)`
+                                          : fmtCOP.format(Number(c.despues))
+                                        : String(c.despues);
+                                    return (
+                                      <div key={`${c.campo}-${idx}`} className="text-[11px] leading-snug">
+                                        <span className="font-semibold text-slate-700">{c.etiqueta}:</span>{' '}
+                                        <span className="text-slate-500">{antesFmt}</span>{' '}
+                                        <span className="text-slate-400">→</span>{' '}
+                                        <span className="font-medium text-slate-900">{despuesFmt}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </td>
                               <td className="px-4 py-2 text-right">{renderMontoConAnticipo(d.tipo, d.saldo_antes)}</td>
                               <td className="px-4 py-2 text-right">{renderMontoConAnticipo(d.tipo, d.saldo_despues)}</td>
                               <td
                                 className={`px-4 py-2 text-right font-bold tabular-nums ${
-                                  d.diferencia < 0 ? 'text-emerald-700' : 'text-red-600'
+                                  d.diferencia === 0
+                                    ? 'text-slate-400'
+                                    : d.diferencia < 0
+                                    ? 'text-emerald-700'
+                                    : 'text-red-600'
                                 }`}
                               >
                                 {fmtCOP.format(d.diferencia)}
