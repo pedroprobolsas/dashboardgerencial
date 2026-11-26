@@ -17,6 +17,7 @@ export type Vista =
   | 'analisis-materiales'
   | 'cierre-costo'
   | 'finanzas-dashboard'
+  | 'cartera-clientes'
   | 'kpi-incentivos'
   | 'configuracion'
   | 'estado-datos'
@@ -53,6 +54,7 @@ export default function Sidebar({ vistaActual, onNavegar, pendientesAprobacion }
         { id: 'dashboard', etiqueta: 'Dashboard', icono: '▦' },
         { id: 'vista-diaria', etiqueta: 'Vistazo Diario', icono: '📅' },
         { id: 'finanzas-dashboard', etiqueta: 'Finanzas (Saldos)', icono: '💰' },
+        { id: 'cartera-clientes', etiqueta: 'Cartera Clientes', icono: '🏦' },
         { id: 'costo-produccion-detalle', etiqueta: 'Margen por OP', icono: '⚙️' },
         { id: 'analisis-responsables', etiqueta: 'Análisis Responsables', icono: '👥' },
         { id: 'analisis-materiales', etiqueta: 'Análisis Materiales', icono: '📦' },

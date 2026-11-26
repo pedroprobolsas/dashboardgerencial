@@ -409,7 +409,7 @@ async function kpiMargenCaja({ mesNum, anio }, metas = {}) {
 }
 
 // ── KPI: Cuentas por Cobrar por Asesor ───────────────────────────────────────
-// Snapshot de cartera_vendedor (se actualiza completa en cada sync).
+// Snapshot de cartera_clientes (se actualiza completa en cada sync).
 // Muestra total + top asesores por saldo, con desglose vencido/corriente.
 
 async function kpiCarteraPorAsesor(metas = {}) {
@@ -417,17 +417,17 @@ async function kpiCarteraPorAsesor(metas = {}) {
     const [{ rows }, { rows: maxRows }] = await Promise.all([
       query(
         `SELECT
-           COALESCE(vendedor, 'TOTAL') AS vendedor,
+           CASE WHEN GROUPING(vendedor) = 1 THEN 'TOTAL' ELSE COALESCE(vendedor, 'SIN ASESOR') END AS vendedor,
            COUNT(*)                                                             AS facturas,
            ROUND(SUM(saldo), 0)                                                AS saldo_total,
            ROUND(SUM(CASE WHEN dias_vencido > 0  THEN saldo ELSE 0 END), 0)   AS vencido,
            ROUND(SUM(CASE WHEN dias_vencido <= 0 THEN saldo ELSE 0 END), 0)   AS corriente
-         FROM crisolweb.cartera_vendedor
-         WHERE saldo > 0
+         FROM crisolweb.cartera_clientes
+         WHERE tipo = 'factura' AND saldo > 0
          GROUP BY ROLLUP(vendedor)
          ORDER BY saldo_total DESC NULLS LAST`
       ),
-      query(`SELECT MAX(_sync_fecha)::date as max_date FROM crisolweb.cartera_vendedor`)
+      query(`SELECT (MAX(_sync_fecha) AT TIME ZONE 'America/Bogota')::date as max_date FROM crisolweb.cartera_clientes`)
     ]);
 
     const maxDate = maxRows[0]?.max_date;

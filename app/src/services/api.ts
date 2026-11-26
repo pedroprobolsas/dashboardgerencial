@@ -784,3 +784,192 @@ export async function recargarMesSaldosSiigo(anio: number, mes: number): Promise
   }
   return payload.data as RecargarMesSiigoResultado;
 }
+
+// ── Cartera Clientes ──────────────────────────────────────────────────────────
+
+export interface CarteraFechasResponse {
+  ok: boolean;
+  fecha_actual: string | null;
+  fechas: string[];
+}
+
+export interface CarteraAntiguedadItem {
+  rango: string;
+  key: string;
+  cantidad: number;
+  saldo: number;
+}
+
+export interface CarteraAsesorItem {
+  asesor: string;
+  facturas: number;
+  saldo: number;
+  vencido: number;
+  pct_vencido: number;
+  saldo_mas_30: number;
+}
+
+export interface CarteraResumenResponse {
+  ok: boolean;
+  fecha_foto: string | null;
+  sync_fecha: string | null;
+  hora_foto: string | null;
+  desactualizado: boolean;
+  es_historico: boolean;
+  totales: {
+    facturas_cantidad: number;
+    facturas_saldo: number;
+    vencido: number;
+    vencido_cantidad: number;
+    vence_hoy: number;
+    vence_hoy_cantidad: number;
+    por_vencer: number;
+    por_vencer_cantidad: number;
+    anticipos_cantidad: number;
+    anticipos_saldo: number;
+    neto: number;
+  };
+  antiguedad_facturas: CarteraAntiguedadItem[];
+  antiguedad_anticipos: CarteraAntiguedadItem[];
+  por_asesor: CarteraAsesorItem[];
+  siigo: {
+    fecha_siigo: string | null;
+    clientes_1305: number;
+    anticipos_2805: number;
+    diferencia_facturas: number;
+    diferencia_anticipos: number;
+  };
+}
+
+export interface CarteraClienteItem {
+  nit_cliente: string;
+  nombre_cliente: string;
+  facturas_cantidad: number;
+  facturas_saldo: number;
+  vencido: number;
+  mora_maxima: number | null;
+  anticipos_cantidad: number;
+  anticipos_saldo: number;
+  neto: number;
+  cruce_pendiente: boolean;
+}
+
+export interface CarteraDocumentoItem {
+  tipo: 'factura' | 'anticipo';
+  nit_cliente: string;
+  nombre_cliente: string;
+  nro_factura: string;
+  fecha_factura: string | null;
+  fecha_vencimiento: string | null;
+  dias_vencido: number;
+  antiguedad_dias: number;
+  valor_total: number;
+  saldo: number;
+  vendedor: string | null;
+}
+
+export interface CarteraTendenciaItem {
+  fecha: string;
+  facturas_saldo: number;
+  vencido: number;
+  anticipos_saldo: number;
+  neto: number;
+  documentos: number;
+}
+
+export interface CarteraCambioDoc {
+  tipo: 'factura' | 'anticipo';
+  nro_factura: string;
+  nit_cliente: string;
+  nombre_cliente: string;
+  fecha_factura: string | null;
+  fecha_vencimiento: string | null;
+  vendedor: string | null;
+  saldo: number;
+}
+
+export interface CarteraCambioSaldoDoc {
+  tipo: 'factura' | 'anticipo';
+  nro_factura: string;
+  nit_cliente: string;
+  nombre_cliente: string;
+  fecha_factura: string | null;
+  fecha_vencimiento: string | null;
+  vendedor: string | null;
+  saldo_antes: number;
+  saldo_despues: number;
+  diferencia: number;
+}
+
+export interface CarteraCambiosResponse {
+  ok: boolean;
+  desde: string | null;
+  hasta: string | null;
+  mensaje: string | null;
+  salieron: CarteraCambioDoc[];
+  entraron: CarteraCambioDoc[];
+  cambiaron_saldo: CarteraCambioSaldoDoc[];
+  totales: {
+    salieron: { cantidad: number; saldo: number };
+    entraron: { cantidad: number; saldo: number };
+    cambiaron_saldo: {
+      cantidad: number;
+      saldo_antes: number;
+      saldo_despues: number;
+      diferencia: number;
+    };
+  };
+}
+
+export async function fetchCarteraFechas(): Promise<CarteraFechasResponse> {
+  const res = await fetch('/api/cartera-clientes/fechas');
+  checkAuthError(res);
+  if (!res.ok) throw new Error(`Error ${res.status} al cargar fechas de cartera`);
+  return res.json();
+}
+
+export async function fetchCarteraResumen(fecha?: string): Promise<CarteraResumenResponse> {
+  const qs = fecha ? `?fecha=${encodeURIComponent(fecha)}` : '';
+  const res = await fetch(`/api/cartera-clientes/resumen${qs}`);
+  checkAuthError(res);
+  if (!res.ok) throw new Error(`Error ${res.status} al cargar resumen de cartera`);
+  return res.json();
+}
+
+export async function fetchCarteraClientes(fecha?: string): Promise<{ ok: boolean; fecha_foto: string | null; clientes: CarteraClienteItem[] }> {
+  const qs = fecha ? `?fecha=${encodeURIComponent(fecha)}` : '';
+  const res = await fetch(`/api/cartera-clientes/clientes${qs}`);
+  checkAuthError(res);
+  if (!res.ok) throw new Error(`Error ${res.status} al cargar clientes de cartera`);
+  return res.json();
+}
+
+export async function fetchCarteraDocumentos(fecha?: string): Promise<{ ok: boolean; fecha_foto: string | null; documentos: CarteraDocumentoItem[] }> {
+  const qs = fecha ? `?fecha=${encodeURIComponent(fecha)}` : '';
+  const res = await fetch(`/api/cartera-clientes/documentos${qs}`);
+  checkAuthError(res);
+  if (!res.ok) throw new Error(`Error ${res.status} al cargar documentos de cartera`);
+  return res.json();
+}
+
+export async function fetchCarteraTendencia(desde?: string, hasta?: string): Promise<{ ok: boolean; serie: CarteraTendenciaItem[] }> {
+  const params = new URLSearchParams();
+  if (desde) params.append('desde', desde);
+  if (hasta) params.append('hasta', hasta);
+  const qs = params.toString();
+  const res = await fetch(qs ? `/api/cartera-clientes/tendencia?${qs}` : '/api/cartera-clientes/tendencia');
+  checkAuthError(res);
+  if (!res.ok) throw new Error(`Error ${res.status} al cargar tendencia de cartera`);
+  return res.json();
+}
+
+export async function fetchCarteraCambios(desde?: string, hasta?: string): Promise<CarteraCambiosResponse> {
+  const params = new URLSearchParams();
+  if (desde) params.append('desde', desde);
+  if (hasta) params.append('hasta', hasta);
+  const qs = params.toString();
+  const res = await fetch(qs ? `/api/cartera-clientes/cambios?${qs}` : '/api/cartera-clientes/cambios');
+  checkAuthError(res);
+  if (!res.ok) throw new Error(`Error ${res.status} al cargar cambios de cartera`);
+  return res.json();
+}
