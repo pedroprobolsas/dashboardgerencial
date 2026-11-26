@@ -31,6 +31,7 @@ const movimientosMaterialesRouter = require('./routes/movimientosMateriales');
 const kpiIncentivosRouter  = require('./routes/kpiIncentivos');
 const saldosContablesRouter = require('./routes/saldosContables');
 const dataStatusRouter     = require('./routes/dataStatus');
+const carteraClientesRouter = require('./routes/carteraClientes');
 
 const { query } = require('./dbClient');
 // Seed initial ratio parameter if missing
@@ -85,6 +86,12 @@ const ENDPOINTS_REGISTRADOS = [
   'GET  /api/saldos-contables',
   'GET  /api/saldos-contables/export',
   'POST /api/saldos-contables/recargar-mes',
+  'GET  /api/cartera-clientes/fechas',
+  'GET  /api/cartera-clientes/resumen',
+  'GET  /api/cartera-clientes/clientes',
+  'GET  /api/cartera-clientes/documentos',
+  'GET  /api/cartera-clientes/tendencia',
+  'GET  /api/cartera-clientes/cambios',
 ];
 
 app.get('/api/health', async (_req, res) => {
@@ -195,6 +202,7 @@ app.use('/api/usuarios',          usuariosRouter);
 app.use('/api/kpi-incentivos',    kpiIncentivosRouter);
 app.use('/api/saldos-contables',  saldosContablesRouter);
 app.use('/api/data-status',       dataStatusRouter);
+app.use('/api/cartera-clientes',  carteraClientesRouter);
 
 // ── Error handler global ──────────────────────────────────────────────────────
 

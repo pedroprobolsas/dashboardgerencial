@@ -17,7 +17,7 @@ const ENDPOINT = '/api/cartera_por_asesor';
  * Query params:
  *   fecha_corte – ISO date (YYYY-MM-DD). Informativo (la tabla es snapshot).
  *
- * Nota: crisolweb.cartera_vendedor es un snapshot que se actualiza en cada
+ * Nota: crisolweb.cartera_clientes es un snapshot que se actualiza en cada
  * sincronización. No tiene columna de fecha, así que fecha_corte es solo
  * para contexto en la respuesta.
  */
@@ -43,12 +43,12 @@ router.get('/', asyncHandler(ENDPOINT, async (req, res) => {
          ROUND(SUM(saldo), 0)             AS saldo_total,
          ROUND(SUM(CASE WHEN dias_vencido > 0  THEN saldo ELSE 0 END), 0) AS vencido,
          ROUND(SUM(CASE WHEN dias_vencido <= 0 THEN saldo ELSE 0 END), 0) AS corriente
-       FROM crisolweb.cartera_vendedor
-       WHERE saldo > 0
+       FROM crisolweb.cartera_clientes
+       WHERE tipo = 'factura' AND saldo > 0
        GROUP BY vendedor
        ORDER BY saldo_total DESC`
     ),
-    query(`SELECT MAX(_sync_fecha)::date as max_date FROM crisolweb.cartera_vendedor`)
+    query(`SELECT (MAX(_sync_fecha) AT TIME ZONE 'America/Bogota')::date as max_date FROM crisolweb.cartera_clientes`)
   ]);
 
   // ── Calcular totales ──────────────────────────────────────────────────
